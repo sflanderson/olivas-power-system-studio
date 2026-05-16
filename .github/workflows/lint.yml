@@ -50,8 +50,9 @@ jobs:
       - name: Install minimal deps (sem PySide6)
         run: |
           python -m pip install --upgrade pip
-          # Apenas cores: numpy, sem Qt
-          pip install numpy
+          # Cores sem Qt: numpy + pydantic + PyYAML (necessários
+          # pelos schemas .ocomp e node_coalescer)
+          pip install numpy pydantic PyYAML
       - name: Smoke import (preprocessor + standards)
         run: |
           python -c "import app.standards.iec60909"
