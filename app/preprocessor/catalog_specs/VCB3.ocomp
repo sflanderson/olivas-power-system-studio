@@ -1,0 +1,211 @@
+# VCB 3φ — Disjuntor a vácuo trifásico com modelo estatístico de reignição.
+# 3 pólos com T_open/T_close independentes por fase + reignição comum.
+
+schema_version: "1.0"
+code: VCB3
+label_pt: Disjuntor a vácuo (VCB) 3φ
+label_en: Vacuum Circuit Breaker 3-phase
+description: |
+  Disjuntor a vácuo trifásico. Três câmaras de vácuo independentes
+  com T_open/T_close ajustáveis por fase (útil para estudar
+  "pole-discrepancy" — abertura não-simultânea que causa TRV mais severo).
+  Parâmetros de reignição são compartilhados entre os 3 pólos (mesma
+  família de câmara).
+
+  A partir de v0.22.1, quando qualquer parâmetro de reignição é
+  customizado, o bridge emite 3 blocos USE (um por fase A/B/C) no
+  cabeçalho /MODELS — T_open por fase permite estudar pole-
+  discrepancy com reignição estatística em cada câmara. Se todos
+  os parâmetros ficam nos defaults CIGRE, apenas 3 chaves TYPE-13
+  simples são emitidas.
+
+  Wiring TACS é MANUAL em v0.22.1; automação em v0.22.2.
+
+category: switch
+atp_supported: true
+
+symbol:
+  size: [80, 80]
+  bounding_box: [-40, -40, 80, 80]
+  renderer: VCB3PhaseSymbol
+
+pins:
+  - name: A_in
+    label: Fase A - entrada
+    position: [-40, -30]
+    phase: A
+  - name: A_out
+    label: Fase A - saída
+    position: [40, -30]
+    phase: A
+  - name: B_in
+    label: Fase B - entrada
+    position: [-40, 0]
+    phase: B
+  - name: B_out
+    label: Fase B - saída
+    position: [40, 0]
+    phase: B
+  - name: C_in
+    label: Fase C - entrada
+    position: [-40, 30]
+    phase: C
+  - name: C_out
+    label: Fase C - saída
+    position: [40, 30]
+    phase: C
+
+properties:
+  - name: T_open_A
+    label: T_open A
+    unit: s
+    type: float
+    default: 0.05
+    visible: true
+    group: timing
+    phase: A
+    min: 0.0
+    description: Tempo de abertura do pólo A
+  - name: T_close_A
+    label: T_close A
+    unit: s
+    type: float
+    default: 1.0e9
+    visible: true
+    group: timing
+    phase: A
+    description: Tempo de fechamento do pólo A (1e9 = mantém aberto)
+  - name: T_open_B
+    label: T_open B
+    unit: s
+    type: float
+    default: 0.05
+    visible: true
+    group: timing
+    phase: B
+    min: 0.0
+  - name: T_close_B
+    label: T_close B
+    unit: s
+    type: float
+    default: 1.0e9
+    visible: true
+    group: timing
+    phase: B
+  - name: T_open_C
+    label: T_open C
+    unit: s
+    type: float
+    default: 0.05
+    visible: true
+    group: timing
+    phase: C
+    min: 0.0
+  - name: T_close_C
+    label: T_close C
+    unit: s
+    type: float
+    default: 1.0e9
+    visible: true
+    group: timing
+    phase: C
+  - name: I_chop
+    label: I_chop
+    unit: A
+    type: float
+    default: 5.0
+    visible: true
+    group: reignition
+    min: 0.0
+    description: Corrente média de chopping (comum aos 3 pólos)
+  - name: sigma_I_chop
+    label: σ(I_chop)
+    unit: A
+    type: float
+    default: 1.0
+    visible: false
+    group: reignition
+    min: 0.0
+  - name: didt_crit
+    label: di/dt_crit
+    unit: A/µs
+    type: float
+    default: 16.0
+    visible: true
+    group: reignition
+    min: 0.0
+  - name: didt_sigma
+    label: d(di/dt)
+    unit: A/µs²
+    type: float
+    default: 0.034
+    visible: false
+    group: reignition
+  - name: k_dielec
+    label: k_dielec
+    unit: V/µs
+    type: float
+    default: 17.0
+    visible: true
+    group: reignition
+    min: 0.0
+  - name: U0_dielec
+    label: U0_dielec
+    unit: V
+    type: float
+    default: 690.0
+    visible: false
+    group: reignition
+  - name: T_bounce
+    label: T_bounce
+    unit: s
+    type: float
+    default: 5.0e-4
+    visible: false
+    group: reignition
+    min: 0.0
+  - name: Seed
+    label: Seed
+    type: int
+    default: 1
+    visible: false
+    group: reignition
+    description: Semente RNG (varie em Monte Carlo)
+
+atp_emission:
+  kind: multi_switch
+  count: 3
+  branches:
+    - phase: A
+      pins: [A_in, A_out]
+      property_mapping:
+        t_open: T_open_A
+        t_close: T_close_A
+    - phase: B
+      pins: [B_in, B_out]
+      property_mapping:
+        t_open: T_open_B
+        t_close: T_close_B
+    - phase: C
+      pins: [C_in, C_out]
+      property_mapping:
+        t_open: T_open_C
+        t_close: T_close_C
+
+llm_hints:
+  typical_applications:
+    - Pole-discrepancy study (abertura não-simultânea das 3 fases)
+    - TRV severo em desconexão de reator shunt
+    - Reignições múltiplas em motores de indução (worst case 3φ)
+    - Sincronismo de fechamento (point-on-wave)
+  references:
+    - "CIGRE WG A3.26, Technical Brochure 570, 2014"
+    - "IEC 62271-100 — High-voltage circuit-breakers"
+    - "IEEE Std C37.011 — Application Guide for TRV"
+  common_mistakes:
+    - Mesmo T_open nos 3 pólos ignora dispersão mecânica real (~1 ms típico)
+    - Alterar I_chop em só 1 pólo fisicamente inconsistente — é parâmetro de câmara
+    - Seed idêntica entre pólos dá realização correlacionada (não independente)
+  alternatives:
+    - 3× VCB — mesmo resultado mas sem agrupamento visual
+    - SwIdeal trifásico — sem reignição, ideal para estudo didático

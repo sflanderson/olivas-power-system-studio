@@ -1,0 +1,55 @@
+# Chave controlada por sinal TACS/MODELS.
+
+schema_version: "1.0"
+code: SwTACS
+label_pt: Chave controlada por TACS
+label_en: TACS-controlled switch
+description: |
+  Chave que abre/fecha com base num sinal lógico TACS ou MODELS
+  (1=fechada, 0=aberta). Emissão ATP: TYPE-11 com gate lógico.
+  Permite implementar lógicas de controle arbitrárias via bloco
+  TACS ou MODEL externo.
+
+category: switch
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: SwitchIdealSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties:
+  - name: trigger_signal
+    label: Sinal de trigger (TACS/MODEL)
+    type: string
+    default: "trigger"
+    visible: true
+    group: main
+    description: Nome do sinal TACS/MODEL que controla o estado
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Chaveamento PWM controlado
+    - Proteção com lógica customizada
+    - Simulação de sistemas de controle complexos
+  references:
+    - "ATP Rule Book, Section V (TACS)"
+    - "ATP Rule Book, Section VI (MODELS)"
+  common_mistakes:
+    - Sinal TACS inexistente (trigger_signal não declarado)
+    - Confundir com SwIdeal (time-controlled)
+  alternatives:
+    - SwIdeal — controle por tempo
+    - VCB — disjuntor a vácuo (comportamento físico próprio)

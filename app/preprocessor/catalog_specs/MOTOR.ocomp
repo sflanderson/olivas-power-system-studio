@@ -1,0 +1,138 @@
+# MOTOR — motor elétrico (IM/MS) com contribuição de SC.
+
+schema_version: "1.0"
+code: MOTOR
+label_pt: Motor (IM/MS)
+label_en: Motor (Induction/Synchronous)
+description: |
+  Motor elétrico (indução ou síncrono) com modelagem da
+  contribuição de SC conforme IEC 60909-0 §6.5 e NBR 17227
+  §4.2.2.
+
+  Em ambientes industriais, motores são fontes secundárias de
+  SC durante 3-8 ciclos (50-130 ms). Para arc-flash com clearing
+  rápido (50-100 ms), a contribuição é significativa.
+
+  Modelagem:
+  - X''_M = (1 / I_LR_rel) · V² / S
+  - Decay exponencial com τ = 20 ms (IM) ou 200 ms (MS).
+  - Contribuição máxima = locked rotor current.
+
+  Para simulação transitória completa de motor, considere usar
+  SM (síncrono) com P0 < 0 ou aguardar UM (Universal Machine,
+  v0.28.x). Este componente é otimizado para análise de SC.
+
+category: machine
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: MotorSymbol
+
+pins:
+  - name: A
+    label: Terminal A
+    position: [30, -20]
+  - name: B
+    label: Terminal B
+    position: [30, 0]
+  - name: C
+    label: Terminal C
+    position: [30, 20]
+
+properties:
+  - name: motor_type
+    label: Tipo (induction / synchronous)
+    type: string
+    default: "induction"
+    visible: true
+    group: main
+
+  - name: rated_voltage_kV
+    label: V_LL nominal (kV)
+    type: float
+    default: "0.480"
+    visible: true
+    group: main
+
+  - name: rated_power_kW
+    label: Potência (kW)
+    type: float
+    default: "100"
+    visible: true
+    group: main
+
+  - name: rated_pf
+    label: Fator de potência
+    type: float
+    default: "0.85"
+    visible: true
+    group: electrical
+
+  - name: efficiency
+    label: Rendimento (η)
+    type: float
+    default: "0.95"
+    visible: true
+    group: electrical
+
+  - name: locked_rotor_current_pu
+    label: I_LR / I_rM (pu)
+    type: float
+    default: "6.0"
+    visible: true
+    group: electrical
+    description: |
+      Razão de corrente de rotor bloqueado. NEMA Design B = 6,
+      Design D = até 12. Verificar datasheet.
+
+  - name: starting_pf
+    label: cos(φ) na partida
+    type: float
+    default: "0.30"
+    visible: false
+    group: electrical
+
+  - name: n_poles
+    label: Número de polos
+    type: float
+    default: "4"
+    visible: false
+    group: electrical
+
+  - name: Td_pp_ms
+    label: Td'' (ms)
+    type: float
+    default: "20"
+    visible: false
+    group: advanced
+    description: |
+      Constante de tempo subtransitória. Default 20 ms para IM
+      pequeno; usar 100 ms para IM grande, 200 ms+ para MS.
+
+atp_emission:
+  kind: custom
+  count: 1
+  custom_emitter: motor.emit_motor_metadata_lines
+
+llm_hints:
+  typical_applications:
+    - Estudo de SC em planta industrial (NBR 17227 §4.2.2)
+    - Avaliação de contribuição de motores em arc-flash
+    - Coordenação 51 e 51LR (locked rotor)
+    - Cálculo de pickup mínimo do feeder do motor (1.25 × I_LR)
+  references:
+    - "IEC 60909-0:2016 §6.5 — Asynchronous motors"
+    - "ABNT NBR 17227:2025 §4.2.2 — Inclusão de motores"
+    - "IEEE 242-2001 (Buff Book) §15 — motor contribution"
+    - "IEEE C37.96-2012 — motor protection"
+    - "NEMA MG-1 — Motors and Generators"
+  common_mistakes:
+    - "Esquecer motores em arc-flash com clearing < 100 ms"
+    - "Usar I_LR_rel = 6 sem verificar datasheet (pode ser 12)"
+    - "Não considerar decay temporal (3-8 ciclos NBR 17227)"
+    - "Confundir P_eixo (kW) com S_aparente (kVA)"
+  alternatives:
+    - "SM — máquina síncrona com P0 < 0 (motor síncrono completo)"
+    - "Vac + R + L — modelo simplificado para SC apenas"

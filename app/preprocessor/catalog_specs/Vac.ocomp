@@ -1,0 +1,83 @@
+# Fonte de tensão AC senoidal — impõe V(t) = A*cos(2πf t + φ - δ) entre terminais.
+
+schema_version: "1.0"
+code: Vac
+label_pt: Fonte de tensão AC
+label_en: AC voltage source
+description: |
+  Fonte de tensão AC senoidal ideal. Gera um cartão TYPE-14
+  (senoide cossenoidal) no arquivo ATP. Pode ser usada 1 ou 3 instâncias
+  defasadas em 120° para formar um sistema trifásico (futuramente será
+  substituída pela fonte 3φ nativa em v0.22.0).
+
+category: source
+atp_supported: true
+
+symbol:
+  size: [40, 60]
+  bounding_box: [-20, -30, 40, 60]
+  renderer: VacSymbol
+
+pins:
+  - name: plus
+    label: Terminal (+)
+    position: [0, -30]
+  - name: minus
+    label: Terminal (-)
+    position: [0, 30]
+
+properties:
+  - name: amplitude
+    label: Amplitude (pico)
+    unit: V
+    type: float
+    default: 220.0
+    visible: true
+    group: main
+    description: Valor de pico (não RMS) em Volts
+    example: 311.13
+  - name: frequency
+    label: Frequência
+    unit: Hz
+    type: float
+    default: 60.0
+    visible: true
+    group: main
+    min: 0.0
+    description: Frequência nominal
+    example: 60
+  - name: phase
+    label: Fase
+    unit: "°"
+    type: float
+    default: 0.0
+    visible: false
+    group: main
+    description: Deslocamento de fase em graus
+  - name: delay
+    label: Delay
+    unit: s
+    type: float
+    default: 0.0
+    visible: false
+    group: timing
+    min: 0.0
+    description: Atraso antes da fonte ligar (fica em 0 V antes de t=delay)
+
+atp_emission:
+  kind: source_ac
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Fonte trifásica simétrica (3× Vac com phase = 0/-120/+120)
+    - Estudos de regime permanente e energização
+    - Forma de onda de teste para filtros
+  references:
+    - "ATP Rule Book, Section I.C (TYPE-14)"
+  common_mistakes:
+    - Usar amplitude RMS em vez de pico — ATP espera pico
+    - Frequência 50 vs 60 Hz — verificar o sistema em estudo
+    - Defasagem com sinal trocado (CCW vs CW) é erro comum
+  alternatives:
+    - ACSource 3φ nativa (v0.22.0+) — elimina triplicação manual

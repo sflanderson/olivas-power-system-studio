@@ -1,0 +1,50 @@
+# Amperímetro (probe de corrente) — sonda inserida em série.
+
+schema_version: "1.0"
+code: IProbe
+label_pt: Amperímetro (probe)
+label_en: Current probe
+description: |
+  Sonda de corrente ideal — inserida EM SÉRIE no ramo. Impedância
+  zero (não altera o circuito). Expõe a corrente como variável de
+  saída na simulação.
+
+  No ATP corresponde a uma MEASURING switch em /SWITCH: TYPE-0
+  com t_close=-1, t_open=1000. A corrente do "ramo" criado pelo
+  switch é registrada no .pl4.
+
+category: meter
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: IProbeSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties: []
+
+atp_emission:
+  kind: probe_i
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Medir I em ramo durante simulação transitória
+    - Monitorar corrente de falta / curto-circuito
+    - Medir corrente de inrush
+    - Verificar convergência KCL em debugging
+  references:
+    - "ATP Rule Book, Section I.E (TYPE-0 measuring switch)"
+  common_mistakes:
+    - Inserir probe em paralelo (curto-circuita o ramo)
+    - Esquecer a direção da medição (convenção de sinal)
+  alternatives:
+    - VProbe — sonda de tensão (não-intrusiva)

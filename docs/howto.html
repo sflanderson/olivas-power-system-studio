@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Olivas ATP Studio — Como executar um estudo?</title>
+<style>
+body {
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  margin: 0; padding: 24px;
+  background-color: #EFF0E8; color: #2A2D24;
+  max-width: 900px; margin: 0 auto;
+}
+.container {
+  background: #FAFAF5; padding: 40px;
+  border: 1px solid #B5D4A8; border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(85,107,47,0.08);
+}
+h1 { color: #556B2F; border-bottom: 3px solid #6B8E23;
+     padding-bottom: 8px; }
+h2 { color: #556B2F; border-bottom: 1px solid #B5D4A8;
+     padding-bottom: 4px; margin-top: 32px; }
+h3 { color: #6B8E23; margin-top: 24px; }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+th, td { border: 1px solid #B5D4A8; padding: 10px 14px;
+         text-align: left; }
+th { background-color: #556B2F; color: #FAFAF5; }
+tr:nth-child(even) { background-color: #EFF0E8; }
+code { background: #1c1f1a; color: #BFFF00;
+       padding: 2px 6px; border-radius: 3px;
+       font-family: 'Consolas', monospace; }
+.tag { display: inline-block; padding: 3px 10px; border-radius: 12px;
+       background-color: #B5D4A8; font-size: 11px;
+       color: #556B2F; margin-right: 4px; font-weight: 500; }
+ul { line-height: 1.7; }
+.hero {
+  display: flex; align-items: center; gap: 24px;
+  padding-bottom: 24px; margin-bottom: 24px;
+  border-bottom: 3px solid #556B2F;
+}
+.hero img { width: 96px; height: 96px; flex-shrink: 0; }
+.hero h1 { border: none; padding: 0; margin: 0 0 4px 0; }
+.hero .tagline { color: #6B8E23; font-style: italic; margin: 0; }
+.callout {
+  padding: 12px 16px; border-radius: 4px;
+  background: #FEF7E0; border-left: 4px solid #D4AF37;
+  margin: 16px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="hero">
+  <img src="../app/resources/logo.png" alt="Olivas ATP Studio" />
+  <div>
+    <h1>Como executar um estudo?</h1>
+    <p class="tagline">Olivas ATP Studio — ATP Power System Simulation</p>
+  </div>
+</div>
+
+<p>
+  Olivas ATP Studio oferece três caminhos de execução. Este
+  guia também é acessível em qualquer momento via tecla
+  <code>F1</code> ou <strong>Ajuda → Como executar?</strong>
+</p>
+
+<h2>1. ▶ Simulação ATP (transitórios eletromagnéticos)</h2>
+
+<p>Para rodar simulação no solver ATP/EMTP:</p>
+
+<ul>
+  <li>Caso o esquemático esteja no <strong>Esquemático Visual</strong>,
+      clique em <strong>Exportar ATP</strong> primeiro.</li>
+  <li>Configure o caminho do solver:
+      <strong>Simulação → Configurar caminho ATP</strong>.</li>
+  <li>Clique no botão ▶ azul na toolbar superior, ou
+      <strong>Simulação → Executar ATP</strong>.</li>
+  <li>Saída: arquivos <code>.pl4</code>, <code>.lis</code> em
+      <code>runs/</code>.</li>
+</ul>
+
+<div class="callout">
+  <strong>Pré-requisito:</strong> ATP/EMTP solver instalado
+  (não distribuído com o ATP Studio — licença BPA). Use
+  <code>tpgigg32.exe</code> para casos grandes.
+</div>
+
+<h2>2. ▶ Executar Análise (estudos profissionais)</h2>
+
+<p>
+  No <strong>Esquemático Visual</strong>, clique no botão verde
+  <strong>▶ Executar Análise</strong> da toolbar (ou menu
+  <strong>Análise</strong>).
+</p>
+
+<table>
+<tr>
+  <th>Análise</th>
+  <th>Pré-requisitos</th>
+  <th>Norma</th>
+</tr>
+<tr>
+  <td><strong>Estudo completo do barramento</strong></td>
+  <td>BUS no esquemático</td>
+  <td>IEC 60909 + IEEE 1584 + NBR 17227</td>
+</tr>
+<tr>
+  <td>Curto-circuito</td>
+  <td>BUS no esquemático</td>
+  <td>IEC 60909-0:2016</td>
+</tr>
+<tr>
+  <td>Fluxo de potência</td>
+  <td>Topologia + Slack/PV/PQ</td>
+  <td>Newton-Raphson</td>
+</tr>
+<tr>
+  <td>Partida de motor</td>
+  <td>BUS + MOTOR</td>
+  <td>IEEE 399 §10</td>
+</tr>
+<tr>
+  <td>Arc-flash</td>
+  <td>BUS configurado</td>
+  <td>NBR 17227 / IEEE 1584</td>
+</tr>
+</table>
+
+<h2>3. 📚 Exemplos das normas</h2>
+
+<p>
+  Menu <strong>Exemplos</strong> oferece 6 worked examples com
+  esquemáticos pré-preenchidos:
+</p>
+
+<ul>
+  <li>Stevenson §9 — Power Flow 3-bus</li>
+  <li>Stevenson §11 — Faltas Assimétricas</li>
+  <li>IEC 60909 Annex C — SC com transformador</li>
+  <li>IEEE 1584 D.4 — Arc-flash 480V VCB</li>
+  <li>IEEE 399 §10 — Partida Motor 1500 kW</li>
+  <li>NBR 17227 — Switchgear 13.8 kV</li>
+</ul>
+
+<p>
+  Cada exemplo carrega o <strong>esquemático .sch</strong> no
+  editor visual + executa o cálculo + exibe relatório
+  expected vs computed.
+</p>
+
+<h2>O que é "BUS"?</h2>
+
+<p>
+  O <strong>componente BUS</strong> representa um barramento
+  elétrico com metadata específica para arc-flash + coordenação:
+</p>
+
+<ul>
+  <li><strong>V_LL</strong> (kV) — tensão linha-linha</li>
+  <li><strong>panel_type</strong> — CCM, switchgear, LV panel</li>
+  <li><strong>is_lineside</strong> — vs loadside</li>
+  <li><strong>has_AFD</strong> — Arc Fault Detection</li>
+  <li><strong>n_taps</strong> — número de feeders</li>
+</ul>
+
+<p>
+  Adicione via <strong>Paleta → BUS</strong>, ou nos exemplos
+  das normas que já o trazem configurado.
+</p>
+
+<h2>Configurar API Claude</h2>
+
+<p>
+  Para habilitar o assistente Claude no editor visual e no
+  chat global:
+</p>
+
+<ul>
+  <li><strong>Simulação → Configurar API Key Claude...</strong></li>
+  <li>Cole sua chave (<code>sk-ant-...</code>) e teste.</li>
+  <li>Persistente via QSettings.</li>
+</ul>
+
+<hr style="margin-top: 40px; border: none; border-top: 2px solid #556B2F;">
+<p style="text-align: center; color: #5C4D3C; font-size: 11px;
+          margin-top: 16px;">
+  <img src="../app/resources/logo.png"
+       style="height: 28px; vertical-align: middle; margin-right: 8px;" />
+  <strong style="color: #556B2F;">Olivas ATP Studio</strong>
+  — ATP Power System Simulation —
+  <span style="color: #7E2BA8;">Doutorado UFMG</span>
+</p>
+
+</div>
+</body>
+</html>

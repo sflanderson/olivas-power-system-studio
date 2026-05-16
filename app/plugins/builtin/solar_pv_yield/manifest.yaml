@@ -1,0 +1,23 @@
+schema_version: "1.0"
+name: solar_pv_yield
+display_name: Solar PV Yield Calculator
+version: "1.0.0"
+author: Olivas Team
+license: MIT
+description: |
+  Calcula yield anual (kWh) de sistema fotovoltaico baseado em
+  irradiação solar local (NSRDB) e parâmetros do painel.
+  Implementa o método NREL Sandia para o Brasil (radiação típica
+  1500-2200 kWh/m²·ano).
+
+min_olivas_version: "1.5.0"
+category: study
+entry_point: plugin.py
+permissions:
+  - studies
+tags:
+  - solar
+  - photovoltaic
+  - yield
+  - brazil
+  - renewable

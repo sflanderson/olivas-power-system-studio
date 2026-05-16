@@ -1,0 +1,137 @@
+# ============================================================
+# Olivas ATP Studio — .gitignore
+# ============================================================
+# Ver docs/LICENSING.md §6 para a política clean-room que
+# justifica os padrões proprietários bloqueados abaixo.
+
+# ------------------------------------------------------------
+# Arquivos proprietários de ferramentas de terceiros (ATPDraw
+# e ATP). NUNCA devem entrar no repositório.
+# ------------------------------------------------------------
+*.exe
+*.scl
+*.sup
+*.acp
+*.alc
+*.bct
+*.xfr
+
+# ATPDraw installation folder (nunca commitar o instalador local
+# do ATPDraw; o path foi dado pelo autor para referência local).
+/ATPDRAW/
+
+# ------------------------------------------------------------
+# Saída de simulação (gerada pelo usuário, pode conter dados
+# sensíveis de projetos reais)
+# ------------------------------------------------------------
+*.pl4
+*.lis
+*.dbg
+*.tmp
+*.bin
+/runs/
+/dum*.bin
+
+# ------------------------------------------------------------
+# Python / build / cache
+# ------------------------------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+
+# Build artefatos do PyInstaller — ignora SAÍDA mas preserva specs
+build/*/
+!build/README.md
+!build/*.spec
+!build/*.py
+
+# ------------------------------------------------------------
+# Diretórios proibidos pela clean-room policy (LICENSING §6)
+# ------------------------------------------------------------
+/app/core/GNUATP/
+/pre-processor/
+/_tmp_ptw/
+/LIB/
+/LIBRARY/
+/library_relay/
+/restore_points/
+
+# ------------------------------------------------------------
+# Lixo de sincronização (Google Drive / OneDrive / Dropbox)
+# ------------------------------------------------------------
+.tmp.driveupload/
+*.tmp.driveupload
+*.tmp.drivedownload
+.dropbox
+.dropbox.attr
+
+# Duplicatas do Windows ("Cópia de X.txt", "X - Copy.txt")
+Cópia de *
+* - Copy.*
+* - Cópia.*
+
+# PDFs soltos no root e em tests/ (manuais terceiros, exports)
+/*.pdf
+/tests/*.pdf
+
+# Transcrições de manuais SKM PTW / DAPPER (proprietários)
+/ptw_userguide.txt
+/dapper_*.txt
+/*_ptw_*.txt
+
+# ------------------------------------------------------------
+# IDEs e sistema operacional
+# ------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ------------------------------------------------------------
+# Claude Code (rastreamento de sessão local)
+# ------------------------------------------------------------
+.claude/
+
+# ------------------------------------------------------------
+# Cloudflare Worker / Node
+# ------------------------------------------------------------
+infra/license-server/node_modules/
+infra/license-server/.dev.vars
+infra/license-server/.wrangler/
+infra/license-server/dist/
+
+# ------------------------------------------------------------
+# Segredos / chaves de API (nunca commitar)
+# ------------------------------------------------------------
+.env
+.env.local
+*.key
+*.pem
+credentials.json
+secrets/
+api_keys.json
+
+# ------------------------------------------------------------
+# Logs e outputs de simulação reais
+# ------------------------------------------------------------
+*.log
+auto-save/
+/CIRCUITO.png
+/Gemini_Generated_Image_*.png
+
+# ------------------------------------------------------------
+# Exceções: arquivos .atp que são fixtures do projeto,
+# gerados pelo autor e permitidos
+# ------------------------------------------------------------
+!tests/fixtures/*.atp

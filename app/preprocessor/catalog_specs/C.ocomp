@@ -1,0 +1,74 @@
+# Capacitor linear — elemento passivo 2-terminal com energia elétrica.
+# Corresponde ao cartão ATP TYPE-0 (branch linear) com C != 0.
+
+schema_version: "1.0"
+code: C
+label_pt: Capacitor
+label_en: Capacitor
+description: |
+  Capacitor linear com tensão inicial V_0 opcional. Gera um cartão
+  ATP de ramo linear (R-L-C com R=L=0).
+
+category: passive
+atp_supported: true
+
+symbol:
+  size: [40, 60]
+  bounding_box: [-20, -30, 40, 60]
+  renderer: CapacitorSymbol
+
+pins:
+  - name: p1
+    label: Terminal superior
+    position: [0, -30]
+  - name: p2
+    label: Terminal inferior
+    position: [0, 30]
+
+properties:
+  - name: C
+    label: Capacitância
+    unit: F
+    type: float
+    default: 1.0e-6
+    visible: true
+    group: main
+    min: 0.0
+    description: Capacitância em Farads (aceita 1 uF, 1 nF, 1 pF)
+    example: 1.0e-6
+  - name: V_0
+    label: Tensão inicial
+    unit: V
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    description: Tensão inicial em t=0 (0 = descarregado)
+  - name: polarity
+    label: Polaridade
+    type: enum
+    default: neutral
+    visible: false
+    group: metadata
+    choices: [neutral, positive, negative]
+    description: Para capacitores polarizados (eletrolíticos)
+
+atp_emission:
+  kind: capacitor
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Capacitância parasita de linha (modelos PI)
+    - Banco de capacitores de compensação shunt
+    - Filtros harmônicos
+    - Snubbers RC em dispositivos de potência
+  references:
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Ch. 4"
+  common_mistakes:
+    - C muito grande em nó de alta-Z causa constante de tempo inviável
+    - V_0 diferente de regime estabelecido causa transitório espúrio inicial
+    - Não confundir XOPT/COPT (opções de escala de R/C) com valores C
+  alternatives:
+    - TLIN / BERG / JMARTI — se precisa de capacitância distribuída
+    - ZnO — para-raios com componente capacitivo efetivo

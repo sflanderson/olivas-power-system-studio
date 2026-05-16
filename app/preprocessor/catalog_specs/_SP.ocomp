@@ -1,0 +1,37 @@
+# S-parameters — análise só-Qucs (RF/HF).
+
+schema_version: "1.0"
+code: ".SP"
+label_pt: S-parameters
+label_en: S-parameter analysis
+description: |
+  Análise de parâmetros S (espalhamento) Qucs — puramente RF/HF.
+  Não há equivalente no ATP (que é orientado a sistemas de
+  potência, não RF). Preservado apenas para não quebrar parse de
+  .sch originais com essa diretiva.
+
+category: sim
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties: []
+
+atp_emission:
+  kind: custom
+  count: 0
+
+llm_hints:
+  typical_applications:
+    - Preservar parse de .sch Qucs com diretiva .SP
+  references:
+    - "Qucs Reference Manual, Sec. 3.5 (S-parameters)"
+  common_mistakes:
+    - Tentar usar análise RF no ATP (contextos totalmente distintos)
+  alternatives:
+    - ADS / Microwave Office / HFSS — ferramentas RF dedicadas

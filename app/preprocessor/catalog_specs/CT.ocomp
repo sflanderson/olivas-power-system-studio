@@ -1,0 +1,156 @@
+# TC (Transformador de Corrente) para proteção
+# IEEE C57.13.1-2017 / IEC 61869-2:2012 / NBR 6856:2015.
+
+schema_version: "1.0"
+code: CT
+label_pt: TC (Transformador de Corrente)
+label_en: CT (Current Transformer)
+description: |
+  Transformador de corrente para proteção. Suporta análise
+  de saturação em 3 níveis (ANSI estático / IEC joelho /
+  Dinâmico RK4) via módulo
+  ``app.postprocessor.ct_saturation``.
+
+  Modelagem
+  ==========
+
+  * Relação de transformação (ratio_pri / ratio_sec)
+  * Classe ANSI C (C50–C800) ou IEC P/PR (10P10..10PR50)
+  * Burden total (relé + cabo)
+  * Curva de excitação (típica ou custom)
+  * Fator de remanência Kr (alta=0.8, baixa=0.1)
+
+  Cobertura normativa
+  ====================
+
+  * IEEE Std C57.13.1-2017 — Test Code for CTs
+  * IEEE Std C37.110-2007 — Application of CTs for Relaying
+  * IEC 61869-2:2012 — Current transformers
+  * CIGRÉ WG 23-15 — Saturation effects on relays
+  * ABNT NBR 6856:2015 — TCs
+
+category: switch
+atp_supported: false
+
+symbol:
+  size: [40, 50]
+  bounding_box: [-20, -25, 40, 50]
+  renderer: ResistorSymbol
+
+pins:
+  - name: P1
+    label: Primário lado 1
+    position: [-30, 0]
+  - name: P2
+    label: Primário lado 2
+    position: [30, 0]
+  - name: S1
+    label: Secundário 1
+    position: [0, 25]
+  - name: S2
+    label: Secundário 2
+    position: [20, 25]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: "CT-01"
+    visible: true
+    group: main
+    description: Identificador
+  - name: ratio_pri
+    label: Relação primária
+    unit: A
+    type: float
+    default: 200.0
+    visible: true
+    group: main
+    description: Corrente primária nominal
+  - name: ratio_sec
+    label: Secundária
+    unit: A
+    type: enum
+    default: "5"
+    visible: true
+    group: main
+    choices: ["1", "5"]
+    description: Corrente secundária (1 ou 5 A)
+  - name: classe
+    label: Classe
+    type: enum
+    default: ANSI_C
+    visible: true
+    group: main
+    choices: [ANSI_C, IEC_P, IEC_PR]
+    description: ANSI C / IEC P (alta rem) / IEC PR (baixa rem)
+  - name: c_rating_V
+    label: Classe Cxxx
+    unit: V
+    type: float
+    default: 200.0
+    visible: true
+    group: main
+    description: Tensão de capacidade C (ANSI)
+  - name: rs_ohm
+    label: R secundário
+    unit: ohm
+    type: float
+    default: 0.5
+    visible: false
+    group: electrical
+    description: Resistência interna
+  - name: rb_ohm
+    label: R burden
+    unit: ohm
+    type: float
+    default: 0.3
+    visible: false
+    group: electrical
+    description: Burden total (relé + cabo)
+  - name: kr
+    label: Kr
+    type: float
+    default: 0.8
+    visible: false
+    group: advanced
+    description: Fator de remanência (0.8 alta / 0.1 baixa)
+  - name: t_relay_ms
+    label: Tempo do relé
+    unit: ms
+    type: float
+    default: 20.0
+    visible: false
+    group: timing
+    description: Pickup do relé
+  - name: t_breaker_ms
+    label: Tempo do disjuntor
+    unit: ms
+    type: float
+    default: 50.0
+    visible: false
+    group: timing
+    description: Tempo de abertura
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: ct_no_atp
+
+llm_hints:
+  typical_applications:
+    - Proteção 50/51 em feeders MT
+    - Diferencial de transformador (87T)
+    - Diferencial de barra (87B)
+    - Medição faturável (com classe medição)
+  references:
+    - "IEEE Std C57.13.1-2017"
+    - "IEC 61869-2:2012"
+    - "CIGRÉ WG 23-15"
+  common_mistakes:
+    - "Saturação não verificada → relé não enxerga falta"
+    - "Kr alto + X/R alto → saturação prematura"
+    - "Cabo longo aumentando burden → bitola C insuficiente"
+  alternatives:
+    - "Hall sensor (fora de norma para proteção)"
+    - "Rogowski coil (IEC 61869-6)"

@@ -1,0 +1,21 @@
+schema_version: "1.0"
+name: nbr_5410_validator
+display_name: NBR 5410 Circuit Validator
+version: "1.0.0"
+author: Olivas Team
+license: MIT
+description: |
+  Valida circuitos terminais contra ABNT NBR 5410:2004 (Instalações
+  elétricas de baixa tensão). Verifica queda de tensão, fator de
+  correção (FC), proteção contra sobrecorrente.
+
+min_olivas_version: "1.5.0"
+category: validator
+entry_point: plugin.py
+permissions:
+  - validators
+tags:
+  - nbr5410
+  - low-voltage
+  - validation
+  - brazil

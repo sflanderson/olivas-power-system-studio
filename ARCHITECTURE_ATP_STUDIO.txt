@@ -1,0 +1,354 @@
+ARCHITECTURE
+OLIVAS ATP STUDIO
+v0.12.1
+
+============================================================
+1. VISAO GERAL DA ARQUITETURA
+============================================================
+
+Olivas ATP Studio segue uma arquitetura em camadas com separacao
+clara de responsabilidades. O fluxo principal e:
+
+  .atp (arquivo) --> parser --> modelo semantico --> GUI / LLM / validacao
+                                     |
+                                serializer --> .atp (saida)
+
+Camadas (de baixo para cima):
+
+  [1] CORE        modelo de dados, parser, serializer
+  [2] VALIDATION  validadores estruturais, fisicos, de dominio
+  [3] SIMULATION  execucao ATP, leitura de resultados
+  [4] ANALYSIS    metricas, exportacao, comparacao, relatorios
+  [5] LLM         agente, API programatica, intents, parametrico
+  [6] GUI         janela principal, chat, topologia, comparacao
+
+Dependencias fluem de cima para baixo. Nenhuma camada inferior
+importa uma superior.
+
+============================================================
+2. CAMADA CORE
+============================================================
+
+Diretorio: app/core/
+
+Responsabilidade: representacao e manipulacao do arquivo .atp.
+
+Modulos:
+
+  project_model.py
+  ----------------
+  Dataclasses que formam o modelo semantico:
+  - AtpProject: raiz do projeto (file_path, header, models, uses,
+    branches, switches, sources, nodes, raw_lines)
+  - HeaderInfo: delta_t, t_max, frequency
+  - ModelDefinition: name, inputs, outputs, data, variables,
+    init_code, exec_code
+  - UseInstance: model_name, instance_name, inputs, outputs, data
+  - DataParam: name, default_value, assigned_value
+  - InputMapping: local_name, mapped_to
+  - OutputMapping: global_name, local_name
+  - BranchComponent: node1, node2, R/L/C, semantic_type
+  - SwitchComponent: node1, node2, switch_type, semantic_type
+  - SourceComponent: node, amplitude, frequency, semantic_type
+  - Node: name, sources (lista de origens)
+  - Section: name, raw_lines, start_line, end_line
+  - ModelsGlobalIO: inputs, outputs globais do bloco MODELS
+
+  parser.py
+  ---------
+  Funcao principal: parse_file(path) -> AtpProject
+  Etapas:
+  1. Le arquivo .atp completo
+  2. Separa secoes por delimitadores (/BRANCH, /SWITCH, etc.)
+  3. Parseia header (delta_t, t_max, frequency de formato fixo)
+  4. Parseia bloco MODELS: global I/O, cada MODEL, cada USE
+  5. Parseia componentes de BRANCH (formato fixo 6-char, extrai R/L/C)
+  6. Parseia componentes de SWITCH (tipo, nos, tacs output)
+  7. Parseia componentes de SOURCE (tipo, amplitude, frequencia)
+  8. Classifica semanticamente (_classify_branch, _classify_switch,
+     _classify_source)
+  9. Extrai nos de todas as secoes
+
+  serializer.py
+  -------------
+  Funcao: serialize_project(project) -> str
+  Reconstroi o arquivo .atp a partir do modelo semantico,
+  preservando formatacao original quando possivel.
+  Reescreve USE instances com DATA/INPUT/OUTPUT modificados.
+
+  diff_util.py
+  ------------
+  Funcoes: compute_context_diff(), has_changes()
+  Gera diff textual entre original e serializado.
+
+============================================================
+3. CAMADA VALIDATION
+============================================================
+
+Diretorio: app/validation/
+
+Responsabilidade: detectar inconsistencias e problemas no projeto.
+
+Modulos:
+
+  validator_models.py
+  -------------------
+  Validacao estrutural MODEL/USE:
+  - Referencias USE -> MODEL (nomes existem?)
+  - Contagem I/O/DATA (compativel entre MODEL e USE?)
+  - Case mismatch (VCB_RR vs VCB_Rr)
+  - Duplicatas de nomes
+  - Secoes presentes e bem formadas
+  - Sintaxe (ENDMODEL, ENDUSE, BLANK cards)
+
+  Classes compartilhadas:
+  - Severity(Enum): INFO, WARNING (AVISO), ERROR (ERRO)
+  - ValidationMessage: severity, code, message
+
+  validator_physics.py
+  --------------------
+  Validacao de parametros fisicos:
+  - R/L/C negativos (BRANCH)
+  - Self-loops (node1 == node2)
+  - Chaves com Tclose > Topen
+  - Fontes inativas (amplitude=0, Tstart>=Tstop)
+  - Nos flutuantes
+  - Valores extremos (R > 1e12, V > 10MV)
+  - R=0 com L (instabilidade numerica)
+
+  validator_vcb.py
+  ----------------
+  Validacao de dominio para disjuntores a vacuo:
+  - Estrutura do MODEL VCB (inputs/outputs esperados)
+  - Faixas de parametros (T_OPEN, I_CHOP, RRDS, etc.)
+  - Cobertura de fases (R, S, T)
+  - Conexao snubber-VCB (CB_STATE -> SNUB_CTRL)
+
+============================================================
+4. CAMADA SIMULATION
+============================================================
+
+Diretorio: app/simulation/
+
+Responsabilidade: execucao ATP e leitura de resultados.
+
+Modulos:
+
+  runner.py
+  ---------
+  Classe AtpRunner:
+  - executable_path: caminho do ATP.exe
+  - timeout: tempo limite em segundos
+  - run(file_path) -> RunResult
+  - Cria diretorio runs/<caso>_<timestamp>/
+  - Salva execution.log com stdout, stderr, metadata
+  - RunResult: success, return_code, stdout, stderr, run_dir
+
+  results_reader.py
+  -----------------
+  Leitura de resultados de simulacao:
+  - read_pl4(path) -> AtpResults (binario)
+    Tenta multiplas estrategias:
+    1. Fortran unformatted records (record-length markers)
+    2. Layout direto binario
+    Suporta 6-char e 8-char variable names, little/big endian
+  - read_lis(path) -> str (texto)
+  - find_result_files(atp_path) -> dict (pl4, lis)
+  - AtpResults: variables, time, data, delta_t, n_steps
+
+============================================================
+5. CAMADA ANALYSIS
+============================================================
+
+Diretorio: app/analysis/
+
+Responsabilidade: pos-processamento, metricas e exportacao.
+
+Modulos:
+
+  transient_metrics.py
+  --------------------
+  - TransientMetrics: pico, min, RMS, media, frequencia,
+    amortecimento, settling_time, n_samples
+  - TrvMetrics: pico TRV (kV), RRRV (kV/us), tempo primeiro polo,
+    comparacao IEC 62271-100 (Uc, t3, suportabilidade)
+  - compute_transient_metrics(): calcula metricas basicas
+    (zero-crossings para freq, decremento logaritmico para amort.)
+  - compute_trv_metrics(): calcula TRV/RRRV apos current zero
+  - format_transient_report(), format_trv_report()
+
+  csv_export.py
+  -------------
+  - export_waveforms_csv(): time + todas as variaveis (dados brutos)
+  - export_metrics_csv(): resumo de metricas por variavel
+
+  report_export.py
+  ----------------
+  - generate_html_report(): relatorio HTML autocontido
+    Logo Olivas embutido em base64 (redimensionado com Pillow)
+    Secoes: resumo, validacao, componentes, USE DATA, resultados,
+    metricas de transitorio
+    CSS responsivo com suporte a impressao
+  - export_html_report(): gera e salva em arquivo
+
+  case_compare.py
+  ---------------
+  - CompareResult, ParamDiff dataclasses
+  - compare_cases(): compara header, MODEL DATA defaults,
+    USE DATA values, contagem de componentes
+
+============================================================
+6. CAMADA LLM
+============================================================
+
+Diretorio: app/llm/
+
+Responsabilidade: integracao com agente LLM e automacao.
+
+Modulos:
+
+  intents.py
+  ----------
+  Catalogo de 20 intents em 7 categorias:
+  FILE, QUERY, EDIT, VALIDATE, SIMULATE, ANALYZE, PARAMETRIC
+  Cada intent com name, description, required/optional params, exemplos.
+
+  project_api.py
+  --------------
+  Classe ProjectAPI: API programatica que abstrai operacoes do projeto.
+  Todos os metodos retornam dict[str, Any] para consumo por LLM.
+  Metodos: open_file, save_file, project_summary, list_models,
+  list_uses, get_model_info, get_use_info, list_components,
+  list_nodes, get_header, set_data_param, set_model_default,
+  set_input_mapping, validate_all, configure_atp, run_simulation,
+  export_csv, export_report.
+
+  agent.py
+  --------
+  - get_tool_definitions(): 18 tools no formato Claude API tool_use
+  - AgentDispatcher: mapeia tool_name + tool_input para ProjectAPI
+  - get_system_prompt(): prompt de sistema do agente
+
+  parametric.py
+  -------------
+  Automacao de estudos parametricos:
+  - SweepParameter: modelo + parametro + valores
+  - generate_sweep_cases(): produto cartesiano
+  - run_parametric_sweep(): clona, modifica, serializa, executa
+  - linspace_values(), format_sweep_report()
+
+============================================================
+7. CAMADA GUI
+============================================================
+
+Diretorio: app/gui/
+
+Responsabilidade: interface grafica PySide6.
+
+Modulos:
+
+  main_window.py
+  --------------
+  Classe MainWindow (QMainWindow):
+  - Arvore estrutural (QTreeWidget) com Header, MODELS, USES,
+    BRANCH, SWITCH, SOURCE, NODES
+  - 8 abas (QTabWidget): Detalhes, Texto bruto, Topologia,
+    Validacao, Diff, Resultados, Agente, Comparar
+  - Seletor de caso (QComboBox) para multi-caso
+  - Menus: Arquivo, Simulacao, Visualizar, Validacao
+  - Tabelas editaveis para DATA, INPUT, OUTPUT
+  - QSettings para persistencia (caminho ATP, timeout)
+  - Property project com getter/setter para multi-caso
+
+  chat_widget.py
+  --------------
+  Classe ChatWidget:
+  - Parse de comandos locais (20+ comandos PT/EN)
+  - Integracao Claude API via anthropic SDK
+  - _ClaudeWorker: thread de background para chamadas API
+  - Loop agentic com ate 10 turnos de tool_use
+  - Historico colorido (user=azul, agent=branco, system=verde)
+
+  topology_widget.py
+  ------------------
+  Classe TopologyWidget (QGraphicsView):
+  - Visualizacao topologica do circuito
+  - Nos coloridos por tipo (fonte, MODELS, generico)
+  - Arestas por secao (branch, switch VCB, snubber)
+  - Legenda e agrupamento por fase
+
+  compare_widget.py
+  -----------------
+  Classe CompareWidget:
+  - Seletores Caso A / Caso B
+  - Tabela de diferencas com cores por categoria
+  - Sincronizado com casos abertos na MainWindow
+
+============================================================
+8. FLUXO DE DADOS
+============================================================
+
+ABERTURA:
+  arquivo .atp
+    --> parser.parse_file()
+      --> AtpProject (modelo semantico)
+        --> MainWindow._populate_tree()
+        --> TopologyWidget.load_project()
+        --> ChatWidget.sync_project()
+        --> CompareWidget.update_cases()
+
+EDICAO:
+  usuario edita tabela GUI
+    --> UseInstance.data[i].assigned_value = novo_valor
+    --> UseInstance.modified = True
+
+SALVAMENTO:
+  serializer.serialize_project(project) --> texto
+    --> diff_util.compute_context_diff() --> preview
+      --> usuario confirma --> grava arquivo
+
+SIMULACAO:
+  AtpRunner.run(file_path)
+    --> subprocess (ATP.exe)
+      --> RunResult (stdout, stderr, return_code)
+        --> results_reader.read_pl4() --> AtpResults
+          --> transient_metrics.compute_transient_metrics()
+
+AGENTE LLM:
+  usuario digita no chat
+    --> parse_local_command() (tenta comando local)
+    --> se nao reconhecido e tem API key:
+      --> _ClaudeWorker (thread)
+        --> anthropic.messages.create (com tools)
+          --> tool_use --> AgentDispatcher.process_tool_call()
+            --> ProjectAPI.metodo() --> resultado
+              --> volta ao Claude para proxima iteracao
+
+============================================================
+9. CONVENCOES
+============================================================
+
+- Formato fixo ATP: colunas de 6 caracteres para nomes de nos
+- semantic_type: classificacao automatica de componentes
+- Todos os metodos de ProjectAPI retornam dict[str, Any]
+- ValidationMessage com Severity (INFO, AVISO, ERRO)
+- QSettings("OlivasATPStudio", "OlivasATPStudio") para persistencia
+- Cores GUI: ERRO=vermelho, AVISO=amarelo, INFO=azul
+- Diretorio de execucao: runs/<caso>_<YYYYMMDD_HHMMSS>/
+
+============================================================
+10. DEPENDENCIAS ENTRE CAMADAS
+============================================================
+
+  GUI ----> ANALYSIS, SIMULATION, VALIDATION, LLM, CORE
+  LLM ----> ANALYSIS, SIMULATION, VALIDATION, CORE
+  ANALYSIS --> SIMULATION, VALIDATION, CORE
+  SIMULATION --> CORE
+  VALIDATION --> CORE
+  CORE ----> (nenhuma dependencia interna)
+
+Nenhum modulo de camada inferior importa camada superior.
+
+============================================================
+
+FIM DO GUIA DE ARQUITETURA

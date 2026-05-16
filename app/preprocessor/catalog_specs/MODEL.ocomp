@@ -1,0 +1,55 @@
+# Bloco MODEL externo — referência a arquivo .mod.
+
+schema_version: "1.0"
+code: MODEL
+label_pt: Bloco MODEL (USE)
+label_en: MODEL block (USE reference)
+description: |
+  Referência a um modelo escrito em linguagem ATP MODELS, externo
+  ao arquivo .atp. Emissão: cartão USE dentro de /MODELS
+  apontando para o arquivo .mod. Permite lógica complexa (controle
+  não-linear, lookup tables, algoritmos estatísticos como VCB
+  reignition — v0.22.1).
+
+  Sem pinos elétricos — I/O via nomes de sinal ou variáveis TACS.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: ModelUseSymbol
+
+pins: []
+
+properties:
+  - name: model_file
+    label: Arquivo .mod
+    type: file
+    default: "model.mod"
+    visible: true
+    group: main
+    description: Caminho para o arquivo .mod com a definição do MODEL
+
+atp_emission:
+  kind: model_use
+  count: 1
+  model_ref: external
+
+llm_hints:
+  typical_applications:
+    - Reignição estatística de VCB (v0.22.1 emite MODEL automático)
+    - Controle de conversor com PLL
+    - Algoritmo de proteção diferencial
+    - Modelagem de carga dinâmica (motor)
+  references:
+    - "ATP Rule Book, Section VI (MODELS language)"
+    - "L. Dubé, 'Models in ATP', Leuven EMTP Course, 1996"
+  common_mistakes:
+    - Arquivo .mod não encontrado no path do ATP
+    - Mismatch de INPUT/OUTPUT entre USE e MODEL
+    - Variáveis globais conflitantes entre múltiplos USE
+  alternatives:
+    - TACS — lógica inline simples
+    - SwTACS — chave controlada (caso trivial)

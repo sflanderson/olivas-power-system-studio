@@ -1,0 +1,37 @@
+# Sweep paramétrico — diretiva Qucs.
+
+schema_version: "1.0"
+code: ".SW"
+label_pt: Sweep paramétrico
+label_en: Parameter sweep
+description: |
+  Sweep paramétrico Qucs (.SW) — varia um parâmetro em steps.
+  No ATP não existe equivalente direto; a prática é rodar múltiplas
+  simulações variando o cartão manualmente. Preservado para compat.
+
+category: sim
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties: []
+
+atp_emission:
+  kind: custom
+  count: 0
+
+llm_hints:
+  typical_applications:
+    - Estudo de sensibilidade (variar Ron, V_forward, etc.)
+    - Monte Carlo simplificado
+  references:
+    - "Qucs Reference Manual, Sec. 3.4 (Sweep)"
+  common_mistakes:
+    - Esperar que .SW dispare runs ATP automáticas
+  alternatives:
+    - Script externo que edita .atp e roda múltiplas vezes

@@ -1,0 +1,22 @@
+schema_version: "1.0"
+name: csv_exporter
+display_name: CSV Exporter for Study Results
+version: "1.0.0"
+author: Olivas Team
+license: MIT
+description: |
+  Exporta resultados de qualquer estudo Olivas para CSV (compatível
+  com Excel/LibreOffice). Útil para relatórios consolidados e
+  pós-processamento externo (Power BI, Tableau).
+
+min_olivas_version: "1.5.0"
+category: exporter
+entry_point: plugin.py
+permissions:
+  - exporters
+  - filesystem.write
+tags:
+  - csv
+  - export
+  - reports
+  - excel

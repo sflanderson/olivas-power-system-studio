@@ -1,0 +1,153 @@
+# VCB 1φ — Disjuntor a vácuo monofásico com modelo estatístico de reignição.
+# Baseado em CIGRE WG A3.26 (2014) e EPRI (1989).
+
+schema_version: "1.0"
+code: VCB
+label_pt: Disjuntor a vácuo (VCB) 1φ
+label_en: Vacuum Circuit Breaker 1-phase
+description: |
+  Disjuntor a vácuo monofásico. A partir de v0.22.1, quando qualquer
+  parâmetro de reignição é customizado (diferente do default CIGRE),
+  o bridge emite um bloco /MODELS ... MODEL vcb_reignition ... USE
+  no cabeçalho do .atp implementando o algoritmo estatístico completo.
+  Se todos os parâmetros ficam nos defaults CIGRE, apenas a chave
+  TYPE-13 time-controlled (T_open/T_close) é emitida — comportamento
+  idêntico às versões anteriores.
+
+  Wiring TACS (MEASURING + SOURCE TACS conectando o output switch_cmd
+  ao TYPE-13) é MANUAL em v0.22.1 — edição direta do .atp. Automação
+  completa: v0.22.2.
+
+  Parâmetros de reignição seguem a referência CIGRE WG A3.26:
+  * I_chop ~ N(I_chop_mean, σ²) — corrente de chopping por pólo
+  * di/dt_crit ~ di/dt_crit + d(di/dt)*t — recuperação dielétrica da câmara
+  * U_dielec(t) = U0 + k*(t - t_zero) — tensão de suportabilidade
+  * T_bounce — tempo de rebote após contato
+
+category: switch
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: SwitchIdealSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties:
+  - name: T_open
+    label: T_open
+    unit: s
+    type: float
+    default: 0.0
+    visible: true
+    group: timing
+    min: 0.0
+    description: Instante de início do movimento de abertura
+  - name: T_close
+    label: T_close
+    unit: s
+    type: float
+    default: 1.0e9
+    visible: true
+    group: timing
+    description: Instante de fechamento (1e9 = nunca fecha)
+  - name: I_chop
+    label: I_chop
+    unit: A
+    type: float
+    default: 5.0
+    visible: true
+    group: reignition
+    min: 0.0
+    description: Corrente média de chopping (EPRI 1989 típico 3-8 A)
+    example: 5
+  - name: sigma_I_chop
+    label: σ(I_chop)
+    unit: A
+    type: float
+    default: 1.0
+    visible: false
+    group: reignition
+    min: 0.0
+    description: Desvio-padrão do chopping (distribuição gaussiana)
+  - name: didt_crit
+    label: di/dt_crit
+    unit: A/µs
+    type: float
+    default: 16.0
+    visible: true
+    group: reignition
+    min: 0.0
+    description: di/dt crítico para reignição (câmara MT típica 10-30)
+  - name: didt_sigma
+    label: d(di/dt)
+    unit: A/µs²
+    type: float
+    default: 0.034
+    visible: false
+    group: reignition
+    description: Variação de di/dt_crit com o tempo após separação
+  - name: k_dielec
+    label: k_dielec
+    unit: V/µs
+    type: float
+    default: 17.0
+    visible: true
+    group: reignition
+    min: 0.0
+    description: Taxa de recuperação dielétrica (17 V/µs = EPRI médio)
+  - name: U0_dielec
+    label: U0_dielec
+    unit: V
+    type: float
+    default: 690.0
+    visible: false
+    group: reignition
+    description: Tensão dielétrica residual imediatamente após separação
+  - name: T_bounce
+    label: T_bounce
+    unit: s
+    type: float
+    default: 5.0e-4
+    visible: false
+    group: reignition
+    min: 0.0
+    description: Tempo de rebote mecânico do contato
+  - name: Seed
+    label: Seed
+    type: int
+    default: 1
+    visible: false
+    group: reignition
+    description: Semente do RNG para reprodutibilidade (varie em Monte Carlo)
+
+atp_emission:
+  kind: switch_simple
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Estudo de sobretensão de switching em MT/AT
+    - Análise de TRV (Transient Recovery Voltage)
+    - Reignições múltiplas em desconexão de motor de indução
+    - Validação de snubber RC
+  references:
+    - "CIGRE WG A3.26, Technical Brochure 570, 2014"
+    - "EPRI, Methodology for High-Frequency Transient Studies, 1989"
+    - "IEC 62271-100 — High-voltage alternating-current circuit-breakers"
+    - "IEEE Std C37.011 — Application Guide for TRV"
+  common_mistakes:
+    - Usar apenas T_open sem reignição produz resultados otimistas
+    - I_chop fixo (sem σ) não representa dispersão real
+    - Seed=0 é válido mas reproduz sempre a mesma realização
+    - k_dielec muito baixo pode travar reignições repetidas
+  alternatives:
+    - SwIdeal — sem reignição (estudo ideal)
+    - VCB3 — 3 pólos independentes (trifásico)

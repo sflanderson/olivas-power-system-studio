@@ -1,0 +1,67 @@
+# Low-pass filter — y = K/(1 + τ·s) · u.
+
+schema_version: "1.0"
+code: LowPass
+label_pt: Filtro passa-baixa
+label_en: Low-pass filter
+description: |
+  Filtro passa-baixa de 1ª ordem: y = K/(1 + τ·s) · u.
+  Emissão ATP: device-1 com numerator=(1) e denominator=(1, τ),
+  gain=K.
+
+  τ é a constante de tempo (s). Frequência de corte
+  ω_c = 1/τ rad/s ⇔ f_c = 1/(2π·τ) Hz.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: LowPassSymbol
+
+pins: []
+
+properties:
+  - name: input_signal
+    label: Sinal de entrada
+    type: string
+    default: "u"
+    visible: true
+    group: main
+
+  - name: output_name
+    label: Nome do sinal de saída
+    type: string
+    default: "y"
+    visible: true
+    group: main
+
+  - name: K
+    label: Ganho K
+    type: float
+    default: "1.0"
+    visible: true
+    group: main
+
+  - name: tau
+    label: Constante de tempo τ (s)
+    type: float
+    default: "0.001"
+    visible: true
+    group: main
+    description: Constante de tempo em segundos (deve ser > 0).
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Anti-aliasing antes de medição
+    - Suavização de set-point (pré-filtro de PID)
+    - Filtragem de ruído de sensor
+    - PLL (parte do detector de fase)
+  alternatives:
+    - HighPass (não disponível ainda — v0.26.6)
+    - LeadLag — compensação de fase

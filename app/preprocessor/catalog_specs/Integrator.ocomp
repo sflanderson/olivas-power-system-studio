@@ -1,0 +1,79 @@
+# Integrator — y = K·∫u·dt = K/s · u.
+
+schema_version: "1.0"
+code: Integrator
+label_pt: Integrador
+label_en: Integrator
+description: |
+  Integrador puro y = K/s · u. Emissão ATP: device-1 com
+  numerator=(1) e denominator=(0,1), gain=K.
+
+  Pode ser saturado via ``output_min``/``output_max`` (clipping
+  hard — útil para acumuladores limitados). Sem pinos elétricos —
+  conecta via nome de sinal TACS.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: IntegratorSymbol
+
+pins: []
+
+properties:
+  - name: input_signal
+    label: Sinal de entrada
+    type: string
+    default: "u"
+    visible: true
+    group: main
+
+  - name: output_name
+    label: Nome do sinal de saída
+    type: string
+    default: "y"
+    visible: true
+    group: main
+
+  - name: K
+    label: Ganho K
+    type: float
+    default: "1.0"
+    visible: true
+    group: main
+
+  - name: initial_output
+    label: Valor inicial
+    type: float
+    default: "0.0"
+    visible: true
+    group: main
+
+  - name: output_min
+    label: Saturação min
+    type: float
+    default: ""
+    visible: false
+    group: advanced
+
+  - name: output_max
+    label: Saturação max
+    type: float
+    default: ""
+    visible: false
+    group: advanced
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Acumulador de erro (parte I do PID standalone)
+    - Estimação de posição a partir de velocidade
+    - Conversor de tensão para fluxo magnético
+  alternatives:
+    - PID — versão completa Kp+Ki+Kd
+    - LowPass — quase integrador para τ grande

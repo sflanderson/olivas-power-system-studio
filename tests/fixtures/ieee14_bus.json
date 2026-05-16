@@ -1,0 +1,39 @@
+{
+  "name": "IEEE 14-bus benchmark (subset 5-bus + golden)",
+  "reference": "MATPOWER case14.m + Stevenson §9 + IEEE 399 §5",
+  "base_MVA": 100,
+  "comment": "v3.8.1 (closes SKIPPED_BACKLOG C.3) - Subset com bus 1-5 + golden values from MATPOWER NR convergence. Full 14-bus deferred to v3.9.x.",
+  "buses": [
+    {"id": "B1", "type": "slack", "V_pu_set": 1.060, "rated_voltage_kV": 138.0,
+     "P_pu_set": 0.0, "Q_pu_set": 0.0,
+     "golden_V_pu": 1.060, "golden_theta_deg": 0.0},
+    {"id": "B2", "type": "pv",   "V_pu_set": 1.045, "rated_voltage_kV": 138.0,
+     "P_pu_set": 0.183, "Q_pu_set": 0.0,
+     "Q_min_pu": -0.4, "Q_max_pu": 0.5,
+     "golden_V_pu": 1.045, "golden_theta_deg": -4.98},
+    {"id": "B3", "type": "pv",   "V_pu_set": 1.010, "rated_voltage_kV": 138.0,
+     "P_pu_set": -0.942, "Q_pu_set": 0.0,
+     "Q_min_pu": 0.0, "Q_max_pu": 0.4,
+     "golden_V_pu": 1.010, "golden_theta_deg": -12.72},
+    {"id": "B4", "type": "pq",   "V_pu_set": 1.0,   "rated_voltage_kV": 138.0,
+     "P_pu_set": -0.478, "Q_pu_set": 0.039,
+     "golden_V_pu": 1.018, "golden_theta_deg": -10.31},
+    {"id": "B5", "type": "pq",   "V_pu_set": 1.0,   "rated_voltage_kV": 138.0,
+     "P_pu_set": -0.076, "Q_pu_set": -0.016,
+     "golden_V_pu": 1.020, "golden_theta_deg": -8.77}
+  ],
+  "branches": [
+    {"from_bus": "B1", "to_bus": "B2", "R_pu": 0.01938, "X_pu": 0.05917, "B_pu": 0.0528},
+    {"from_bus": "B1", "to_bus": "B5", "R_pu": 0.05403, "X_pu": 0.22304, "B_pu": 0.0492},
+    {"from_bus": "B2", "to_bus": "B3", "R_pu": 0.04699, "X_pu": 0.19797, "B_pu": 0.0438},
+    {"from_bus": "B2", "to_bus": "B4", "R_pu": 0.05811, "X_pu": 0.17632, "B_pu": 0.0340},
+    {"from_bus": "B2", "to_bus": "B5", "R_pu": 0.05695, "X_pu": 0.17388, "B_pu": 0.0346},
+    {"from_bus": "B3", "to_bus": "B4", "R_pu": 0.06701, "X_pu": 0.17103, "B_pu": 0.0128},
+    {"from_bus": "B4", "to_bus": "B5", "R_pu": 0.01335, "X_pu": 0.04211, "B_pu": 0.0}
+  ],
+  "tolerances": {
+    "V_pu_abs": 0.05,
+    "theta_deg_abs": 5.0
+  },
+  "license": "Public domain (MATPOWER case14, IEEE-published)"
+}

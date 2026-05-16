@@ -1,0 +1,122 @@
+# Fusível — proteção primária (NEMA Type-K, IEC gG/gM/aM).
+# Usado em alimentação radial e dimensionamento de proteção.
+
+schema_version: "1.0"
+code: FUSE
+label_pt: Fusível
+label_en: Fuse
+description: |
+  Fusível de proteção (HRC, K-link, IEC gG/gM/aM). Modelagem
+  por curva I²t (energia incidente sobre integral de
+  corrente) — atua quando ∫i²dt > K²·S² conforme classe.
+
+  Suporta análise de coordenação 50/51 contra relés
+  upstream/downstream via módulo
+  ``app.postprocessor.tcc_curves`` (ainda como TCC simples
+  em v1.0.2; v1.1 adiciona melt/clear curves duplas).
+
+  Cobertura normativa
+  ====================
+
+  * IEC 60269-1:2014 — Low-voltage fuses
+  * IEEE Std C37.46:2010 — Power fuses HV
+  * NBR IEC 60269 — Fusíveis BT (Brasil)
+  * UL 248 — Low-voltage fuses (USA)
+
+category: switch
+atp_supported: false
+
+symbol:
+  size: [40, 30]
+  bounding_box: [-20, -15, 40, 30]
+  renderer: ResistorSymbol
+
+pins:
+  - name: T1
+    label: Terminal 1
+    position: [-30, 0]
+  - name: T2
+    label: Terminal 2
+    position: [30, 0]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: "F-01"
+    visible: true
+    group: main
+    description: Identificador
+  # v1.7.1: estado open/closed para análise de energização.
+  # Default closed (intacto). 'open' = fundido/aberto.
+  - name: state
+    label: Estado
+    type: enum
+    default: closed
+    visible: true
+    group: main
+    choices: [closed, open]
+    description: |
+      Estado: closed (intacto, conduzindo) ou open (queimado).
+  - name: rated_current_A
+    label: Corrente nominal
+    unit: A
+    type: float
+    default: 100.0
+    visible: true
+    group: main
+    description: In do fusível (corrente máxima contínua)
+  - name: rated_voltage_V
+    label: Tensão nominal
+    unit: V
+    type: float
+    default: 600.0
+    visible: true
+    group: main
+    description: Vn do fusível
+  - name: classe
+    label: Classe
+    type: enum
+    default: gG
+    visible: true
+    group: main
+    choices: [gG, gM, aM, K, T, J, R, RK1, RK5]
+    description: Classe NBR/IEC ou NEMA
+  - name: breaking_capacity_kA
+    label: Iccs (kA)
+    unit: kA
+    type: float
+    default: 100.0
+    visible: false
+    group: electrical
+    description: Capacidade de interrupção
+  - name: i2t_kA2_s
+    label: I²t (kA²·s)
+    type: float
+    default: 50.0
+    visible: false
+    group: advanced
+    description: Energia I²t para coordenação fusível-fusível
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: fuse_no_atp
+
+llm_hints:
+  typical_applications:
+    - Proteção de circuito de motor (gM)
+    - Proteção de feeder LV (gG)
+    - Backup de disjuntor (limita Iccs)
+    - Proteção de transformador (HV K-link)
+  references:
+    - "IEC 60269-1:2014"
+    - "IEEE Std C37.46:2010"
+    - "ABNT NBR IEC 60269"
+  common_mistakes:
+    - "Iccs do fusível < Ik'' do bus → fusão não-clear"
+    - "I²t fusível > I²t cabo → cabo queima antes do fusível"
+    - "gM em vez de gG num feeder de carga genérica"
+  alternatives:
+    - "Disjuntor termomagnético (mais cara, religável)"
+    - "Relé 51 + breaker"

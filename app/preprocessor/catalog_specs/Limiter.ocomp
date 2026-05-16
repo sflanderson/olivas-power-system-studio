@@ -1,0 +1,70 @@
+# Hard limiter — y = clip(u, lo, hi).
+
+schema_version: "1.0"
+code: Limiter
+label_pt: Limitador
+label_en: Hard limiter
+description: |
+  Limitador hard standalone: y = max(output_min, min(u,
+  output_max)). Emissão ATP: device-54 (TACS limiter).
+
+  Diferente do output_min/output_max do PID/Integrator: aqui é um
+  bloco standalone que pode ser inserido em qualquer ponto da
+  cadeia de controle (ex: antes do conversor PWM, após o PID).
+
+  Sem pinos elétricos — conecta via nome de sinal TACS.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: LimiterSymbol
+
+pins: []
+
+properties:
+  - name: input_signal
+    label: Sinal de entrada
+    type: string
+    default: "u"
+    visible: true
+    group: main
+
+  - name: output_name
+    label: Nome do sinal de saída
+    type: string
+    default: "y"
+    visible: true
+    group: main
+
+  - name: output_min
+    label: Limite inferior
+    type: float
+    default: "-1.0"
+    visible: true
+    group: main
+    description: Valor mínimo da saída.
+
+  - name: output_max
+    label: Limite superior
+    type: float
+    default: "1.0"
+    visible: true
+    group: main
+    description: Valor máximo da saída (deve ser > output_min).
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Limitar duty-cycle PWM em [0, 1] ou [-1, +1]
+    - Limitar índice de modulação de inversor
+    - Saturar set-point antes do PID
+    - Proteção de overshoot em referência
+  alternatives:
+    - PID com output_min/max (limites integrados ao PID)
+    - DeadBand — zero dentro de janela (oposto)

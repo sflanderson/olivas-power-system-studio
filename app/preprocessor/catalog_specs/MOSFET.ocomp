@@ -1,0 +1,70 @@
+# MOSFET de potência — N-channel enhancement mode.
+
+schema_version: "1.0"
+code: MOSFET
+label_pt: MOSFET de potência
+label_en: Power MOSFET
+description: |
+  Transistor de efeito de campo para aplicações de potência. Liga
+  por tensão no gate (VGS > Vth). Sem queda de tensão "diodo-like"
+  no estado ligado — só RDS(on). Ideal para frequências altas
+  (> 100 kHz) onde IGBT não chega. Aplicações: fontes chaveadas,
+  conversores solares, drives baixa potência.
+
+category: power_el
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: MOSFETSymbol
+
+pins:
+  - name: drain
+    label: Dreno
+    position: [-30, 0]
+  - name: source
+    label: Fonte
+    position: [30, 0]
+  - name: gate
+    label: Gate
+    position: [0, 20]
+
+properties:
+  - name: R_DSon
+    label: R_DS(on)
+    unit: ohm
+    type: float
+    default: 0.05
+    visible: true
+    group: electrical
+    min: 0.0
+    description: Resistência dreno-fonte no estado ligado
+  - name: R_on
+    label: R_on
+    unit: ohm
+    type: float
+    default: 1.0e-3
+    visible: false
+    group: electrical
+    min: 0.0
+
+atp_emission:
+  kind: mosfet
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Fonte chaveada (SMPS) 100 kHz-1 MHz
+    - Conversor solar (MPPT boost)
+    - Inversor de baixa potência (< 10 kW)
+    - Motor drive automotivo 12 V / 48 V
+  references:
+    - "N. Mohan, T. Undeland, W. Robbins, 'Power Electronics', 3ª ed., 2003"
+  common_mistakes:
+    - Usar em alta potência (> 1 MW) — escolher IGBT
+    - Esquecer o diodo parasítico do substrato (body diode)
+    - RDS(on) aumenta com temperatura (verificar RthJC)
+  alternatives:
+    - IGBT — potências médias/altas, frequências moderadas
+    - Diode — diodo schottky para roda-livre

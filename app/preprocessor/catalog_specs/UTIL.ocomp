@@ -1,0 +1,136 @@
+# Utility source (concessionária / source of grid power).
+# v3.1.1 Sprint 2 — paridade Tutorial PTW §Part 1 p.21-28
+# (utility component com MVAsc + X/R + kV).
+#
+# Distinto de Vac (fonte ideal Qucs/ATP-EMTP) — Util tem
+# impedância equivalente (Z_pos = V² / MVAsc) e usa X/R
+# para análise de SC ANSI/IEC.
+
+schema_version: "1.0"
+code: UTIL
+label_pt: Utility (concessionária)
+label_en: Utility source
+description: |
+  Fonte de potência da concessionária com impedância equivalente
+  derivada de MVA de curto-circuito (MVAsc) e relação X/R. Em
+  análises ANSI/IEC SC e PF, a Util é o **swing bus** (PV ou
+  Slack) do sistema.
+
+  Modelo:
+  * V nominal: kV L-L
+  * MVAsc: capacidade de SC trifásica fornecida pela utility
+  * X/R: relação X/R no point of interconnection (PCC)
+  * Tipo de aterramento: solid / NGR / IT
+
+  Cobertura normativa
+  ====================
+  * ANSI/IEEE C37.010-1979 (utility model)
+  * IEC 60909-0:2016 §3.2 (Voltage source equivalent)
+  * IEEE 141-1993 (Red Book) §4.4
+  * NBR IEC 60909 (Brasil)
+
+category: source
+atp_supported: false
+
+symbol:
+  size: [50, 50]
+  bounding_box: [-25, -25, 50, 50]
+  renderer: UtilitySymbol
+
+pins:
+  - name: T1
+    label: Phase
+    position: [0, 25]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: UTIL-001
+    visible: true
+    group: main
+    description: Identificador único da utility no projeto
+
+  - name: nominal_voltage_kV
+    label: Tensão nominal
+    unit: kV
+    type: float
+    default: 13.8
+    visible: true
+    group: main
+    description: Tensão L-L da utility (V_LL)
+
+  - name: mva_sc
+    label: MVAsc 3-phase
+    unit: MVA
+    type: float
+    default: 200.0
+    visible: true
+    group: main
+    description: |
+      Capacidade de curto-circuito trifásica no PCC. Valor
+      tipicamente fornecido pela concessionária. Z_pos =
+      V_LL² / MVAsc (pu MVA base).
+
+  - name: x_over_r
+    label: X/R no PCC
+    type: float
+    default: 10.0
+    visible: true
+    group: main
+    description: |
+      Relação X/R da impedância equivalente da utility.
+      Usada em ANSI C37 e arc-flash para asymmetric duty.
+
+  - name: mva_sc_slg
+    label: MVAsc SLG (single-line-to-ground)
+    unit: MVA
+    type: float
+    default: 0.0
+    visible: false
+    group: advanced
+    description: |
+      Capacidade de SC monofásica (SLG). Se 0, assume Z0=Z1.
+
+  - name: grounding
+    label: Aterramento
+    type: enum
+    default: solid
+    visible: true
+    group: advanced
+    choices: [solid, NGR, IT, no_ground]
+    description: |
+      Tipo de aterramento do neutro:
+      solid (sólido), NGR (resistor de aterramento),
+      IT (isolado), no_ground (sem neutro).
+
+  - name: pre_fault_voltage_pu
+    label: V pre-fault
+    unit: pu
+    type: float
+    default: 1.0
+    visible: false
+    group: advanced
+    description: |
+      Voltagem pre-fault em pu (default 1.0). Usado em
+      análises ANSI C37 (PTW Tutorial §Part 5 p.131-135).
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: utility_no_atp
+
+llm_hints:
+  typical_applications:
+    - Concessionária de distribuição BT/MT (Tutorial §Part 1)
+    - PCC em estudos ANSI Comp SC (A_FAULT §1.4.4 Plant)
+    - Slack bus em load flow (IEEE 399)
+  references:
+    - "PTW Tutorial v8.0 §Part 1 p.21-28"
+    - "ANSI/IEEE C37.010-1979"
+    - "IEC 60909-0:2016 §3.2"
+    - "IEEE Std 141 (Red Book) §4.4"
+  common_mistakes:
+    - "MVAsc muito baixo → Z_eq grande → I_fault subestimado"
+    - "X/R = 0 → análise asymmetric perde significado"
+    - "MVAsc SLG = 0 quando Z0 ≠ Z1 → SLG fault errado"

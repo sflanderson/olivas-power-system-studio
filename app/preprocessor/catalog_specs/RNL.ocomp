@@ -1,0 +1,56 @@
+# Resistor não-linear R(I) — curva arbitrária via tabela.
+
+schema_version: "1.0"
+code: RNL
+label_pt: Resistor não-linear R(I)
+label_en: Nonlinear resistor R(I)
+description: |
+  Resistor com característica V-I definida por tabela lookup.
+  Genérico — usuário fornece um arquivo .dat com pares (I, V).
+  Emissão ATP: TYPE-99 (PWL exponential) ou TYPE-92.
+
+  Exemplos: MOV customizado, varistor, arc furnace, característica
+  saturada de contato (chave).
+
+category: nonlinear
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: NonLinearRSymbol
+
+pins:
+  - name: p1
+    label: Terminal superior
+    position: [0, -30]
+  - name: p2
+    label: Terminal inferior
+    position: [0, 30]
+
+properties:
+  - name: lookup_file
+    label: Tabela R(I)
+    type: file
+    default: "lookup.dat"
+    visible: true
+    group: main
+    description: Arquivo .dat com pares (I, V)
+
+atp_emission:
+  kind: nonlinear_r
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - MOV customizado (fora do catálogo ZnO)
+    - Arc furnace (resistência variável)
+    - Contato de chave com característica não-ideal
+  references:
+    - "ATP Rule Book, Section II.C (TYPE-99 PWL exponential)"
+  common_mistakes:
+    - Tabela não-monotônica (solução multi-valued)
+    - Extrapolação fora dos limites da tabela causa divergência
+  alternatives:
+    - ZnO — para-raios com curva paramétrica (V_ref)
+    - R — linear (para sistemas lineares)

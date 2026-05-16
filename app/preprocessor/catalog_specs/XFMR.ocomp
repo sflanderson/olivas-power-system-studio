@@ -1,0 +1,201 @@
+# XFMR — Hybrid Transformer (Mork model) com núcleo topologicamente correto.
+
+schema_version: "1.0"
+code: XFMR
+label_pt: Transformador Hybrid (XFMR)
+label_en: Hybrid Transformer (Mork)
+description: |
+  Modelo Hybrid Transformer (XFMR) baseado no trabalho de
+  Mork et al. (Michigan Tech, BPA-funded). Captura corretamente
+  fenômenos não-lineares do núcleo, fundamental para:
+
+  * Estudos de **inrush** (energização)
+  * Sympathetic inrush em transformadores próximos
+  * Geomagnetic disturbance (GIC/GMD)
+  * Ferroressonância
+  * Coordenação 87T (bloqueio de 2ª harmônica)
+
+  Diferente do BCTRAN (linear), o XFMR modela:
+  - Saturação por perna do núcleo (3-leg, 5-leg, shell-form)
+  - Equação de Frolich para magnetização
+  - Fluxo residual (key parameter para inrush)
+
+  MVP v0.27.5: Test Report mode com 2 enrolamentos (HV+LV).
+
+category: coupled
+atp_supported: true
+
+symbol:
+  size: [80, 80]
+  bounding_box: [-40, -40, 80, 80]
+  renderer: TransformerSymbol
+
+pins:
+  - name: HV_A
+    label: Primário Fase A
+    position: [-40, -25]
+  - name: HV_B
+    label: Primário Fase B
+    position: [-40, 0]
+  - name: HV_C
+    label: Primário Fase C
+    position: [-40, 25]
+  - name: LV_A
+    label: Secundário Fase A
+    position: [40, -25]
+  - name: LV_B
+    label: Secundário Fase B
+    position: [40, 0]
+  - name: LV_C
+    label: Secundário Fase C
+    position: [40, 25]
+
+properties:
+  # Ratings
+  - name: rated_voltage_HV_kV
+    label: V_HV nominal (kV)
+    type: float
+    default: "138"
+    visible: true
+    group: main
+
+  - name: rated_voltage_LV_kV
+    label: V_LV nominal (kV)
+    type: float
+    default: "13.8"
+    visible: true
+    group: main
+
+  - name: rated_power_MVA
+    label: S_3φ nominal (MVA)
+    type: float
+    default: "25"
+    visible: true
+    group: main
+
+  - name: frequency_Hz
+    label: Frequência (Hz)
+    type: float
+    default: "60"
+    visible: true
+    group: main
+
+  # Core
+  - name: core_type
+    label: Tipo de núcleo
+    type: string
+    default: "THREE_LEG"
+    visible: true
+    group: main
+    description: TRIPLEX, THREE_LEG, FIVE_LEG, SHELL.
+
+  # Test report — short circuit
+  - name: uk_pos_pct
+    label: uk + (%)
+    type: float
+    default: "10"
+    visible: true
+    group: electrical
+
+  - name: p_load_kW
+    label: Perdas de carga (kW)
+    type: float
+    default: "100"
+    visible: true
+    group: electrical
+
+  # Test report — no load
+  - name: i_no_load_pct
+    label: I_0 (%)
+    type: float
+    default: "0.5"
+    visible: true
+    group: electrical
+
+  - name: p_no_load_kW
+    label: P_0 vazio (kW)
+    type: float
+    default: "15"
+    visible: true
+    group: electrical
+
+  # Inrush parameters
+  - name: residual_flux_pu
+    label: Fluxo residual (pu)
+    type: float
+    default: "0.0"
+    visible: true
+    group: advanced
+    description: Crítico para pico de inrush (-0.95 a 0.95).
+
+  - name: final_slope_inductance_pu
+    label: La saturação extrema (pu)
+    type: float
+    default: "0.04"
+    visible: false
+    group: advanced
+
+  # Connections
+  - name: connection_HV
+    label: Conexão HV
+    type: string
+    default: "Yg"
+    visible: false
+    group: advanced
+
+  - name: connection_LV
+    label: Conexão LV
+    type: string
+    default: "D"
+    visible: false
+    group: advanced
+
+  # Capacitances (optional)
+  - name: C_HV_to_ground_pF
+    label: C HV-terra (pF)
+    type: float
+    default: "0"
+    visible: false
+    group: advanced
+
+  - name: C_LV_to_ground_pF
+    label: C LV-terra (pF)
+    type: float
+    default: "0"
+    visible: false
+    group: advanced
+
+  - name: C_HV_LV_pF
+    label: C HV-LV (pF)
+    type: float
+    default: "0"
+    visible: false
+    group: advanced
+
+atp_emission:
+  kind: custom
+  count: 1
+  custom_emitter: xfmr.emit_xfmr_cards
+
+llm_hints:
+  typical_applications:
+    - Estudo de inrush em energização de TR
+    - Sympathetic inrush (TR adjacente)
+    - Geomagnetic disturbance (GIC)
+    - Ferroressonância
+    - Coordenação 87T com bloqueio de 2ª harmônica
+  references:
+    - "B. A. Mork et al. MTU4-MTU7 reports (BPA, 2002-2008)"
+    - "H. K. Høidalen, ATPDraw §5.7 Hybrid Transformer"
+    - "IEEE Std C57.123-2002"
+    - "IEEE C37.91-2008 (Transformer Protection)"
+    - "Dommel EMTP Theory Book §6.3"
+  common_mistakes:
+    - "Usar BCTRAN linear para inrush — subestima pico em 5-10×"
+    - "Ignorar fluxo residual após desligamento (pior caso)"
+    - "Não diferenciar 3-leg vs 5-leg para zero-seq"
+    - "La (final slope) muito alto subestima inrush"
+  alternatives:
+    - "BCTRAN — linear, OK para steady-state e SC; FALHA em inrush"
+    - "Tr/sTr — modelo simples saturável; menos preciso"
+    - "TopMag (Saber) — alternativa não-ATP"

@@ -1,0 +1,44 @@
+# Referência de terra — 1 pino, conecta ao nó 0 (TERRA) do ATP.
+
+schema_version: "1.0"
+code: GND
+label_pt: Terra
+label_en: Ground
+description: |
+  Referência de terra. Todo nó ligado a este componente vira
+  o nó 0 (TERRA) no cartão ATP. Obrigatório em todo circuito
+  com fonte de tensão — o EMTP precisa de uma referência.
+
+category: passive
+atp_supported: true
+
+symbol:
+  size: [30, 30]
+  bounding_box: [-15, 0, 30, 30]
+  renderer: GroundSymbol
+
+pins:
+  - name: gnd
+    label: Terra
+    position: [0, 0]
+    role: ground
+
+properties: []
+
+atp_emission:
+  kind: ground
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Ponto de referência de tensão de todo o circuito
+    - Aterramento de neutro (direto)
+    - Retorno de fontes DC
+  references:
+    - "ATP Rule Book, Section I (nó 0 reservado)"
+  common_mistakes:
+    - Esquecer GND em um circuito com AC source causa matriz singular
+    - Múltiplos GND em subcircuitos desconectados não são problema (todos viram nó 0)
+  alternatives:
+    - R de baixo valor + GND = aterramento com impedância (NGR)
+    - L-R série + GND = aterramento por bobina Petersen

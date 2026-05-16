@@ -1,0 +1,52 @@
+# Bloco TACS — expressão/lógica de controle inline.
+
+schema_version: "1.0"
+code: TACS
+label_pt: Fonte TACS
+label_en: TACS expression source
+description: |
+  Bloco TACS (Transient Analysis of Control Systems) — permite
+  escrever expressões matemáticas de controle inline (f(t), PID,
+  filtros, lógica digital). Emissão ATP: section /TACS HYBRID
+  com a expressão convertida em devices adequados (integrador,
+  derivador, etc.).
+
+  Sem pinos elétricos — conecta via nome de sinal.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties:
+  - name: expression
+    label: Expressão TACS
+    type: string
+    default: "f(t)"
+    visible: true
+    group: main
+    description: Expressão matemática (sintaxe ATP TACS)
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - PID de controle de tensão em STATCOM
+    - Geração de sinal de disparo para tiristor
+    - Lógica digital (AND/OR/FlipFlop)
+    - Filtros passa-baixa (PLL)
+  references:
+    - "ATP Rule Book, Section V (TACS Hybrid)"
+  common_mistakes:
+    - Sintaxe TACS difere de MODELS (não misturar)
+    - TACS é sincronizado com step de simulação principal
+  alternatives:
+    - MODEL — lógica mais complexa em bloco MODEL externo
+    - SwTACS — chave controlada pelo sinal

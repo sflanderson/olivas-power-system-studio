@@ -1,0 +1,64 @@
+# Fonte de tensão em rampa linear (slope).
+
+schema_version: "1.0"
+code: Vrect
+label_pt: Fonte de tensão rampa
+label_en: Ramp voltage source
+description: |
+  Fonte de tensão com rampa linear:
+
+    v(t) = amplitude * (t / T_rampa) para 0 <= t <= T_rampa
+    v(t) = amplitude                  para t > T_rampa
+
+  Equivalente a TYPE-13 ATP (rampa). Útil para simular partida
+  suave, soft-start, rise time de fontes DC.
+
+category: source
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: VdcSymbol
+
+pins:
+  - name: p_pos
+    label: Terminal positivo
+    position: [0, -30]
+  - name: p_neg
+    label: Terminal negativo
+    position: [0, 30]
+
+properties:
+  - name: amplitude
+    label: Amplitude final
+    unit: V
+    type: string
+    default: "100 V"
+    visible: true
+    group: main
+  - name: T_rampa
+    label: Tempo de rampa
+    unit: s
+    type: string
+    default: "10 ms"
+    visible: true
+    group: main
+
+atp_emission:
+  kind: source_ramp
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Simulação de soft-start de inversor
+    - Rise time controlado de fonte DC
+    - Teste de proteção com taxa dV/dt limitada
+  references:
+    - "ATP Rule Book, Section IV (SOURCE TYPE-13)"
+  common_mistakes:
+    - T_rampa = 0 gera degrau (indefinido)
+    - Confundir com Vsurge (impulso curto)
+  alternatives:
+    - Vdc — degrau imediato
+    - Vsurge — impulso 1.2/50, 8/20

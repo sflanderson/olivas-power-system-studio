@@ -1,0 +1,46 @@
+# Voltímetro (probe de tensão) — sonda não-intrusiva.
+
+schema_version: "1.0"
+code: VProbe
+label_pt: Voltímetro (probe)
+label_en: Voltage probe
+description: |
+  Sonda de tensão ideal — mede V entre dois nós SEM inserir ramo
+  (impedância infinita). No ATP corresponde a uma entrada implícita
+  na saída de dados (.pl4): o nó é listado em /OUTPUT, o usuário
+  obtém V(node) no pós-processamento.
+
+category: meter
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: VProbeSymbol
+
+pins:
+  - name: p_pos
+    label: Terminal positivo (medido)
+    position: [0, -30]
+  - name: p_neg
+    label: Terminal de referência (normalmente GND)
+    position: [0, 30]
+
+properties: []
+
+atp_emission:
+  kind: probe_v
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Medir V em barra durante simulação transitória
+    - Monitorar TRV em terminais de chave
+    - Verificar convergência em pós-processamento
+  references:
+    - "ATP Rule Book, Section III (OUTPUT)"
+  common_mistakes:
+    - Esquecer de adicionar o nó à lista /OUTPUT manualmente
+    - Usar probe de tensão onde precisa de probe de corrente
+  alternatives:
+    - IProbe — sonda de corrente

@@ -1,0 +1,68 @@
+# IGBT — Insulated Gate Bipolar Transistor.
+
+schema_version: "1.0"
+code: IGBT
+label_pt: IGBT
+label_en: Insulated Gate Bipolar Transistor
+description: |
+  Chave totalmente controlada (gate isolado). Liga/desliga com
+  comando no gate. Usado amplamente em drives de baixa/média
+  potência (até ~10 MVA), UPS, STATCOM, veículos elétricos.
+  Emissão ATP: TYPE-11 + lógica gate.
+
+category: power_el
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: IGBTSymbol
+
+pins:
+  - name: collector
+    label: Coletor
+    position: [-30, 0]
+  - name: emitter
+    label: Emissor
+    position: [30, 0]
+  - name: gate
+    label: Gate
+    position: [0, 20]
+
+properties:
+  - name: V_gate_on
+    label: V_gate_on
+    unit: V
+    type: float
+    default: 2.5
+    visible: true
+    group: electrical
+    min: 0.0
+    description: Tensão threshold de condução gate-emissor
+  - name: R_on
+    label: R_on
+    unit: ohm
+    type: float
+    default: 1.0e-3
+    visible: false
+    group: electrical
+    min: 0.0
+
+atp_emission:
+  kind: igbt
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Inversor 3φ para drives industriais
+    - UPS dupla conversão
+    - STATCOM / SVC
+    - Veículo elétrico (inversor de tração)
+  references:
+    - "N. Mohan, T. Undeland, W. Robbins, 'Power Electronics', 3ª ed., 2003"
+  common_mistakes:
+    - Não modelar o diodo antiparalelo (roda-livre) em cargas indutivas
+    - Frequência > 50 kHz causa perdas significativas (usar MOSFET)
+  alternatives:
+    - MOSFET — sem queda de tensão mínima, frequências maiores
+    - GTO — potências maiores

@@ -1,0 +1,37 @@
+# Análise transitória — diretiva de simulação Qucs.
+
+schema_version: "1.0"
+code: ".TR"
+label_pt: Análise transitória
+label_en: Transient analysis
+description: |
+  Diretiva Qucs de análise transitória (.TR). No ATP o controle
+  equivalente é feito pelo cartão TIMECARD (Δt, T_max). Esta
+  entrada existe apenas para preservar o layout original do .sch
+  — o conteúdo não é emitido no .atp.
+
+category: sim
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties: []
+
+atp_emission:
+  kind: custom
+  count: 0
+
+llm_hints:
+  typical_applications:
+    - Preservar análises Qucs ao importar .sch para visualização
+  references:
+    - "Qucs Reference Manual, Sec. 3.1 (Transient)"
+  common_mistakes:
+    - Esperar que .TR configure T_max do ATP — setar em TIMECARD
+  alternatives:
+    - TIMECARD no ATP (configurado pelo editor de texto)

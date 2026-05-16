@@ -1,0 +1,63 @@
+# Para-raios ZnO (óxido de zinco) — não-linear com V_ref de joelho.
+
+schema_version: "1.0"
+code: ZnO
+label_pt: Para-raios ZnO
+label_en: ZnO surge arrester
+description: |
+  Para-raios de óxido de zinco (metal oxide varistor, MOV).
+  Característica V-I altamente não-linear: abaixo de V_ref comporta-
+  se como isolador (corrente de fuga µA); acima conduz como
+  condutor (dezenas de kA). Proteção primária contra surtos
+  atmosféricos e manobras em MT/AT.
+
+  Emissão ATP: TYPE-92 (ZnO) ou lookup via TYPE-99 se for uma
+  característica customizada. Atualmente placeholder.
+
+category: nonlinear
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: ZnOSymbol
+
+pins:
+  - name: p1
+    label: Terminal superior
+    position: [0, -30]
+  - name: p2
+    label: Terminal inferior (normalmente aterrado)
+    position: [0, 30]
+
+properties:
+  - name: V_ref
+    label: Tensão de referência (joelho)
+    unit: V
+    type: string
+    default: "200 V"
+    visible: true
+    group: electrical
+    description: V na corrente de referência 1 mA (IEC 60099-4)
+
+atp_emission:
+  kind: zno
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Proteção contra surtos atmosféricos em subestação
+    - Para-raios de linha (limitador de TRV em VCB)
+    - Proteção de transformador contra chaveamento
+    - MOV em filtro de fonte (AC-DC)
+  references:
+    - "IEC 60099-4 — Metal-oxide surge arresters"
+    - "IEEE C62.11 — MOV arresters for AC systems"
+    - "CIGRE WG A3.17, 'Metal Oxide Arresters'"
+  common_mistakes:
+    - Dimensionar V_ref abaixo da tensão de operação (drive-out)
+    - Não considerar MCOV (Maximum Continuous Operating Voltage)
+    - Ignorar energy rating (absorção de surtos)
+  alternatives:
+    - RNL — R(I) genérico com curva arbitrária
+    - LNL — indutor saturável (não para proteção)

@@ -1,0 +1,252 @@
+# Synchronous Machine SM59/SM58 — manufacturers data input.
+
+schema_version: "1.0"
+code: SM
+label_pt: Máquina Síncrona
+label_en: Synchronous Machine
+description: |
+  Máquina síncrona ATP MACHINE-59 (2 amortecedores) ou MACHINE-58
+  (1 amortecedor — q-axis sem transitório, default para hidro
+  salient-pole). Modelagem completa via Park transformation com
+  manufacturers data padrão IEEE Std 115.
+
+  Aplicações típicas:
+
+  * **TRT (Transient Recovery Voltage)** — gerador como fonte
+    atrás do disjuntor.
+  * **Curto-circuito** alimentado por gerador — pico subtransi-
+    tório define rating de equipamento.
+  * **Estabilidade transitória** — H define inércia eletromecânica.
+  * **Inrush sympathetic** — trafo próximo ao gerador.
+
+  Nota: tipo 58 é selecionado automaticamente quando Xq' = 0
+  (round-rotor com Xq' > 0 ⇒ tipo 59).
+
+category: machine
+atp_supported: true
+
+symbol:
+  size: [80, 80]
+  bounding_box: [-40, -40, 80, 80]
+  renderer: SynchronousMachineSymbol
+
+pins:
+  - name: A
+    label: Terminal A
+    position: [40, -20]
+  - name: B
+    label: Terminal B
+    position: [40, 0]
+  - name: C
+    label: Terminal C
+    position: [40, 20]
+  - name: N
+    label: Neutro (opcional)
+    position: [40, 40]
+
+properties:
+  # Ratings
+  - name: rated_voltage_kV
+    label: Tensão nominal V_LL (kV)
+    type: float
+    default: "13.8"
+    visible: true
+    group: main
+    description: Tensão nominal linha-linha em kV.
+
+  - name: rated_power_MVA
+    label: Potência S_3φ (MVA)
+    type: float
+    default: "100"
+    visible: true
+    group: main
+
+  - name: frequency_Hz
+    label: Frequência (Hz)
+    type: float
+    default: "60"
+    visible: true
+    group: main
+
+  - name: n_poles
+    label: Número de polos
+    type: float
+    default: "2"
+    visible: true
+    group: main
+
+  # d-axis
+  - name: Xd
+    label: Xd (pu)
+    type: float
+    default: "1.8"
+    visible: true
+    group: electrical
+    description: Reatância d-axis síncrona (pu).
+
+  - name: Xd_prime
+    label: Xd' (pu)
+    type: float
+    default: "0.30"
+    visible: true
+    group: electrical
+    description: Reatância d-axis transitória.
+
+  - name: Xd_pp
+    label: Xd'' (pu)
+    type: float
+    default: "0.20"
+    visible: true
+    group: electrical
+    description: Reatância d-axis subtransitória.
+
+  - name: Td_prime
+    label: Td' (s)
+    type: float
+    default: "0.8"
+    visible: true
+    group: electrical
+    description: Constante de tempo CC d-axis transitória.
+
+  - name: Td_pp
+    label: Td'' (s)
+    type: float
+    default: "0.030"
+    visible: true
+    group: electrical
+    description: Constante de tempo CC d-axis subtransitória.
+
+  # q-axis
+  - name: Xq
+    label: Xq (pu)
+    type: float
+    default: "1.7"
+    visible: true
+    group: electrical
+
+  - name: Xq_prime
+    label: Xq' (pu) [0 = tipo 58]
+    type: float
+    default: "0.55"
+    visible: true
+    group: electrical
+    description: Reatância q-axis transitória (0 ativa tipo 58 sem transitório q).
+
+  - name: Xq_pp
+    label: Xq'' (pu)
+    type: float
+    default: "0.20"
+    visible: true
+    group: electrical
+
+  - name: Tq_prime
+    label: Tq' (s)
+    type: float
+    default: "0.4"
+    visible: false
+    group: electrical
+
+  - name: Tq_pp
+    label: Tq'' (s)
+    type: float
+    default: "0.050"
+    visible: false
+    group: electrical
+
+  # Comuns
+  - name: Ra
+    label: Ra (pu)
+    type: float
+    default: "0.003"
+    visible: false
+    group: electrical
+    description: Resistência de armadura (pu).
+
+  - name: xL
+    label: xL (pu)
+    type: float
+    default: "0.15"
+    visible: false
+    group: electrical
+    description: Reatância de dispersão de estator.
+
+  - name: X0
+    label: X0 (pu)
+    type: float
+    default: "0.05"
+    visible: false
+    group: electrical
+    description: Reatância zero-sequência.
+
+  # Mecânica
+  - name: H
+    label: H (s) - inércia
+    type: float
+    default: "3.0"
+    visible: true
+    group: advanced
+    description: Constante de inércia em segundos (energia cinética / S_base).
+
+  - name: D
+    label: D (pu) - damping
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+  # Inicialização
+  - name: P0_MW
+    label: P0 inicial (MW)
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+  - name: Q0_MVAr
+    label: Q0 inicial (MVAr)
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+  - name: V0_pu
+    label: V0 inicial (pu)
+    type: float
+    default: "1.0"
+    visible: false
+    group: advanced
+
+  - name: angle0_deg
+    label: ang0 inicial (graus)
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+atp_emission:
+  kind: custom
+  count: 1
+  custom_emitter: synchronous_machine.emit_sm_cards
+
+llm_hints:
+  typical_applications:
+    - TRT (Transient Recovery Voltage) — disjuntor desligando carga indutiva
+    - Curto-circuito alimentado por gerador (pico subtransitório)
+    - Estabilidade transitória após falta
+    - Sympathetic inrush em transformadores próximos
+    - Energia incidente em arc-flash
+  references:
+    - "IEEE Std 115-2009 (test procedures for synchronous machines)"
+    - "P. M. Anderson, A. A. Fouad, Power System Control and Stability §4"
+    - "P. Kundur, Power System Stability and Control §3"
+    - "ATP Rule Book vol 2, Section VIII (synchronous machines)"
+  common_mistakes:
+    - "Hierarquia Xd > Xd' > Xd'' > xL violada — verifica datasheet"
+    - "Td' < Td'' (deve ser oposto — transient é mais lento)"
+    - "Esquecer X0 (necessário para faltas desbalanceadas)"
+    - "H expressa em MWs/MVA é o mesmo que segundos"
+    - "Tipo 58 com Xq' > 0 — usar tipo 59 ou zerar Xq'"
+  alternatives:
+    - "IM56 — máquina de indução"
+    - "UM_1/3/4/6/8 — Universal Machine (mais flexível, manual)"
+    - "Vac — fonte ideal AC (sem dinâmica)"

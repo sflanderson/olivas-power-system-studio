@@ -1,0 +1,136 @@
+# Harmonic shunt filter.
+# v3.1.1 Sprint 2 — paridade Tutorial PTW §Part 7 (HI_WAVE) p.205-208
+# (Filter Design — Single Tuned, High-Pass, Double-Tuned).
+
+schema_version: "1.0"
+code: FILTER
+label_pt: Filtro harmônico (shunt)
+label_en: Harmonic shunt filter
+description: |
+  Filtro shunt para mitigação de harmônicos. Tipos:
+
+  * **Single-tuned** — sintonia em uma harmônica (5ª, 7ª, 11ª, 13ª)
+  * **Double-tuned** — duas frequências de notch
+  * **High-pass** — atenuação acima de uma frequência de corte
+  * **C-type** — combinação para 50/60 Hz fundamental
+
+  Modelo IEEE 519 / IEEE 1531:
+  * Q-factor (X_L / R) — agudez do notch
+  * Harmonic order (h) — 5, 7, 11, 13 etc.
+  * Q reactive (kVAR @ fundamental) — capacidade base
+  * V nominal
+
+  Cobertura normativa
+  ====================
+  * IEEE Std 519-2014 (Harmonic Control)
+  * IEEE Std 1531-2003 (Filter Design Guide)
+  * IEC 61000-3-6 (compatibility levels)
+
+category: filter
+atp_supported: false
+
+symbol:
+  size: [50, 60]
+  bounding_box: [-25, -30, 50, 60]
+  renderer: FilterSymbol
+
+pins:
+  - name: T1
+    label: Phase
+    position: [0, -30]
+  - name: T2
+    label: Neutral / Ground
+    position: [0, 30]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: FLT-001
+    visible: true
+    group: main
+    description: Identificador
+
+  - name: filter_type
+    label: Tipo de filtro
+    type: enum
+    default: single_tuned
+    visible: true
+    group: main
+    choices:
+      - single_tuned
+      - double_tuned
+      - high_pass
+      - c_type
+    description: |
+      Tipo do filtro shunt. Single-tuned é o mais comum em
+      indústria; high-pass usado para harmônicas altas.
+
+  - name: harmonic_order
+    label: Ordem harmônica (h)
+    type: float
+    default: 5.0
+    visible: true
+    group: main
+    description: |
+      Harmônica a sintonizar (5, 7, 11, 13). Para tunar abaixo
+      do nominal de h_n: usar h_tune = h_n − 0.05·h_n
+      (ex: h_n=5 → h_tune=4.75 para evitar drift).
+
+  - name: q_factor
+    label: Q-factor
+    type: float
+    default: 50.0
+    visible: true
+    group: main
+    description: |
+      Quality factor X_L / R. Típico 30-100. Maior Q =
+      notch mais agudo, menos perda mas menos robustez.
+
+  - name: q_reactive_kvar
+    label: Reativos no fundamental
+    unit: kVAR
+    type: float
+    default: 100.0
+    visible: true
+    group: main
+    description: |
+      Capacidade reativa do banco capacitor no fundamental
+      (60 Hz). Define o tamanho do filtro.
+
+  - name: nominal_voltage_kV
+    label: Tensão nominal
+    unit: kV
+    type: float
+    default: 13.8
+    visible: true
+    group: main
+    description: Tensão L-L do filtro
+
+  - name: vendor_model
+    label: Vendor / Model
+    type: string
+    default: ""
+    visible: false
+    group: advanced
+    description: Vendor + modelo (link à EquipmentLibrary)
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: filter_no_atp
+
+llm_hints:
+  typical_applications:
+    - Filtro 5ª harmônica em planta com VFDs (6-pulse drives)
+    - High-pass para mitigar ressonância em sistemas ipv
+    - Banco capacitor sintonizado MV (substituir capacitor puro)
+  references:
+    - "PTW Tutorial v8.0 §Part 7 p.205-208 (Filter Design)"
+    - "IEEE Std 519-2014"
+    - "IEEE Std 1531-2003"
+    - "IEC 61000-3-6"
+  common_mistakes:
+    - "harmonic_order = h_n exato → drift de capacitor causa shift"
+    - "Q-factor muito alto → filtro frágil a tolerâncias"
+    - "Sem detuning → ressonância paralela com sistema"

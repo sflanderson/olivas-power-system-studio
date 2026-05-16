@@ -1,0 +1,93 @@
+# Indutor saturável L(i) — curva arbitrária via tabela.
+
+schema_version: "1.0"
+code: LNL
+label_pt: Indutor saturável L(i)
+label_en: Saturable inductor L(i)
+description: |
+  Indutor com característica fluxo-corrente (φ-i) não-linear.
+  Representa núcleos ferromagnéticos em saturação. Emissão ATP:
+  TYPE-98 (PWL flux-current) ou TYPE-93 para núcleos histeréticos.
+
+  Essencial para estudos de inrush current, ferrorressonância,
+  saturação em TC.
+
+category: nonlinear
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: NonLinearLSymbol
+
+pins:
+  - name: p1
+    label: Terminal superior
+    position: [0, -30]
+  - name: p2
+    label: Terminal inferior
+    position: [0, 30]
+
+properties:
+  - name: lookup_file
+    label: Tabela φ(i) (arquivo)
+    type: file
+    default: "sat.dat"
+    visible: false
+    group: main
+    description: Arquivo .dat com pares (corrente, fluxo). Opcional — use sat_curve_csv para curva inline.
+  # v0.24.2: curva inline em CSV — alternativa mais prática ao
+  # arquivo externo. Se preenchido, bridge emite cards Type-98.
+  - name: sat_curve_csv
+    label: Curva de saturação (i, ψ)
+    type: string
+    default: ""
+    visible: true
+    group: main
+    widget_hint: saturation_curve
+    description: |
+      Pontos (i, ψ) da característica PWL do núcleo.
+      i em Amperes, ψ em V·s (fluxo concatenado). Monotônico em ambos.
+      Editor tabular com +/- linha, validação visual, preview matplotlib.
+      Serializa internamente como "0,0; 1,0.95; 5,1.05" (CSV).
+      Se preenchido, gera cards ATP Type-98 reais; vazio → placeholder.
+    example: "0,0; 1,0.95; 5,1.05; 20,1.10; 200,1.15"
+  - name: i_ss
+    label: I em regime (phasor)
+    unit: A
+    type: float
+    default: 0.0
+    visible: false
+    group: advanced
+    min: 0.0
+    description: Corrente em regime (chute inicial para solver)
+  - name: flux_ss
+    label: Fluxo em regime (phasor)
+    unit: V·s
+    type: float
+    default: 0.0
+    visible: false
+    group: advanced
+    min: 0.0
+    description: Fluxo em regime (chute inicial para solver)
+
+atp_emission:
+  kind: nonlinear_l
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Inrush de transformador na energização
+    - Ferrorressonância em trafo de potencial (TP)
+    - Saturação de TC em curto-circuito
+    - Reator com núcleo saturável (inductivo-saturável)
+  references:
+    - "ATP Rule Book, Section II.C (TYPE-98)"
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Section 6.2"
+  common_mistakes:
+    - Usar curva linearizada (L constante) em inrush
+    - Ignorar histerese em núcleos amorfos
+    - Confundir φ (fluxo concatenado) com B (densidade de fluxo)
+  alternatives:
+    - L — linear (sem saturação)
+    - MUT — acoplamento magnético sem núcleo

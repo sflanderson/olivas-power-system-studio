@@ -1,0 +1,37 @@
+# docker-compose.yml — Olivas v2.0.0
+# Reproducible multi-service deployment.
+
+version: "3.9"
+
+services:
+  olivas:
+    image: olivas:2.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: olivas-app
+    environment:
+      - QT_QPA_PLATFORM=offscreen
+      - OLIVAS_HEADLESS=1
+      - OLIVAS_LOCALE=pt
+    volumes:
+      - ./app:/app/app:ro
+      - ./tests:/app/tests:ro
+      - ./reports:/app/reports
+    # Default: roda tests; override para análise:
+    # docker compose run olivas python -c "..."
+    command: ["tests/", "-q"]
+
+  # Postgres opcional para multi-user (v2.0+)
+  # Descomentar se features multi-user forem usadas
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_DB: olivas
+  #     POSTGRES_USER: olivas
+  #     POSTGRES_PASSWORD: olivas_dev
+  #   volumes:
+  #     - olivas-pgdata:/var/lib/postgresql/data
+
+# volumes:
+#   olivas-pgdata:

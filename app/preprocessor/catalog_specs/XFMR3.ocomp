@@ -1,0 +1,215 @@
+# Transformador trifásico de potência (análise NBR/IEEE).
+# Substitui Tr3.ocomp orientado a ATP/BCTRAN.
+
+schema_version: "1.0"
+code: XFMR3
+label_pt: Transformador trifásico (Δ/Y/Yn)
+label_en: Three-phase Transformer
+description: |
+  Transformador trifásico de potência para análise elétrica
+  (curto-circuito, fluxo de potência, coordenação) com:
+
+  * Vector group selecionável: Yyn0, Dyn1, Yd1, Yd11, Dy1,
+    Dy11, Yyn0+Yyn0, YNyn0, Dyn5, Dyn11, etc.
+  * Aterramento configurável: solidly grounded, resistance
+    grounded (Rn), reactance grounded (Xn), ungrounded
+  * Impedância % (% Z) padrão ANSI/IEEE
+  * Razão X/R (típico 6 LV / 15-30 HV)
+  * Tap changer ±5×2.5% padrão
+
+  Cobertura normativa
+  ====================
+
+  * IEEE Std 242:2001 §11 (transformer protection)
+  * IEEE Std C57.12.00 (general requirements)
+  * IEEE Std C57.109-1993 (through-fault duration)
+  * IEC 60076-1 (power transformers)
+  * NBR 5440 (transformadores)
+  * ABNT NBR 5356 (transformadores de potência)
+
+  Diferença vs. Tr3 (legacy)
+  ---------------------------
+
+  * **Tr3** (v0.21.x): orientado ATP/BCTRAN. Usa V_H/V_M/V_B,
+    v_sc_HM_pct, etc. — campos de simulação transitória.
+  * **XFMR3** (v1.4.1): orientado análise eletrotécnica
+    NBR/IEEE. Vector_group + impedance% direto + grounding.
+    Sem dependência ATP.
+
+category: coupled
+atp_supported: false
+
+symbol:
+  size: [80, 60]
+  bounding_box: [-40, -30, 80, 60]
+  renderer: TransformerSymbol
+
+pins:
+  - name: P_A
+    label: Primário fase A
+    position: [-30, -20]
+  - name: P_B
+    label: Primário fase B
+    position: [-30, 0]
+  - name: P_C
+    label: Primário fase C
+    position: [-30, 20]
+  - name: S_A
+    label: Secundário fase A
+    position: [30, -20]
+  - name: S_B
+    label: Secundário fase B
+    position: [30, 0]
+  - name: S_C
+    label: Secundário fase C
+    position: [30, 20]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: "T-01"
+    visible: true
+    group: main
+    description: Identificador
+  - name: kVA_rated
+    label: Potência nominal
+    unit: kVA
+    type: float
+    default: 1000.0
+    visible: true
+    group: main
+    description: Potência nominal trifásica (kVA)
+  - name: V_pri_kV
+    label: Tensão primário
+    unit: kV
+    type: float
+    default: 13.8
+    visible: true
+    group: main
+    description: Tensão nominal lado primário (linha)
+  - name: V_sec_kV
+    label: Tensão secundário
+    unit: kV
+    type: float
+    default: 0.48
+    visible: true
+    group: main
+    description: Tensão nominal lado secundário (linha)
+  - name: vector_group
+    label: Vector Group
+    type: enum
+    default: Dyn1
+    visible: true
+    group: main
+    choices: [Yyn0, YNyn0, Dyn1, Dyn5, Dyn11, Yd1, Yd11,
+              Dy1, Dy11, Yy0, Dd0]
+    description: |
+      Configuração de enrolamentos IEEE/IEC.
+      Y=estrela, D=delta, n=neutro acessível, N=neutro
+      aterrado. Número = phase shift × 30° lag.
+      Ex: Dyn1 = delta primário / estrela aterrada secundário
+      / 30° lag (típico distribuição BR).
+  - name: impedance_pct
+    label: Impedância % (Z)
+    unit: "%"
+    type: float
+    default: 5.75
+    visible: true
+    group: main
+    description: |
+      Impedância % do transformador (placa). Tipicamente:
+      LV (≤500 kVA): 4-5%
+      MV: 5-7%
+      HV: 8-15%
+  - name: xr_ratio
+    label: Razão X/R
+    type: float
+    default: 6.0
+    visible: true
+    group: electrical
+    description: |
+      Razão X/R do transformador. Tipicamente:
+      LV (<500 kVA): 3-6
+      MV (500-5000 kVA): 6-12
+      HV (>5000 kVA): 15-30
+  - name: pri_grounding
+    label: Aterramento primário
+    type: enum
+    default: none
+    visible: true
+    group: electrical
+    choices: [none, solid, resistance, reactance]
+    description: |
+      Tipo de aterramento do neutro primário.
+      'none' apenas se vector_group permite (D = sem neutro).
+  - name: pri_grounding_ohm
+    label: Resistência/reactância aterramento primário
+    unit: ohm
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    description: |
+      Resistência (se pri_grounding=resistance) ou reactância
+      (se =reactance) do neutro primário. 0 se solid ou none.
+  - name: sec_grounding
+    label: Aterramento secundário
+    type: enum
+    default: solid
+    visible: true
+    group: electrical
+    choices: [none, solid, resistance, reactance]
+    description: Idem secundário
+  - name: sec_grounding_ohm
+    label: Resistência/reactância aterramento secundário
+    unit: ohm
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    description: 0 se solid ou none
+  - name: tap_position
+    label: Posição do tap
+    type: enum
+    default: "0"
+    visible: false
+    group: advanced
+    choices: ["-2", "-1", "0", "+1", "+2"]
+    description: |
+      Posição do tap changer (cada step ±2.5%).
+      Tap 0 = nominal. Tap +2 = +5% sobre V_pri.
+  - name: tap_step_pct
+    label: Step do tap %
+    unit: "%"
+    type: float
+    default: 2.5
+    visible: false
+    group: advanced
+    description: Step do tap (default 2.5% padrão NBR 5356)
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: xfmr3_no_atp
+
+llm_hints:
+  typical_applications:
+    - Subestação distribuição 13.8/0.48 kV (Dyn1 padrão BR)
+    - Subestação industrial 138/13.8 kV (Dy11 padrão IEEE)
+    - Auto-trafo HV 500/138 kV (YNyn0)
+    - Trafo de aterramento (zigzag) — não modelado aqui
+  references:
+    - "IEEE Std C57.12.00"
+    - "IEEE Std C57.109-1993 (through-fault)"
+    - "IEC 60076-1"
+    - "ABNT NBR 5356"
+    - "ABNT NBR 5440 (distribuição)"
+  common_mistakes:
+    - "Vector group errado (Dyn1 vs Dyn5) → fault analysis SLG errado"
+    - "Aterramento solid em sistema MV → fault HV pode danificar"
+    - "Impedance % muito baixo → fault Iccs cresce demais"
+    - "Esquecer X/R → kappa peak factor IEC 60909 vai errado"
+  alternatives:
+    - "Tr (2-enrol legacy) para análise simplificada"
+    - "Tr3 (3-enrol BCTRAN ATP) para transitórios"

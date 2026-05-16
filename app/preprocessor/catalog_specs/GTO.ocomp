@@ -1,0 +1,66 @@
+# GTO (Gate Turn-Off Thyristor).
+
+schema_version: "1.0"
+code: GTO
+label_pt: GTO
+label_en: Gate Turn-Off Thyristor
+description: |
+  Tiristor com capacidade de desligamento via gate (corrente
+  negativa de gate). Usado em aplicações de alta potência onde
+  IGBT não atinge — conversores HVDC, locomotivas, drives
+  industriais de grande porte. Emissão ATP: TYPE-11 + lógica gate.
+
+category: power_el
+atp_supported: true
+
+symbol:
+  size: [60, 40]
+  bounding_box: [-30, -25, 60, 40]
+  renderer: GTOSymbol
+
+pins:
+  - name: anode
+    label: Ânodo
+    position: [-30, 0]
+  - name: cathode
+    label: Cátodo
+    position: [30, 0]
+  - name: gate
+    label: Gate (turn-on/off)
+    position: [10, -20]
+
+properties:
+  - name: V_forward
+    label: V_forward
+    unit: V
+    type: float
+    default: 0.7
+    visible: true
+    group: electrical
+    min: 0.0
+  - name: R_on
+    label: R_on
+    unit: ohm
+    type: float
+    default: 1.0e-3
+    visible: false
+    group: electrical
+    min: 0.0
+
+atp_emission:
+  kind: gto
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - HVDC clássico (conversores de grande porte)
+    - Locomotivas elétricas
+    - STATCOM de alta potência
+  references:
+    - "ATP Rule Book, Section I.E"
+  common_mistakes:
+    - Confundir GTO com tiristor comum (GTO pode desligar por gate)
+    - Frequência máxima de chaveamento ~1 kHz — não usar em PWM alto
+  alternatives:
+    - Thyr — sem gate turn-off
+    - IGBT — mais comum em aplicações < 5 MVA

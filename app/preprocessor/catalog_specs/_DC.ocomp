@@ -1,0 +1,37 @@
+# Análise DC — diretiva de simulação Qucs.
+
+schema_version: "1.0"
+code: ".DC"
+label_pt: Análise DC
+label_en: DC analysis
+description: |
+  Diretiva Qucs de análise DC (.DC). No ATP corresponde a ignorar
+  elementos reativos e resolver o circuito como steady-state DC
+  — não há cartão direto; use uma simulação com T_max grande e
+  fonte DC. Preservada aqui apenas para compat com .sch originais.
+
+category: sim
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties: []
+
+atp_emission:
+  kind: custom
+  count: 0
+
+llm_hints:
+  typical_applications:
+    - Preservar análise Qucs de load flow DC
+  references:
+    - "Qucs Reference Manual, Sec. 3.2 (DC)"
+  common_mistakes:
+    - .DC não gera cartão ATP; omitir transientes manualmente
+  alternatives:
+    - Simulação ATP com T_max longo + fonte Vdc

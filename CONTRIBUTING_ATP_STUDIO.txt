@@ -1,0 +1,274 @@
+CONTRIBUTING
+ATP STUDIO
+
+============================================================
+1. OBJETIVO DESTE DOCUMENTO
+============================================================
+
+Este documento define diretrizes para desenvolvimento e contribuição
+no projeto ATP Studio.
+
+O objetivo é manter:
+
+- coerência arquitetural
+- qualidade do código
+- clareza organizacional
+- segurança de edição do arquivo ATP
+- facilidade de manutenção
+
+============================================================
+2. PRINCÍPIOS DE CONTRIBUIÇÃO
+============================================================
+
+Toda contribuição deve respeitar os princípios do projeto:
+
+1. o arquivo .atp é a fonte única da verdade
+2. parsing e GUI devem permanecer desacoplados
+3. alterações devem ser incrementais sempre que possível
+4. o modelo semântico é a base da inteligência do sistema
+5. robustez e rastreabilidade têm prioridade
+6. compatibilidade com ATP vale mais do que “embelezamento” de código
+
+============================================================
+3. ORGANIZAÇÃO DOS MÓDULOS
+============================================================
+
+A estrutura atual do projeto é:
+
+- app/core/
+- app/validation/
+- app/simulation/
+- app/gui/
+- docs/
+
+Toda nova funcionalidade deve ser alocada no módulo correto.
+
+Exemplos:
+
+Parsing:
+- app/core/parser.py
+
+Modelo semântico:
+- app/core/project_model.py
+
+Serialização:
+- app/core/serializer.py
+
+Validação:
+- app/validation/
+
+Execução ATP:
+- app/simulation/
+
+Interface gráfica:
+- app/gui/
+
+============================================================
+4. REGRAS DE ARQUITETURA
+============================================================
+
+4.1. Não colocar lógica de parsing na GUI
+Widgets não devem conter parsing estrutural do ATP.
+
+4.2. Não colocar subprocess espalhado pela aplicação
+Execução ATP deve ficar centralizada em app/simulation/runner.py.
+
+4.3. Não editar texto bruto diretamente sem critério
+Sempre preferir operações sobre o modelo semântico.
+
+4.4. Preservar raw_text e raw_lines
+Esses campos são essenciais para rastreabilidade.
+
+4.5. Não reintroduzir ATPDraw como dependência central
+A arquitetura oficial do projeto é independente do ATPDraw.
+
+============================================================
+5. PADRÃO DE CÓDIGO
+============================================================
+
+Regras gerais:
+
+- usar Python 3.11+
+- usar nomes claros
+- manter funções coesas
+- evitar funções excessivamente longas
+- preferir dataclasses para entidades de domínio
+- manter tipagem quando possível
+- evitar acoplamento excessivo entre módulos
+
+============================================================
+6. CONVENÇÕES DE NOMENCLATURA
+============================================================
+
+Classes:
+- PascalCase
+Exemplo:
+- AtpProject
+- ModelDefinition
+- AtpRunner
+
+Funções e métodos:
+- snake_case
+Exemplo:
+- parse_file
+- serialize_project
+- validate_project
+
+Arquivos:
+- snake_case
+Exemplo:
+- project_model.py
+- validator_models.py
+
+============================================================
+7. COMO PROPOR UMA NOVA FUNCIONALIDADE
+============================================================
+
+Toda proposta deve responder:
+
+1. Qual o objetivo?
+2. Em qual camada ela pertence?
+3. Quais arquivos serão afetados?
+4. Como ela preserva a arquitetura atual?
+5. Existe risco de quebrar compatibilidade com ATP?
+6. Existe impacto no serializer?
+7. Existe impacto na GUI?
+
+============================================================
+8. COMO IMPLEMENTAR MUDANÇAS
+============================================================
+
+Fluxo recomendado:
+
+1. entender o requisito
+2. identificar o módulo correto
+3. atualizar o modelo semântico, se necessário
+4. atualizar parser/serializer, se necessário
+5. atualizar validação
+6. atualizar GUI somente depois da lógica principal
+7. documentar impacto
+8. registrar no changelog
+
+============================================================
+9. TESTES RECOMENDADOS
+============================================================
+
+Mesmo sem framework formal definido ainda, recomenda-se validar:
+
+- abertura do arquivo ATP
+- parsing das seções
+- parsing de MODEL e USE
+- validação MODEL/USE
+- serialização de USE
+- carregamento da GUI
+- edição de DATA
+- salvamento
+- execução ATP com runner configurado
+
+Quando o projeto crescer, recomenda-se criar pasta tests/.
+
+============================================================
+10. REGRAS PARA O SERIALIZER
+============================================================
+
+Contribuições no serializer devem observar:
+
+- não corromper o restante do arquivo
+- preservar ao máximo raw_lines
+- documentar claramente o que está sendo reescrito
+- evitar reformatar mais do que o necessário
+- manter rastreabilidade da alteração
+
+============================================================
+11. REGRAS PARA O PARSER
+============================================================
+
+Contribuições no parser devem observar:
+
+- preservar dados brutos
+- registrar warnings quando a interpretação for parcial
+- não assumir semântica inexistente
+- evoluir de forma incremental
+- diferenciar parse estrutural de interpretação avançada
+
+============================================================
+12. REGRAS PARA A GUI
+============================================================
+
+Contribuições na GUI devem observar:
+
+- não misturar lógica pesada com widgets
+- manter navegação simples
+- preservar clareza do fluxo
+- priorizar inspeção e edição assistida
+- preparar expansão futura sem reescrever tudo
+
+============================================================
+13. DOCUMENTAÇÃO OBRIGATÓRIA
+============================================================
+
+Toda mudança relevante deve atualizar ao menos um destes arquivos:
+
+- SPEC_ATP_STUDIO.txt
+- ROADMAP_ATP_STUDIO.txt
+- TASKS_ATP_STUDIO.txt
+- CHANGELOG_ATP_STUDIO.txt
+
+============================================================
+14. MUDANÇAS DE ALTO IMPACTO
+============================================================
+
+São consideradas mudanças de alto impacto:
+
+- alteração no modelo semântico central
+- alteração na forma de serialização
+- alteração nas regras de validação
+- mudança arquitetural de módulos
+- introdução de nova dependência crítica
+- alteração de fluxo principal da GUI
+
+Essas mudanças devem ser descritas com clareza e justificativa.
+
+============================================================
+15. BOAS PRÁTICAS
+============================================================
+
+- preferir código legível a código “esperto”
+- adicionar comentários em pontos críticos
+- preservar comportamento existente quando possível
+- separar claramente o que é estado atual e o que é roadmap
+- escrever pensando em manutenção futura
+- considerar sempre a natureza sensível do ATP/EMTP
+
+============================================================
+16. O QUE EVITAR
+============================================================
+
+Evitar:
+
+- reescritas totais sem necessidade
+- parsing frágil acoplado à GUI
+- lógica ATP espalhada em vários lugares
+- quebra da rastreabilidade textual
+- “atalhos” que dificultem evolução futura
+- assumir que todo arquivo ATP segue o mesmo formato estrito
+
+============================================================
+17. FLUXO RECOMENDADO DE CONTRIBUIÇÃO
+============================================================
+
+1. escolher tarefa do backlog
+2. identificar impacto arquitetural
+3. implementar no módulo correto
+4. validar comportamento mínimo
+5. atualizar documentação
+6. registrar mudança no changelog
+
+============================================================
+18. DIRETRIZ FINAL
+============================================================
+
+Contribuir para o ATP Studio significa preservar a ideia central do projeto:
+uma plataforma robusta, auditável, modular e inteligente para trabalho com ATP.
+
+FIM DO DOCUMENTO DE CONTRIBUIÇÃO

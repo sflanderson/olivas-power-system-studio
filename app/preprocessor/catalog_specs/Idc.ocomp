@@ -1,0 +1,53 @@
+# Fonte de corrente DC constante.
+
+schema_version: "1.0"
+code: Idc
+label_pt: Fonte de corrente DC
+label_en: DC current source
+description: |
+  Injeta corrente constante no nó vivo (non-ground). Equivalente
+  a TYPE-11 ATP com amplitude fixa. Útil para modelar cargas de
+  corrente constante, correntes de fuga, injeções para estudo
+  de curto-circuito.
+
+category: source
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: IdcSymbol
+
+pins:
+  - name: p_pos
+    label: Terminal positivo (saída de corrente)
+    position: [0, -30]
+  - name: p_neg
+    label: Terminal negativo
+    position: [0, 30]
+
+properties:
+  - name: amplitude
+    label: Amplitude
+    unit: A
+    type: string
+    default: "1 A"
+    visible: true
+    group: main
+
+atp_emission:
+  kind: source_dc
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Injeção para estudo de curto-circuito
+    - Carga de corrente constante (LED driver, etc.)
+    - Simulação de corrente de fuga
+  references:
+    - "ATP Rule Book, Section IV (SOURCE)"
+  common_mistakes:
+    - Conectar fonte de corrente em circuito aberto — viola KCL
+  alternatives:
+    - Vdc — fonte de tensão DC
+    - Iac — fonte de corrente AC

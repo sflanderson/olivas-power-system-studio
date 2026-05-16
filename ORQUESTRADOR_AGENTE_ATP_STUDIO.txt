@@ -1,0 +1,469 @@
+ORQUESTRADOR DO AGENTE
+ATP STUDIO
+ARQUIVO MESTRE DE OPERAÇÃO DO LLM
+
+============================================================
+1. FINALIDADE DESTE ARQUIVO
+============================================================
+
+Este arquivo define como o agente LLM deve operar sobre os arquivos do projeto ATP Studio.
+
+Ele funciona como um orquestrador principal para:
+
+- entender o papel de cada arquivo .txt do projeto
+- consultar o documento correto para cada tipo de solicitação
+- operar sobre arquivos .atp com segurança
+- manter coerência arquitetural
+- apoiar desenvolvimento, análise, validação e evolução do sistema
+
+Este arquivo deve ser usado como camada de coordenação entre:
+- o agente LLM
+- os documentos de apoio
+- os arquivos de código
+- os arquivos ATP do usuário
+
+============================================================
+2. ARQUIVOS QUE O AGENTE DEVE ORQUESTRAR
+============================================================
+
+O agente deve considerar a existência dos seguintes arquivos no projeto:
+
+Arquivos de documentação principal:
+- AGENTE_ATP_STUDIO_LLM.txt
+- SPEC_ATP_STUDIO.txt
+- ROADMAP_ATP_STUDIO.txt
+- README_ATP_STUDIO.txt
+- CONTRIBUTING_ATP_STUDIO.txt
+- TASKS_ATP_STUDIO.txt
+- CHANGELOG_ATP_STUDIO.txt
+
+Arquivos de projeto operacional:
+- arquivos .atp do usuário
+- arquivos .py do sistema ATP Studio
+- imagens e diagramas auxiliares, como CIRCUITO.png
+
+============================================================
+3. HIERARQUIA DE CONSULTA DO AGENTE
+============================================================
+
+O agente deve obedecer à seguinte hierarquia de consulta:
+
+NÍVEL 1 — ORQUESTRADOR
+Arquivo principal:
+- ORQUESTRADOR_AGENTE_ATP_STUDIO.txt
+
+Função:
+- decidir qual documento consultar
+- definir comportamento operacional
+- coordenar respostas e ações
+
+NÍVEL 2 — IDENTIDADE E CONDUTA DO AGENTE
+Arquivo:
+- AGENTE_ATP_STUDIO_LLM.txt
+
+Função:
+- definir identidade do agente
+- definir regras de raciocínio
+- definir comportamento técnico e arquitetural
+- estabelecer limites e proibições
+
+NÍVEL 3 — ESPECIFICAÇÃO DO SISTEMA
+Arquivo:
+- SPEC_ATP_STUDIO.txt
+
+Função:
+- explicar o que o sistema é
+- explicar arquitetura
+- explicar módulos
+- explicar requisitos funcionais e não funcionais
+
+NÍVEL 4 — PLANEJAMENTO E EVOLUÇÃO
+Arquivo:
+- ROADMAP_ATP_STUDIO.txt
+
+Função:
+- orientar próximos passos
+- organizar fases
+- definir prioridades de evolução
+
+NÍVEL 5 — OPERAÇÃO PRÁTICA
+Arquivo:
+- README_ATP_STUDIO.txt
+
+Função:
+- instruir instalação
+- explicar estrutura de pastas
+- explicar uso básico da aplicação
+
+NÍVEL 6 — PADRÃO DE DESENVOLVIMENTO
+Arquivo:
+- CONTRIBUTING_ATP_STUDIO.txt
+
+Função:
+- definir regras para modificar código
+- orientar organização das contribuições
+- impor disciplina arquitetural
+
+NÍVEL 7 — BACKLOG EXECUTÁVEL
+Arquivo:
+- TASKS_ATP_STUDIO.txt
+
+Função:
+- listar tarefas concretas
+- apoiar priorização
+- transformar roadmap em ação prática
+
+NÍVEL 8 — HISTÓRICO DE MUDANÇAS
+Arquivo:
+- CHANGELOG_ATP_STUDIO.txt
+
+Função:
+- registrar o que já foi implementado
+- indicar status evolutivo
+- evitar retrabalho e perda de contexto
+
+============================================================
+4. REGRA DE USO DE CADA ARQUIVO
+============================================================
+
+4.1. Quando o usuário pedir comportamento do agente
+Consultar primeiro:
+- AGENTE_ATP_STUDIO_LLM.txt
+
+4.2. Quando o usuário pedir arquitetura do sistema
+Consultar primeiro:
+- SPEC_ATP_STUDIO.txt
+
+4.3. Quando o usuário pedir próximos passos
+Consultar primeiro:
+- ROADMAP_ATP_STUDIO.txt
+- TASKS_ATP_STUDIO.txt
+
+4.4. Quando o usuário pedir como instalar, executar ou organizar pastas
+Consultar primeiro:
+- README_ATP_STUDIO.txt
+
+4.5. Quando o usuário pedir mudança em código ou padrão de implementação
+Consultar primeiro:
+- CONTRIBUTING_ATP_STUDIO.txt
+- SPEC_ATP_STUDIO.txt
+
+4.6. Quando o usuário pedir status do projeto
+Consultar primeiro:
+- CHANGELOG_ATP_STUDIO.txt
+- ROADMAP_ATP_STUDIO.txt
+
+4.7. Quando o usuário enviar um arquivo .atp para análise
+Consultar primeiro:
+- AGENTE_ATP_STUDIO_LLM.txt
+- SPEC_ATP_STUDIO.txt
+
+============================================================
+5. COMO O AGENTE DEVE LIDAR COM O ARQUIVO ATP DO USUÁRIO
+============================================================
+
+Todo arquivo .atp deve ser tratado como artefato central do projeto.
+
+Regras obrigatórias:
+
+1. O .atp é a fonte única da verdade.
+2. O agente não deve tratá-lo apenas como texto bruto.
+3. O agente deve raciocinar em duas camadas:
+   - texto bruto
+   - modelo semântico
+4. O agente deve preservar rastreabilidade.
+5. O agente deve evitar alterações cegas.
+6. O agente deve diferenciar:
+   - problema do arquivo ATP
+   - limitação da ferramenta
+   - problema de arquitetura
+   - necessidade de nova feature
+
+============================================================
+6. COMO O AGENTE DEVE LIDAR COM IMAGENS COMO CIRCUITO.png
+============================================================
+
+Imagens como CIRCUITO.png devem ser tratadas como artefatos auxiliares.
+
+Elas podem servir para:
+- documentação visual
+- referência de circuito
+- apoio à interpretação do caso
+- conferência com topologia pretendida
+- futura integração com visualização do sistema
+
+Porém:
+- a imagem não substitui o arquivo .atp
+- a imagem não é fonte única da verdade
+- a imagem deve ser usada apenas como apoio
+
+============================================================
+7. MODOS DE OPERAÇÃO DO AGENTE
+============================================================
+
+O agente deve operar em modos claros.
+
+------------------------------------------------------------
+7.1. Modo Diagnóstico
+------------------------------------------------------------
+
+Usar quando o usuário pedir:
+- analisar arquivo ATP
+- encontrar inconsistências
+- explicar erro
+- comparar MODEL e USE
+- revisar organização dos arquivos
+
+Arquivos prioritários:
+- AGENTE_ATP_STUDIO_LLM.txt
+- SPEC_ATP_STUDIO.txt
+- CHANGELOG_ATP_STUDIO.txt
+
+Saída esperada:
+- diagnóstico estrutural
+- inconsistências encontradas
+- limitações da ferramenta
+- sugestões de correção
+
+------------------------------------------------------------
+7.2. Modo Desenvolvimento
+------------------------------------------------------------
+
+Usar quando o usuário pedir:
+- gerar código
+- alterar parser
+- melhorar GUI
+- implementar serializer
+- expandir validação
+
+Arquivos prioritários:
+- CONTRIBUTING_ATP_STUDIO.txt
+- SPEC_ATP_STUDIO.txt
+- TASKS_ATP_STUDIO.txt
+- ROADMAP_ATP_STUDIO.txt
+
+Saída esperada:
+- objetivo
+- impacto arquitetural
+- arquivos afetados
+- estratégia
+- código
+- próximos passos
+
+------------------------------------------------------------
+7.3. Modo Planejamento
+------------------------------------------------------------
+
+Usar quando o usuário pedir:
+- backlog
+- próxima sprint
+- priorização
+- roadmap
+- organização de entregas
+
+Arquivos prioritários:
+- ROADMAP_ATP_STUDIO.txt
+- TASKS_ATP_STUDIO.txt
+- CHANGELOG_ATP_STUDIO.txt
+
+Saída esperada:
+- prioridades
+- tarefas recomendadas
+- dependências
+- sequência de implementação
+
+------------------------------------------------------------
+7.4. Modo Operacional
+------------------------------------------------------------
+
+Usar quando o usuário pedir:
+- como executar
+- como instalar
+- como organizar projeto
+- como usar a GUI
+- como configurar o ATP
+
+Arquivos prioritários:
+- README_ATP_STUDIO.txt
+- SPEC_ATP_STUDIO.txt
+
+Saída esperada:
+- passo a passo
+- pré-requisitos
+- fluxo de uso
+- observações práticas
+
+------------------------------------------------------------
+7.5. Modo Governança Técnica
+------------------------------------------------------------
+
+Usar quando o usuário pedir:
+- padrão de contribuição
+- convenções
+- boas práticas
+- reorganização do projeto
+
+Arquivos prioritários:
+- CONTRIBUTING_ATP_STUDIO.txt
+- SPEC_ATP_STUDIO.txt
+
+Saída esperada:
+- regras
+- critérios
+- recomendações
+- impactos
+
+============================================================
+8. ORQUESTRAÇÃO PRÁTICA DAS RESPOSTAS
+============================================================
+
+Sempre que o agente responder, ele deve internamente seguir este fluxo:
+
+1. Identificar o tipo de solicitação do usuário.
+2. Identificar quais arquivos de documentação devem ser usados como base.
+3. Cruzar a solicitação com o estado atual do projeto.
+4. Separar:
+   - o que já existe
+   - o que falta implementar
+   - o que é melhoria futura
+5. Responder de forma estruturada.
+6. Quando houver mudança de código, indicar:
+   - arquivo a ser alterado
+   - impacto arquitetural
+   - risco
+   - próximo passo
+
+============================================================
+9. REGRAS DE COERÊNCIA ENTRE DOCUMENTOS
+============================================================
+
+Se houver conflito entre documentos, obedecer a seguinte precedência:
+
+1. ORQUESTRADOR_AGENTE_ATP_STUDIO.txt
+2. AGENTE_ATP_STUDIO_LLM.txt
+3. SPEC_ATP_STUDIO.txt
+4. CONTRIBUTING_ATP_STUDIO.txt
+5. ROADMAP_ATP_STUDIO.txt
+6. TASKS_ATP_STUDIO.txt
+7. README_ATP_STUDIO.txt
+8. CHANGELOG_ATP_STUDIO.txt
+
+Regra:
+- CHANGELOG registra histórico, mas não define arquitetura
+- README orienta uso, mas não substitui a especificação
+- TASKS detalha ações, mas não substitui o roadmap
+- CONTRIBUTING disciplina implementação, mas não redefine objetivo do sistema
+
+============================================================
+10. QUANDO O AGENTE DEVE PRIORIZAR O ESTADO REAL DO PROJETO
+============================================================
+
+Sempre que houver diferença entre:
+- documentação
+e
+- arquivos reais do projeto
+
+o agente deve priorizar:
+1. os arquivos reais existentes
+2. a arquitetura documentada que melhor se alinhar ao código real
+3. a atualização da documentação como ação recomendada
+
+============================================================
+11. POLÍTICA DE RESPOSTA PARA IMPLEMENTAÇÃO
+============================================================
+
+Quando o usuário pedir implementação, o agente deve responder nesta ordem:
+
+1. Objetivo
+2. Estado atual relacionado
+3. Arquivos afetados
+4. Estratégia
+5. Código sugerido
+6. Limitações
+7. Próximo passo recomendado
+
+============================================================
+12. POLÍTICA DE RESPOSTA PARA ANÁLISE DE ATP
+============================================================
+
+Quando o usuário pedir análise de um .atp, o agente deve responder nesta ordem:
+
+1. Estrutura identificada
+2. MODELS encontrados
+3. USEs encontrados
+4. Seções relevantes encontradas
+5. Possíveis inconsistências
+6. Limitações do parser atual
+7. Correções sugeridas
+8. Próximo passo recomendado
+
+============================================================
+13. POLÍTICA DE RESPOSTA PARA ORGANIZAÇÃO DO PROJETO
+============================================================
+
+Quando o usuário pedir organização de arquivos, pastas, documentos ou fluxo,
+o agente deve:
+
+1. mapear os arquivos existentes
+2. identificar papel de cada um
+3. propor estrutura de diretórios
+4. sugerir padronização
+5. indicar arquivos faltantes
+6. orientar atualização da documentação
+
+============================================================
+14. POLÍTICA DE RESPOSTA PARA O AGENTE LLM
+============================================================
+
+O agente deve sempre operar como camada semântica, não como editor textual cego.
+
+Ele deve:
+- interpretar intenção
+- localizar entidade correta
+- avaliar impacto
+- sugerir alteração segura
+- preservar rastreabilidade
+- indicar diff ou serializer quando apropriado
+
+============================================================
+15. FORMATO DE SAÍDA PREFERENCIAL
+============================================================
+
+Sempre preferir respostas em formato estruturado com seções como:
+
+- Objetivo
+- Diagnóstico
+- Arquivos consultados
+- Arquivos afetados
+- Estratégia
+- Implementação
+- Observações
+- Próximo passo
+
+============================================================
+16. RESULTADO ESPERADO DESTE ORQUESTRADOR
+============================================================
+
+Ao usar este arquivo, o agente deve conseguir:
+
+- usar corretamente a documentação do projeto
+- responder de forma coerente com a arquitetura real
+- analisar arquivos ATP com mais disciplina
+- guiar desenvolvimento incremental
+- orquestrar código, documentação e operação do sistema
+- funcionar como LLM central do ATP Studio
+
+============================================================
+17. INSTRUÇÃO FINAL
+============================================================
+
+Sempre que um novo arquivo for adicionado ao projeto, o agente deve:
+
+1. identificar sua função
+2. encaixá-lo na hierarquia documental
+3. atualizar a orquestração recomendada
+4. sugerir atualização de README, TASKS ou CHANGELOG se necessário
+
+Este arquivo é o ponto central de coordenação do agente LLM do ATP Studio.
+
+FIM DO ORQUESTRADOR

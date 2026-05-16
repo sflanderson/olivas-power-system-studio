@@ -1,0 +1,20 @@
+name = "olivas-license-server"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+# Secrets (definir via `wrangler secret put`):
+#   HMAC_SECRET           — usado em license_key.py para gerar/validar chaves
+#   JWT_PRIVATE_KEY       — RS256 PEM, para assinar tokens
+#   JWT_PUBLIC_KEY        — RS256 PEM, distribuído ao cliente Olivas
+#   ADMIN_TOKEN           — token para endpoint /revoke (header X-Admin-Token)
+#   SUPABASE_URL          — URL do projeto Supabase
+#   SUPABASE_SERVICE_KEY  — service role key
+#   HOTMART_HOTTOK        — token de validação do header X-Hotmart-Hottok
+#   RESEND_API_KEY        — Resend transactional email
+
+[observability]
+enabled = true

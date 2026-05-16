@@ -1,0 +1,52 @@
+Olivas ATP Studio
+Copyright (c) 2025-2026 Eliandro (UFMG — Doutorado em Engenharia Elétrica)
+and contributors.
+
+This product includes software developed as part of the Olivas ATP
+Studio project, licensed under the Apache License 2.0 (see LICENSE.txt).
+
+================================================================================
+Third-party components
+================================================================================
+
+This product uses (but does not redistribute) the following third-party
+components. Full attributions and license texts are in
+docs/THIRD_PARTY_NOTICES.md.
+
+- PySide6 / Qt for Python — LGPL v3 (with Qt exception)
+  Copyright (C) The Qt Company Ltd. and other contributors.
+  https://www.qt.io/qt-for-python
+
+- anthropic-sdk-python — MIT License
+  Copyright (c) 2023–2026 Anthropic PBC.
+
+- matplotlib — PSF-based (BSD-compatible)
+  Copyright (c) 2012– Matplotlib Development Team.
+
+- pytest — MIT License (dev-only)
+- Pillow (PIL) — HPND / MIT-like (optional)
+
+================================================================================
+Independence from ATPDraw
+================================================================================
+
+This product is INDEPENDENT from ATPDraw. The Olivas ATP Studio was
+developed clean-room, without access to or reuse of the ATPDraw source
+code, binaries, component libraries (.scl, .sup), project format (.acp),
+or any other proprietary artifact distributed by NTNU/SINTEF.
+
+ATPDraw is a trademark of NTNU (Norwegian University of Science and
+Technology) and is developed by Hans Kristian Hoeidalen et al. The
+Olivas ATP Studio has no affiliation with NTNU, SINTEF, or the ATPDraw
+project.
+
+See docs/LICENSING.md for the full clean-room policy.
+
+================================================================================
+ATP-EMTP solver
+================================================================================
+
+The ATP-EMTP solver ("ATP.exe") that the Olivas ATP Studio invokes as
+an external process is NOT distributed with this product. Users must
+obtain their own ATP license through their regional user group (CAUE,
+EEUG, Can/Am EMTP User Group, etc.).

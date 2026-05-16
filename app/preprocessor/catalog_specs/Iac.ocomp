@@ -1,0 +1,75 @@
+# Fonte de corrente AC senoidal.
+
+schema_version: "1.0"
+code: Iac
+label_pt: Fonte de corrente AC
+label_en: AC current source
+description: |
+  Injeta corrente senoidal i(t) = amplitude * sin(2π·f·t + φ)
+  iniciando em t >= delay. Equivalente a TYPE-14 ATP configurado
+  como fonte de corrente. Útil para modelar cargas harmônicas,
+  injeção de testes, carga variável.
+
+category: source
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: IacSymbol
+
+pins:
+  - name: p_pos
+    label: Terminal positivo
+    position: [0, -30]
+  - name: p_neg
+    label: Terminal negativo
+    position: [0, 30]
+
+properties:
+  - name: amplitude
+    label: Amplitude
+    unit: A
+    type: string
+    default: "1 A"
+    visible: true
+    group: main
+  - name: frequency
+    label: Frequência
+    unit: Hz
+    type: string
+    default: "60 Hz"
+    visible: true
+    group: main
+  - name: phase
+    label: Fase
+    unit: "°"
+    type: float
+    default: 0.0
+    visible: false
+    group: main
+  - name: delay
+    label: Delay
+    unit: s
+    type: float
+    default: 0.0
+    visible: false
+    group: main
+
+atp_emission:
+  kind: source_ac
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Injeção de harmônicas para análise de ressonância
+    - Modelagem de carga não-linear (retificador, arc furnace)
+    - Teste de filtros harmônicos
+  references:
+    - "ATP Rule Book, Section IV (SOURCE TYPE-14)"
+  common_mistakes:
+    - Fonte de corrente em circuito aberto — KCL violada
+    - Delay > T_stop da simulação (fonte nunca ativa)
+  alternatives:
+    - Vac — fonte de tensão AC
+    - Idc — fonte de corrente DC

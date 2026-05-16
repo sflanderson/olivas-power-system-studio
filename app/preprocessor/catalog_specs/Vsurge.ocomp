@@ -1,0 +1,63 @@
+# Fonte de impulso atmosférico/manobra padronizado.
+
+schema_version: "1.0"
+code: Vsurge
+label_pt: Surge 1.2/50, 8/20
+label_en: Standard lightning/switching surge
+description: |
+  Fonte de impulso padronizado para testes de suportabilidade
+  dielétrica. Formatos típicos:
+
+  - 1.2/50 µs — impulso atmosférico padrão (IEC 60060-1).
+    Rise time 1.2 µs, half-value 50 µs.
+  - 8/20 µs — impulso de corrente para para-raios (IEC 61643).
+    Rise time 8 µs, half-value 20 µs.
+
+  Emissão ATP: TYPE-15 (Heidler function). A função dupla-
+  exponencial é parametrizada internamente pelo solver.
+
+category: source
+atp_supported: true
+
+symbol:
+  size: [60, 60]
+  bounding_box: [-30, -30, 60, 60]
+  renderer: VdcSymbol
+
+pins:
+  - name: p_pos
+    label: Terminal positivo
+    position: [0, -30]
+  - name: p_neg
+    label: Terminal negativo
+    position: [0, 30]
+
+properties:
+  - name: amplitude
+    label: Amplitude de pico
+    unit: V
+    type: string
+    default: "10 kV"
+    visible: true
+    group: main
+
+atp_emission:
+  kind: source_surge
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Teste de suportabilidade de isolamento (BIL)
+    - Validação de para-raios ZnO
+    - Coordenação de isolamento (CFO, BIL)
+    - Estudo de DIT (Dielectric Impulse Test)
+  references:
+    - "IEC 60060-1 — High-voltage test techniques"
+    - "IEC 61643 — Low-voltage surge protective devices"
+    - "ATP Rule Book, Section IV (SOURCE TYPE-15 Heidler)"
+  common_mistakes:
+    - Aplicar 1.2/50 em sistema > 60 Hz sem ajustar escala de tempo
+    - Confundir 8/20 (corrente, para para-raios) com 1.2/50 (tensão)
+  alternatives:
+    - Vdc — degrau DC (rise time = 0)
+    - Vrect — rampa linear controlada

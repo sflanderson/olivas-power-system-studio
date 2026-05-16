@@ -1,0 +1,67 @@
+# Chave ideal tempo-controlada — TYPE-13 no ATP.
+# Fecha em T_close e abre em T_open (se T_open < T_close, nunca fecha).
+
+schema_version: "1.0"
+code: SwIdeal
+label_pt: Chave ideal (Topen/Tclose)
+label_en: Ideal time-controlled switch
+description: |
+  Chave ideal controlada por tempo (TYPE-13). Fecha exatamente em
+  T_close e abre exatamente em T_open. Corrente de passagem é
+  ilimitada; para modelos realistas use VCB (com reignição) ou
+  Relais (com arc voltage).
+
+category: switch
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: SwitchIdealSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties:
+  - name: T_close
+    label: T_close
+    unit: s
+    type: float
+    default: 0.0
+    visible: true
+    group: timing
+    min: 0.0
+    description: Instante de fechamento (0 = fechada desde t=0)
+  - name: T_open
+    label: T_open
+    unit: s
+    type: float
+    default: 1.0e9
+    visible: true
+    group: timing
+    description: Instante de abertura (1e9 = permanece fechada)
+
+atp_emission:
+  kind: switch_simple
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Energização de linha / barramento
+    - Abertura simultânea de 3 fases (use 3 SwIdeal)
+    - Fault switching (T_close = fault time)
+  references:
+    - "ATP Rule Book, Section I.E (TYPE-13)"
+  common_mistakes:
+    - T_close > T_open faz a chave nunca fechar — revisar
+    - T_close = 0 pode causar transitório espúrio se fonte tem rampa
+    - Não modela corrente de chopping — use VCB se for MT/AT
+  alternatives:
+    - VCB — disjuntor a vácuo com reignição estatística
+    - Relais — chave controlada (T_close/T_open via sinal)
+    - SwTACS — controlada por TACS/MODELS

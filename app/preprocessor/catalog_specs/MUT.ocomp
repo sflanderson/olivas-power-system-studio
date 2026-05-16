@@ -1,0 +1,79 @@
+# Indutores mutuamente acoplados (M) — dois indutores com coeficiente de acoplamento k.
+
+schema_version: "1.0"
+code: MUT
+label_pt: Indutores acoplados (M)
+label_en: Mutually coupled inductors
+description: |
+  Dois indutores com indutância mútua M = k·√(L1·L2). Útil para
+  modelar acoplamento magnético sem modelar um transformador
+  completo (TC em esquema, acoplamento parasita, etc.).
+
+  Na ATP corresponde ao par R-L com acoplamento (tipo 51 mutual
+  branch) em /BRANCH. Emissão atual: placeholder.
+
+category: coupled
+atp_supported: true
+
+symbol:
+  size: [80, 60]
+  bounding_box: [-40, -30, 80, 60]
+  renderer: TransformerSymbol
+
+pins:
+  - name: p1_top
+    label: L1 - superior
+    position: [-30, -20]
+  - name: p1_bot
+    label: L1 - inferior
+    position: [-30, 20]
+  - name: p2_top
+    label: L2 - superior
+    position: [30, -20]
+  - name: p2_bot
+    label: L2 - inferior
+    position: [30, 20]
+
+properties:
+  - name: L1
+    label: Indutância L1
+    unit: H
+    type: string
+    default: "1 mH"
+    visible: true
+    group: electrical
+  - name: L2
+    label: Indutância L2
+    unit: H
+    type: string
+    default: "1 mH"
+    visible: true
+    group: electrical
+  - name: k
+    label: Coeficiente de acoplamento
+    type: float
+    default: 0.5
+    visible: true
+    group: electrical
+    min: 0.0
+    max: 1.0
+    description: k=1 acoplamento ideal; k=0 indutores independentes
+
+atp_emission:
+  kind: transformer_coupled
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Acoplamento capacitivo/indutivo em LT dupla
+    - TC de baixa precisão (k < 1)
+    - Interferência eletromagnética entre circuitos
+  references:
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Section 6.4"
+  common_mistakes:
+    - k > 1 é fisicamente impossível (validar range)
+    - Confundir k com M — M = k·√(L1·L2)
+    - Esquecer que k=1 requer mesmo eixo magnético (ideal)
+  alternatives:
+    - Tr — transformador com enrolamentos explícitos
+    - L — indutor simples (sem acoplamento)

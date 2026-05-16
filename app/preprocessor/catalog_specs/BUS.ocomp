@@ -1,0 +1,183 @@
+# BUS — Barramento elétrico com metadata de painel (estilo SKM PTW).
+
+schema_version: "1.0"
+code: BUS
+label_pt: Barramento / Painel
+label_en: Bus / Panel
+description: |
+  Barramento elétrico zero-impedância (multi-tap) que cumpre dois
+  papéis simultâneos:
+
+  1. **Elétrico**: nó comum unindo múltiplos componentes
+     (alimentadores, transformadores, cargas, geração).
+  2. **Físico (painel)**: invólucro real (CCM, switchgear, painel
+     BT) com metadata para arc-flash, coordenação, lineside vs
+     loadside.
+
+  Inspirado em SKM PowerTools Workstation Equipment Tab. Integra
+  com:
+
+  * NBR 17227 / IEEE 1584 — categoria de painel para arc-flash
+  * IEEE 242 — coordenação (lineside vs loadside)
+  * NFPA 70E — categoria PPE (calculada via post-processor)
+  * AFD (Arc Flash Detection relay) — reduz tempo de extinção
+    para ~10 ms quando habilitado
+
+  4 taps trifásicos (12 pinos no total). Cada tap conecta um
+  componente externo (TR, motor, alimentador).
+
+category: passive
+atp_supported: true
+
+symbol:
+  size: [200, 30]
+  bounding_box: [-100, -22, 200, 38]
+  renderer: BusSymbol
+
+# v0.92.1 — Bus PTW: pinos são SINTÉTICOS (gerados pelo
+# BusSymbol.pin_positions() em runtime, um a cada 10 px ao
+# longo da barra). Os pinos abaixo são apenas referências de
+# compatibilidade para topologias antigas (.sch v0.91 e
+# anteriores) — o editor visual usa pin_positions() dinâmico.
+pins:
+  - name: T_CENTER
+    label: Centro da barra (referência)
+    position: [0, 0]
+  - name: T_LEFT
+    label: Endpoint esquerdo (sincroniza com length)
+    position: [-100, 0]
+  - name: T_RIGHT
+    label: Endpoint direito (sincroniza com length)
+    position: [100, 0]
+
+properties:
+  - name: bus_id
+    label: ID do painel
+    type: string
+    default: "BUS"
+    visible: true
+    group: main
+    description: Identificador único do painel.
+
+  - name: rated_voltage_kV
+    label: Tensão nominal V_LL (kV)
+    type: float
+    default: "13.8"
+    visible: true
+    group: main
+
+  - name: n_phases
+    label: Número de fases
+    type: float
+    default: "3"
+    visible: false
+    group: main
+
+  - name: panel_type
+    label: Tipo de painel
+    type: string
+    default: "swgr_15kv"
+    visible: true
+    group: main
+    description: |
+      Classe do equipamento (NBR 17227 Tabela 1):
+      - ccm_15kv, swgr_15kv (5 < V ≤ 15 kV)
+      - ccm_5kv, swgr_5kv (1 < V ≤ 5 kV)
+      - lv_panel_shallow, lv_panel_typical, lv_swgr (V ≤ 1 kV)
+      - cable_jct_box
+
+  - name: bus_role
+    label: Papel no Power Flow
+    type: string
+    default: "auto"
+    visible: true
+    group: advanced
+    description: |
+      v3.7.0 (closes SKIPPED_BACKLOG B.2) — papel do bus no Power Flow:
+      - "auto" : primeiro BUS do projeto = SLACK, demais = PQ (legacy v3.3.1)
+      - "slack" : barra slack/swing (V e θ fixos = referência)
+      - "pv" : barra PV (V e P fixos; Q calculado — gerador despachado)
+      - "pq" : barra PQ (P e Q fixos = carga ou bus passivo)
+      Per IEEE 399 §5 + PTW Tutorial §Part 2 p.63.
+
+  - name: is_lineside
+    label: Lineside (alimentação) [1=sim, 0=não]
+    type: float
+    default: "1"
+    visible: true
+    group: main
+    description: |
+      1 = lineside (antes da proteção, pior caso, energia maior).
+      0 = loadside (após a proteção, energia menor).
+
+  - name: has_AFD
+    label: AFD habilitado [1=sim, 0=não]
+    type: float
+    default: "0"
+    visible: true
+    group: advanced
+    description: |
+      Arc Flash Detection relay (sensor óptico + trip rápido).
+      Quando habilitado, reduz tempo de extinção para ~10 ms.
+      Tecnologia ABB REA, Schneider VAMP 320, GE Multilin AF-2.
+
+  - name: AFD_clearing_time_ms
+    label: Tempo do AFD (ms)
+    type: float
+    default: "10"
+    visible: false
+    group: advanced
+
+  - name: n_taps
+    label: Número de taps
+    type: float
+    default: "4"
+    visible: false
+    group: advanced
+
+  - name: description
+    label: Descrição
+    type: string
+    default: ""
+    visible: false
+    group: advanced
+
+  - name: length
+    label: Comprimento da barra (px)
+    type: float
+    default: "200"
+    visible: true
+    group: geometry
+    description: |
+      v0.92.1 — Comprimento visual da barra (estilo PTW
+      Power*Tools). Pode ser editado aqui OU redimensionado
+      arrastando os handles azuis nos extremos quando o
+      barramento estiver selecionado. Snap automático para
+      múltiplo de 10 px. Faixa: 60 a 4000 px.
+
+atp_emission:
+  kind: custom
+  count: 1
+  custom_emitter: bus.emit_bus_metadata_lines
+
+llm_hints:
+  typical_applications:
+    - Switchgear MT/AT (5-138 kV) — barramento principal
+    - CCM (Motor Control Center) — distribuição de motores
+    - Painel BT — quadros gerais e secundários
+    - Caixa de junção de cabos — ponto de derivação
+    - Análise arc-flash NBR 17227 (lineside vs loadside)
+    - Avaliação benefício AFD (redução de E vs custo)
+  references:
+    - "ABNT NBR 17227:2025 §4.2.4, §5.1.9 (múltiplas fontes, AFD)"
+    - "IEEE Std 242-2001 Buff Book §15 (bus coordination)"
+    - "NFPA 70E:2024 Tabela 130.5(C) (PPE category)"
+    - "SKM PTW Equipment Tab (industry standard)"
+  common_mistakes:
+    - "Confundir lineside (pior caso) com loadside (após proteção)"
+    - "Não ativar AFD quando o painel tem o sensor instalado"
+    - "Usar panel_type LV para tensão > 1 kV (resulta em E errado)"
+    - "Esquecer que AFD não substitui 51/51N — apenas adiciona caminho rápido"
+  alternatives:
+    - "GND — terra ideal (sem metadata de painel)"
+    - "Conexão direta via fios (sem barramento dedicado)"

@@ -1,0 +1,66 @@
+# Diodo de potência — TYPE-11 (chave controlada por tensão) no ATP.
+
+schema_version: "1.0"
+code: Diode
+label_pt: Diodo de potência
+label_en: Power diode
+description: |
+  Diodo ideal com tensão de condução V_forward e resistência R_on
+  no estado ligado. Conduz quando V(p1) - V(p2) > V_forward; bloqueia
+  caso contrário. Gera uma chave TYPE-11 controlada por tensão no ATP.
+
+category: power_el
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: DiodeSymbol
+
+pins:
+  - name: anode
+    label: Ânodo
+    position: [-30, 0]
+  - name: cathode
+    label: Cátodo
+    position: [30, 0]
+
+properties:
+  - name: V_forward
+    label: V_forward
+    unit: V
+    type: float
+    default: 0.7
+    visible: true
+    group: electrical
+    min: 0.0
+    description: Tensão de condução direta
+    example: 0.7
+  - name: R_on
+    label: R_on
+    unit: ohm
+    type: float
+    default: 1.0e-3
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Resistência no estado ligado
+
+atp_emission:
+  kind: diode
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Ponte retificadora 6 ou 12 pulsos
+    - Diodo de roda-livre (snubber em IGBT)
+    - Diodo de descarga de reator
+  references:
+    - "ATP Rule Book, Section I.E (TYPE-11 voltage-controlled)"
+  common_mistakes:
+    - R_on = 0 causa instabilidade — use 1e-3 ou maior
+    - V_forward muito alto ignora diodo real em baixa tensão
+    - Polaridade invertida (confundir ANO/CAT) é erro comum
+  alternatives:
+    - Thyr — diodo controlado por gate (tiristor)
+    - GTO / IGBT — chaves totalmente controladas

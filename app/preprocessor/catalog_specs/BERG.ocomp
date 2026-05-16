@@ -1,0 +1,139 @@
+# Linha Bergeron — modelo distribuído sem dependência de frequência.
+
+schema_version: "1.0"
+code: BERG
+label_pt: Linha Bergeron (distrib.)
+label_en: Bergeron distributed line
+description: |
+  Linha de transmissão distribuída com parâmetros constantes
+  (R, L, C por km, independentes da frequência). Modelo de ondas
+  viajantes de H. Dommel, base do EMTP. Adequado para transientes
+  onde a dispersão por frequência pode ser ignorada
+  (sobretensões de manobra em faixa LF).
+
+  Para transientes de alta frequência (descargas atmosféricas,
+  reignições) use JMARTI.
+
+category: line
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: LineBergeronSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties:
+  - name: length
+    label: Comprimento
+    unit: km
+    type: string
+    default: "100 km"
+    visible: true
+    group: main
+  - name: Z_char
+    label: Impedância característica
+    unit: ohm
+    type: string
+    default: "500 Ohm"
+    visible: false
+    group: electrical
+    description: Z₀ = √(L'/C') para a linha (legacy; use campos LCC se preencher)
+  # v0.25.2: campos de geometria LCC (mesmo schema da TLIN). Se
+  # TODOS preenchidos, o bridge calcula Z_char e τ via Bergeron
+  # a partir da geometria 3φ usando Carson-Deri-Tévan (v0.25.0).
+  - name: x_a
+    label: x fase A
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+  - name: y_a
+    label: y fase A
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    min: 0.0
+  - name: x_b
+    label: x fase B
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+  - name: y_b
+    label: y fase B
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    min: 0.0
+  - name: x_c
+    label: x fase C
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+  - name: y_c
+    label: y fase C
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    min: 0.0
+  - name: cond_radius
+    label: Raio do condutor
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: cond_R_dc
+    label: R DC do condutor
+    unit: ohm/km
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: soil_rho
+    label: Resistividade do solo
+    unit: ohm·m
+    type: float
+    default: 100.0
+    visible: false
+    group: electrical
+    min: 1.0
+
+atp_emission:
+  kind: line_bergeron
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Sobretensões de manobra (switching)
+    - Curtos-circuitos em linhas longas
+    - Energização de LT
+  references:
+    - "H. W. Dommel, 'Digital Computer Solution of Electromagnetic Transients in Single- and Multi-phase Networks', IEEE Trans. PAS, 1969"
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Ch. 4"
+  common_mistakes:
+    - Usar Bergeron para transientes > 10 kHz (erros de atenuação)
+    - Não considerar modos de propagação (clark transformation)
+  alternatives:
+    - TLIN — PI nominal (steady-state)
+    - JMARTI — com dependência de frequência

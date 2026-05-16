@@ -1,0 +1,199 @@
+# Relé de Proteção (50/51/49/87 — proteção elétrica multi-função).
+# Distinto de "Relais" (chave controlada) — RELAY é a função
+# de PROTEÇÃO real (overcurrent, thermal, differential).
+
+schema_version: "1.0"
+code: RELAY
+label_pt: Relé de proteção (50/51/49/87)
+label_en: Protection relay
+description: |
+  Relé de proteção multi-função com elementos ANSI selecionáveis:
+  50 (instantâneo), 51 (tempo inverso), 50N/51N (terra), 49
+  (térmico), 87 (diferencial), 27/59 (sub/sobretensão), 81
+  (frequência), 79 (religador).
+
+  Modelagem
+  ==========
+
+  * Pickup + TMS configuráveis por elemento
+  * Curva IEC/ANSI selecionável (51)
+  * Conexão via TC (link ao TC do projeto pelo tag)
+  * Vendor model opcional (link à EquipmentLibrary)
+
+  Cobertura normativa
+  ====================
+
+  * IEEE Std 242:2001 (Buff Book) §9 (motor protection)
+  * IEEE Std 242:2001 §11 (transformer protection)
+  * IEEE Std C37.112-2018 (curve types)
+  * IEC 60255-151:2009 (multi-function relays)
+  * IEEE C37.2 (device function numbers)
+  * NEC 110.10 + ABNT NBR 14039 (proteção MV)
+
+  Diferença vs. componente "Relais"
+  ----------------------------------
+
+  * **Relais** (legacy v0.21.x) = chave controlada (acionamento
+    via TACS/MODEL no ATP). NÃO é proteção.
+  * **RELAY** (este, v1.4.1) = relé de proteção dedicado para
+    análise de coordenação NBR/IEEE/NEC. Sem dependência ATP.
+
+category: switch
+atp_supported: false
+
+symbol:
+  size: [60, 50]
+  bounding_box: [-30, -25, 60, 50]
+  renderer: ResistorSymbol
+
+pins:
+  # v1.7.4: RELAY conecta APENAS com TC e BREAKER (não barra).
+  # Pinos T1/T2 (linha lateral) removidos — relé não conduz
+  # corrente principal; antes confundia usuários sugerindo
+  # conexão à barra. Backward compat: spec anterior tinha
+  # T1/T2 mas eram ambíguos (paridade real protection IED:
+  # apenas medição via TC + saída trip via contato seco).
+  - name: TC_link
+    label: Entrada de medição (do TC secundário)
+    position: [0, -25]
+  - name: Trip_out
+    label: Trip → disjuntor (saída de proteção)
+    position: [0, 25]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: "R-01"
+    visible: true
+    group: main
+    description: Identificador do relé
+  - name: vendor_model
+    label: Vendor / Model
+    type: string
+    default: ""
+    visible: true
+    group: main
+    description: |
+      Vendor + modelo (link à EquipmentLibrary). Ex:
+      "SEL-751", "ABB REF615", "Siemens 7SJ82".
+      Vazio = relé genérico (settings manuais).
+  - name: ansi_devices
+    label: Funções ativas (ANSI)
+    type: string
+    default: "51,50"
+    visible: true
+    group: main
+    description: |
+      Lista CSV de funções ANSI ativas. Ex: "51,50,49"
+      (motor) ou "51,50,87" (transformador) ou
+      "51,50,27,59" (feeder com under/over voltage).
+  - name: curve_51
+    label: Curva 51 (tempo inverso)
+    type: enum
+    default: IEC_VERY_INVERSE
+    visible: true
+    group: electrical
+    choices: [IEC_STANDARD_INVERSE, IEC_VERY_INVERSE,
+              IEC_EXTREMELY_INVERSE, IEC_LONG_INVERSE,
+              ANSI_MODERATELY_INVERSE, ANSI_VERY_INVERSE,
+              ANSI_EXTREMELY_INVERSE]
+    description: Curva inverse-time IEEE C37.112 / IEC 60255
+  - name: pickup_51_A
+    label: Pickup 51 (A primário)
+    unit: A
+    type: float
+    default: 100.0
+    visible: true
+    group: electrical
+    description: Corrente de pickup do 51 (A primário, não pu)
+  - name: tms_51
+    label: TMS 51
+    type: float
+    default: 0.30
+    visible: true
+    group: electrical
+    description: Time multiplier setting (0.05–1.0)
+  - name: pickup_50_A
+    label: Pickup 50 (A primário)
+    unit: A
+    type: float
+    default: 1500.0
+    visible: true
+    group: electrical
+    description: Corrente do instantâneo 50 (alto = não-trip em starting)
+  - name: delay_50_s
+    label: Delay 50
+    unit: s
+    type: float
+    default: 0.040
+    visible: false
+    group: electrical
+    description: Atraso inerente (default 2 ciclos @ 60Hz)
+  - name: pickup_49_A
+    label: Pickup 49 thermal (A)
+    unit: A
+    type: float
+    default: 0.0
+    visible: false
+    group: thermal
+    description: Pickup térmico 49 (motor). 0 = desativado.
+  - name: delay_49_s
+    label: Delay 49
+    unit: s
+    type: float
+    default: 8.0
+    visible: false
+    group: thermal
+    description: Tempo até trip térmico
+  - name: pickup_87_A
+    label: Pickup 87 differential (A)
+    unit: A
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    description: Pickup 87 diferencial (XFMR/gerador). 0 = desativado.
+  - name: delay_87_s
+    label: Delay 87
+    unit: s
+    type: float
+    default: 0.025
+    visible: false
+    group: electrical
+    description: Tempo trip 87 (típico 1.5 ciclos)
+  - name: ct_link_tag
+    label: TC associado (tag)
+    type: string
+    default: ""
+    visible: false
+    group: advanced
+    description: |
+      TAG do TC pelo qual o relé "vê" a corrente. Vazio
+      = primary side direto (sem TC modelado).
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: relay_no_atp
+
+llm_hints:
+  typical_applications:
+    - Proteção feeder MV (51 + 50 + 51N + 50N)
+    - Proteção motor (51 + 50 + 49 thermal)
+    - Proteção transformador (51 + 50 + 87 diff)
+    - Proteção gerador (51V + 87 + 27 + 59 + 81)
+  references:
+    - "IEEE Std 242:2001 (Buff Book)"
+    - "IEC 60255-151:2009"
+    - "IEEE C37.112-2018"
+    - "ABNT NBR 14039 (MV protection)"
+    - "NEC 110.10"
+  common_mistakes:
+    - "Pickup 50 < 5×FLA → trip em starting do motor"
+    - "TMS 51 alto demais → coord falha com damage curve do cabo"
+    - "Não atrelar ao TC → análise vê corrente primary direto"
+  alternatives:
+    - "RELAY genérico vs vendor-specific (use library)"
+    - "FUSE para feeders LV simples"
+    - "Recloser para distribuição rural"

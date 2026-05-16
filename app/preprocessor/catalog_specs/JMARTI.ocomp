@@ -1,0 +1,61 @@
+# Linha J. Marti — modelo com dependência de frequência Z(ω).
+
+schema_version: "1.0"
+code: JMARTI
+label_pt: Linha J. Marti Z(omega)
+label_en: J. Marti frequency-dependent line
+description: |
+  Modelo de linha de transmissão com parâmetros dependentes da
+  frequência (J. R. Marti, 1982). Representa fielmente o skin-
+  effect nos condutores e a distorção de ondas por dispersão.
+
+  Usado para transientes rápidos — descargas atmosféricas, manobras
+  de VCB, inrush current. Requer pré-processamento via LCC (Line/
+  Cable Constants) que gera um arquivo .pch com os polos/resíduos
+  do ajuste rational function.
+
+category: line
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: LineJMartiSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties:
+  - name: pch_file
+    label: Arquivo .pch
+    type: file
+    default: "model.pch"
+    visible: true
+    group: main
+    description: Arquivo gerado por LCC com parâmetros Z(ω) ajustados
+
+atp_emission:
+  kind: line_jmarti
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Transientes rápidos em LT (surge atmosférico)
+    - Estudos de TRV em VCB
+    - Inrush de transformador
+    - Cabo com efeito pelicular significativo
+  references:
+    - "J. R. Marti, 'Accurate Modelling of Frequency-Dependent Transmission Lines in Electromagnetic Transient Simulations', IEEE Trans. PAS, 1982"
+    - "ATP Rule Book, Section II.B (Frequency-dependent lines)"
+  common_mistakes:
+    - Usar .pch obsoleto (dimensões ou temperatura erradas)
+    - Esquecer que o arquivo .pch é específico de uma geometria
+    - Não validar resíduos positivos do fitting
+  alternatives:
+    - BERG — sem dependência de frequência (mais simples)
+    - TLIN — PI steady-state

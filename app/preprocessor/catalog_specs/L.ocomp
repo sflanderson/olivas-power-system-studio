@@ -1,0 +1,76 @@
+# Indutor linear — elemento passivo 2-terminal com energia magnética.
+# Corresponde ao cartão ATP TYPE-0 (branch linear) com L != 0.
+
+schema_version: "1.0"
+code: L
+label_pt: Indutor
+label_en: Inductor
+description: |
+  Indutor linear com corrente inicial I_0 opcional. Gera um cartão
+  ATP de ramo linear (R-L-C com R=C=0). Não modela saturação —
+  para núcleos saturáveis use LNL ou XFMR.
+
+category: passive
+atp_supported: true
+
+symbol:
+  size: [40, 60]
+  bounding_box: [-20, -30, 40, 60]
+  renderer: InductorSymbol
+
+pins:
+  - name: p1
+    label: Terminal superior
+    position: [0, -30]
+  - name: p2
+    label: Terminal inferior
+    position: [0, 30]
+
+properties:
+  - name: L
+    label: Indutância
+    unit: H
+    type: float
+    default: 1.0e-3
+    visible: true
+    group: main
+    min: 0.0
+    description: Indutância em Henries (aceita 1 mH, 1 µH em sufixos)
+    example: 0.001
+  - name: I_0
+    label: Corrente inicial
+    unit: A
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    description: Condição inicial em t=0 (0 = regime frio)
+  - name: T_amb
+    label: Temperatura ambiente
+    unit: "°C"
+    type: float
+    default: 26.85
+    visible: false
+    group: thermal
+    description: Apenas para modelos de indutor com dependência térmica
+
+atp_emission:
+  kind: inductor
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Reatância de dispersão em transformadores
+    - Reator shunt de compensação
+    - Reatância de curto-circuito de fonte (Thévenin)
+    - Filtro LC em rectificadores
+  references:
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Ch. 4"
+  common_mistakes:
+    - L = 0 gera singularidade — use R muito pequeno em vez
+    - Saturação de núcleo não é modelada; usar LNL para isso
+    - I_0 sem regime estabelecido pode oscilar artificialmente
+  alternatives:
+    - LNL — indutor saturável L(i)
+    - MUT — indutores mutuamente acoplados
+    - Tr — transformador (preferível a modelar ramo magnetizante manual)

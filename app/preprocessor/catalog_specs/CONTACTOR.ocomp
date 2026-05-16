@@ -1,0 +1,153 @@
+# Contator — chaveamento de motores (NEMA Size 0-9, IEC AC-3/AC-4).
+# Usado em CCMs e em sistemas de partida de motores.
+
+schema_version: "1.0"
+code: CONTACTOR
+label_pt: Contator
+label_en: Contactor
+description: |
+  Contator eletromagnético para comando de motores e cargas
+  resistivas. Modela operação ON/OFF (sem inrush mecânico)
+  com tempo de pickup/dropout e corrente máxima contínua.
+
+  Tipicamente combinado com relé térmico (49) + fusível ou
+  disjuntor para proteção completa do motor (CCM bucket).
+
+  Cobertura normativa
+  ====================
+
+  * IEC 60947-4-1:2018 — Low-voltage switchgear: contactors
+  * NEMA ICS 2:2000 — Industrial control devices
+  * NBR IEC 60947-4 — Contatores BT (Brasil)
+  * UL 508 — Industrial control equipment
+
+  Categorias de utilização IEC
+  =============================
+
+  * AC-1: cargas resistivas (1× In)
+  * AC-3: motores em regime (Ip/In = 6×)  ← mais comum
+  * AC-4: motores em jogging/reversão (Ip/In = 8×)
+  * DC-3: motores DC
+
+category: switch
+atp_supported: false
+
+symbol:
+  size: [40, 50]
+  bounding_box: [-20, -25, 40, 50]
+  renderer: ResistorSymbol
+
+pins:
+  - name: T1
+    label: Linha
+    position: [-30, 0]
+  - name: T2
+    label: Carga
+    position: [30, 0]
+  - name: A1
+    label: Bobina +
+    position: [0, -25]
+  - name: A2
+    label: Bobina -
+    position: [20, -25]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: "K-01"
+    visible: true
+    group: main
+    description: Identificador
+  # v1.7.1: estado open/closed (bobina energizada vs solta).
+  # Default closed (energizado, conduzindo).
+  - name: state
+    label: Estado
+    type: enum
+    default: closed
+    visible: true
+    group: main
+    choices: [closed, open]
+    description: |
+      Estado: closed (bobina energizada, conduzindo) ou
+      open (bobina solta, NA aberto).
+  - name: nema_size
+    label: Tamanho NEMA
+    type: enum
+    default: "Size 1"
+    visible: true
+    group: main
+    choices: ["Size 00", "Size 0", "Size 1", "Size 2",
+              "Size 3", "Size 4", "Size 5", "Size 6",
+              "Size 7", "Size 8", "Size 9"]
+    description: Tamanho NEMA (ICS 2)
+  - name: rated_current_A
+    label: I nominal (AC-3)
+    unit: A
+    type: float
+    default: 25.0
+    visible: true
+    group: main
+    description: In conforme categoria AC-3 (motores)
+  - name: utilization_category
+    label: Categoria
+    type: enum
+    default: AC-3
+    visible: true
+    group: main
+    choices: [AC-1, AC-3, AC-4, DC-3]
+    description: Categoria de utilização IEC 60947-4
+  - name: coil_voltage_V
+    label: Tensão da bobina
+    unit: V
+    type: float
+    default: 220.0
+    visible: false
+    group: electrical
+    description: Tensão de alimentação A1-A2
+  - name: pickup_time_ms
+    label: Tempo pickup
+    unit: ms
+    type: float
+    default: 30.0
+    visible: false
+    group: timing
+    description: Tempo até fechamento dos contatos
+  - name: dropout_time_ms
+    label: Tempo dropout
+    unit: ms
+    type: float
+    default: 20.0
+    visible: false
+    group: timing
+    description: Tempo até abertura
+  - name: lifecycles
+    label: Vida elétrica
+    type: int
+    default: 1000000
+    visible: false
+    group: advanced
+    description: Operações em AC-3 (típico 1M ciclos)
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: contactor_no_atp
+
+llm_hints:
+  typical_applications:
+    - Comando de motor (CCM bucket = contator + 49 + fusível)
+    - Capacitor switching (categoria AC-6b)
+    - Heater control (AC-1)
+    - Reversão de motor (AC-4)
+  references:
+    - "IEC 60947-4-1:2018"
+    - "NEMA ICS 2:2000"
+    - "ABNT NBR IEC 60947-4"
+  common_mistakes:
+    - "Categoria AC-1 em motor → contator queima após poucas operações"
+    - "NEMA Size pequeno demais para corrente nominal"
+    - "Tensão da bobina diferente do controle"
+  alternatives:
+    - "Relé estático (semicondutor — sem desgaste mecânico)"
+    - "VFD (controle eletrônico completo)"

@@ -1,0 +1,37 @@
+# Bloco de equações — só-Qucs, não traduzido para ATP.
+
+schema_version: "1.0"
+code: Eqn
+label_pt: Bloco de equações
+label_en: Equation block
+description: |
+  Bloco de equações Qucs. Não tem equivalente direto no ATP —
+  quando presente em um projeto, é ignorado pelo bridge com
+  warning. Para lógica equivalente no ATP, use TACS ou MODEL.
+
+category: control
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties: []
+
+atp_emission:
+  kind: custom
+  count: 0
+
+llm_hints:
+  typical_applications:
+    - Blocos de equações em projetos Qucs originais (legado)
+  references:
+    - "Qucs Reference Manual, Sec. 4.2"
+  common_mistakes:
+    - Esperar que Eqn gere cartão ATP — usar TACS/MODEL em vez disso
+  alternatives:
+    - TACS — lógica de controle equivalente no ATP
+    - MODEL — lógica complexa em ATP MODELS

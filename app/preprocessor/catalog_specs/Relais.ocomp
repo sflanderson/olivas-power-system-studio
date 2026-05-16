@@ -1,0 +1,60 @@
+# Relé / disjuntor nominal (chave com leads longos).
+
+schema_version: "1.0"
+code: Relais
+label_pt: Chave controlada
+label_en: Relay (controlled switch)
+description: |
+  Chave ideal com leads estendidos (±50 px) — convenção Qucs.
+  Funcionalmente equivalente a SwIdeal (TYPE-13 time-controlled),
+  diferenciada apenas pelo símbolo visual (ocupa mais espaço,
+  típico de relé de proteção em diagramas de subestação).
+
+category: switch
+atp_supported: true
+
+symbol:
+  size: [100, 60]
+  bounding_box: [-50, -30, 100, 60]
+  renderer: RelaisSymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-50, 0]
+  - name: p2
+    label: Terminal direito
+    position: [50, 0]
+
+properties:
+  - name: T_close
+    label: T_close
+    unit: s
+    type: float
+    default: 0.0
+    visible: true
+    group: timing
+    min: 0.0
+  - name: T_open
+    label: T_open
+    unit: s
+    type: float
+    default: 1.0e9
+    visible: true
+    group: timing
+
+atp_emission:
+  kind: switch_simple
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Diagramas de subestação (símbolo grande para clareza)
+    - Relé de proteção nominal (sem curva de trip)
+  references:
+    - "ATP Rule Book, Section I.E (TYPE-13)"
+  common_mistakes:
+    - Confundir com relé real (curvas IEC/IEEE) — este é só nominal
+  alternatives:
+    - SwIdeal — mesma chave com leads menores
+    - VCB — disjuntor a vácuo com reignição

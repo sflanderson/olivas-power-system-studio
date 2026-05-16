@@ -1,0 +1,341 @@
+================================================================
+AUDITORIA TÉCNICA — ATP STUDIO v0.27.11.1
+================================================================
+Data: 2026-04-25
+Suite: 2652 testes passando, 15 skipped, 0 falhas.
+Total LOC app/: 38.093 linhas (94 módulos Python).
+
+================================================================
+1. ESCOPO DA AUDITORIA
+================================================================
+
+Módulos auditados (postprocessor + standards):
+
+  Postprocessor (10 módulos)
+  ───────────────────────────
+    short_circuit.py        — IEC 60909 SC network
+    power_flow.py           — Newton-Raphson PF (NOVO v0.27.11)
+    motor_starting.py       — IEEE 399 motor starting (NOVO)
+    arc_flash.py            — NBR 17227 arc-flash
+    relay_coordination.py   — IEEE 242 coordination
+    relay_suggestions.py    — vendor formats SEL/ABB/Schneider
+    bus_pipeline.py         — orchestrator end-to-end
+    multihop_walker.py      — BFS topology walker
+    trt_analyzer.py         — TRT IEC 62271-100
+
+  Standards (6 módulos)
+  ─────────────────────
+    iec60909.py             — Voltage factor, κ, Ik'', ip
+    iec60255.py             — TC curves IEC + IEEE C37.112
+    iec62271.py             — TRT envelopes
+    nbr17227.py             — Arc-flash NBR/IEEE 1584
+    relay_models.py         — Registry SEL-751, ABB, Schneider
+    ansi_devices.py         — IEEE C37.2
+
+================================================================
+2. TABELA-RESUMO DE STATUS POR MÓDULO
+================================================================
+
+LEGENDA:
+  S = sólido (production-ready)
+  M = MVP / aproximação (precisa refinamento antes de release)
+  C = crítico (bloqueia release de produção)
+
++---------------------------+------+----------+----------+------+
+| Módulo                    | LOC  | Cobert.  | Status   | Prio |
++===========================+======+==========+==========+======+
+| short_circuit.py          |  363 |  alta    |    M     |  P2  |
+| power_flow.py             |  710 |  alta    |    M     |  P2  |
+| motor_starting.py         |  460 |  alta    |    M     |  P3  |
+| arc_flash.py              |  370 |  média   |    M     |  P2  |
+| relay_coordination.py     |  462 |  alta    |    S     |  P3  |
+| relay_suggestions.py      |  737 |  alta    |    M     |  P2  |
+| bus_pipeline.py           | 1039 |  alta    |    M     |  P1  |
+| multihop_walker.py        |  570 |  alta    |    M     |  P2  |
+| trt_analyzer.py           |  395 |  alta    |    S     |  P3  |
+| iec60909.py               |  547 |  alta    |    M     |  P1  |
+| iec60255.py               |  430 |  alta    |    S     |  P3  |
+| iec62271.py               |  463 |  alta    |    M     |  P3  |
+| nbr17227.py               |  662 |  alta    |    C     |  P0  |
+| relay_models.py           |  481 |  média   |    M     |  P2  |
+| ansi_devices.py           |  290 |  alta    |    S     |  P3  |
++---------------------------+------+----------+----------+------+
+
+P0 = bloqueia release imediato
+P1 = bloqueia release de produção
+P2 = recomendado antes de uso comercial
+P3 = melhoria de qualidade / refinamento
+
+================================================================
+3. PRIORIDADES P0 — BLOQUEIO IMEDIATO
+================================================================
+
+P0.1 [nbr17227.py] calculate_incident_energy_J_per_cm2 é
+APROXIMAÇÃO MVP com K_base=6.23 calibrado de 1 exemplo:
+- Tabela 6 da NBR completa NÃO implementada.
+- Equações 3-6 reais ausentes.
+- Sem interpolação entre bandas 600/2700/14300 V.
+- HCB/VOA/HOA fallback silencioso para VCB.
+- Ranges Ibf e G da IEEE 1584 NÃO validados.
+- Working distance < 305mm aceito mas extrapola além de
+  calibração.
+
+Ação: substituir por implementação completa da Tabela 6 +
+interpolação Equação (28-30) ANTES de qualquer laudo final.
+
+================================================================
+4. PRIORIDADES P1 — BLOQUEIO DE PRODUÇÃO
+================================================================
+
+P1.1 [bus_pipeline.py] DEFAULTS CONSERVADORES MASCARAM
+SUBDIMENSIONAMENTO:
+- default_utility_S_kQ_MVA = 500 MVA (concessionária real
+  forte tem 2000-5000 MVA → subestima Ik'').
+- transformer_default_uk_pct = 10% (TRs reais 4-6% →
+  subestima Ik'').
+- S_MVA = 25 hardcoded para Tr/sTr (linha 636) — sem
+  parsing real do schema.
+
+Ação: warnings críticos quando defaults usados; warning
+forte se nenhum dado real disponível.
+
+P1.2 [bus_pipeline.py] comp.name[:6] trunca silenciosamente
+em múltiplos pontos (linhas 437, 454, 516, 661):
+- Colisão de nomes possível.
+- Perda de auditabilidade.
+- Tracking back ao componente fonte fica ambíguo.
+
+Ação: usar UUID interno ou hash; warning se truncado.
+
+P1.3 [iec60909.py] Decay μ·q (near-to-generator) AUSENTE:
+- Ib = Ik = Ik'' sempre (linha 531-532).
+- Para faltas próximas a SM grande, Ib real é 60-80% de
+  Ik'' → SOBRESTIMA breaking duty → equipamentos podem ser
+  oversized (custo) ou tripping spurious.
+- Far-from-generator é default sem detecção automática.
+
+Ação: implementar §4.5/4.6 da IEC 60909-0 (μ-fator para
+decaimento do Xd' subtransient ao Xd' transient e q-fator
+para gerador assíncrono).
+
+P1.4 [iec60909.py] Method C (frequency-equivalent) AUSENTE:
+- Apenas Method B implementado.
+- Para malhas com R/X variáveis, Method B sobrestima ip
+  até 30% (cf. IEC TR 60909-1).
+
+Ação: implementar Method C antes de uso em sistemas
+malhados industriais grandes.
+
+P1.5 [iec60909.py] Sequencial 0/1/2 AUSENTE:
+- Faltas LG/LL/LLG não suportadas.
+- Crítico para 50N/51N (proteção de terra).
+- Limitação compartilhada com short_circuit.py.
+
+Ação: implementar Z_0 e Z_2 para SM, TR, linha (já
+existe Xd_0, X0 no schema do SM!).
+
+================================================================
+5. PRIORIDADES P2 — ANTES DE USO COMERCIAL
+================================================================
+
+P2.1 [short_circuit.py] contribution_breakdown usa módulos
+de Z (não divisor de corrente complexo) → frações podem não
+somar 100%.
+   Ação: I_i = V_th / Z_i complexo, normalizar.
+
+P2.2 [short_circuit.py] add_transformer_series tem comentário
+admitindo confusão sobre lado de referência.
+   Ação: assinatura passar V_HV+V_LV, fazer reflexão internamente.
+
+P2.3 [power_flow.py] LOOPS TRIPLO ANINHADOS (P/Q calc + Jacobian):
+O(n³) puro Python — inviável >50 buses.
+   Ação: vetorizar com np.dot/einsum (ganho ~100×).
+
+P2.4 [power_flow.py] PV→PQ switching e Q-limits AUSENTES:
+- "Convergência" pode ser em ponto inviável.
+   Ação: implementar switching (Saadat §6.6).
+
+P2.5 [power_flow.py] iteration NameError em max_iterations=0:
+- `for iteration in range(1, ...)` não roda → variable
+  undefined no return.
+   Ação: inicializar iteration=0 antes do loop.
+
+P2.6 [arc_flash.py] equipment_class missing key → KeyError
+silencioso.
+   Ação: try/except + warning estruturado.
+
+P2.7 [relay_suggestions.py] HEURÍSTICA Ik''/20 quando
+load_S_MVA=None é TÓXICA:
+- Pode estimar I_n 3-5× maior que real → pickup_51 muito
+  alto → falha de coordenação.
+   Ação: ValueError ou warning crítico em vez de silenciar.
+
+P2.8 [relay_suggestions.py] pickup_50_factor=0.80 usa o
+limite ALTO da Buff Book §15.3 [0.6, 0.8]:
+- Pode falhar coordenação com 50 downstream.
+   Ação: parametrizar; default conservador 0.7.
+
+P2.9 [relay_suggestions.py] pickup_51N_A = 0.10 × pickup_51_A
+sem flag de tipo de aterramento:
+- Para alta-resistência → inadequado.
+   Ação: parametrizar grounding_type.
+
+P2.10 [multihop_walker.py] HEURÍSTICA "outro lado" do TR
+(linhas 183-195) falha em Tr3 trifásico ou autotrafo.
+   Ação: campo node_role: HV|LV no schema.
+
+P2.11 [multihop_walker.py] DETECÇÃO DE LOOPS AUSENTE:
+- Comentário admite "assume topologia radial".
+- Chains paralelas duplicam fontes.
+   Ação: Tarjan ou simple cycle detection.
+
+P2.12 [relay_models.py] INCONSISTÊNCIA TMS RANGE:
+- Schneider P3U30: (0.025, 1.5) declarado.
+- iec60255.py valida [0.05, 1.0] → reject curvas válidas.
+   Ação: passar TMS range para o solver.
+
+================================================================
+6. PRIORIDADES P3 — REFINAMENTO DE QUALIDADE
+================================================================
+
+P3.1 [motor_starting.py] heurística R/X "90% indutivo"
+hardcoded — deveria receber Z_th: complex.
+
+P3.2 [motor_starting.py] T_load_avg = 0.5 × load_torque_pu
+assume carga linear; ventilador/guincho diferentes.
+   Ação: enum LoadType (CONSTANT/LINEAR/QUADRATIC/CUBIC).
+
+P3.3 [relay_coordination.py] margin_required_s=0.20 é
+"digital moderno"; eletromecânicos precisam 0.30.
+   Ação: flag electromechanical_devices.
+
+P3.4 [relay_coordination.py] verifica margem em corrente
+discreta; deveria varrer range [pickup_dn, fault_max].
+
+P3.5 [trt_analyzer.py] _compute_max_rrrv só slope positivo;
+TRT real tem slope negativo significativo.
+
+P3.6 [trt_analyzer.py] sem filtro digital; ruído numérico
+infla RRRV artificialmente.
+
+P3.7 [iec60909.py] LV_RESIDENTIAL (1.05) não diferencia
+230/400V de outros LV na auto-classificação — sempre cai em
+LV_INDUSTRIAL (1.10).
+
+P3.8 [iec60909.py] thermal_equivalent_kA admite "MVP" —
+fatores m+n da §4.8 não implementados.
+
+P3.9 [ansi_devices.py] Subset incompleto: faltam 6, 21P,
+21N, 50G, 64G, 81O/81U separados.
+
+P3.10 [iec60255.py] Curvas vendor-specific (RI ABB,
+ABB-IDMT) não implementadas.
+
+P3.11 [iec62271.py] _TYPICAL_RRRV admite "valores
+conservadores" — variação real 30-50% por Voc.
+
+================================================================
+7. FRAGILIDADES CROSS-CUTTING
+================================================================
+
+7.1 DEFAULTS QUE MASCARAM SUBDIMENSIONAMENTO
+   S_kQ=500 MVA, uk=10%, S_TR=25 MVA, Xd''=0.20, locked
+   rotor=6× — todos espalhados sem fonte normativa única.
+   Recomendação: classe DefaultsRegistry centralizada com
+   fonte normativa explícita por defaults.
+
+7.2 SILENT FALLBACKS
+   - HCB/VOA/HOA → VCB (nbr17227)
+   - Tipos não suportados → ignored (multihop_walker linha 456)
+   - equipment_class faltante → KeyError (arc_flash)
+   Recomendação: warnings estruturados sempre que fallback usado.
+
+7.3 HEURÍSTICAS HARDCODED SEM FLAG
+   - R/X 90% indutivo (motor_starting)
+   - Tipo de carga (motor_starting)
+   - Lado HV/LV de TR (multihop_walker)
+   - 0.95 × ωs como velocidade alvo (motor_starting)
+   Recomendação: cada uma com parâmetro override no Case.
+
+7.4 MAGIC NUMBERS SEM SOURCE
+   Linhas espalhadas: 6.23 (K_base nbr17227), 0.10 (R/X),
+   1e9 (Z para fonte ignorada), 0.05 (time_for_idc_s).
+   Recomendação: const named no topo + docstring com IEC §.
+
+7.5 INCONSISTÊNCIAS REGISTRY vs SOLVER
+   - TMS range Schneider vs IEC.
+   - relay_model.application vs application calculada.
+   Recomendação: testes cruzados em test_pp_registry_guard.
+
+================================================================
+8. ROADMAP DE REFINAMENTO SUGERIDO
+================================================================
+
+SPRINT v0.27.11.5 — P0 + P1 (release crítico):
+  1. nbr17227 Tabela 6 completa + interpolação. (P0.1)
+  2. iec60909 decay μ·q + Method C. (P1.3, P1.4)
+  3. iec60909 sequencial 0/1/2. (P1.5)
+  4. bus_pipeline warnings críticos quando defaults usados. (P1.1)
+  5. comp.name truncation com warning. (P1.2)
+
+SPRINT v0.27.12 — P2 commercial readiness:
+  1. short_circuit contribution_breakdown complexo.
+  2. power_flow vetorizado + PV→PQ switching.
+  3. relay_suggestions sanity warnings.
+  4. multihop_walker loop detection + node_role schema.
+  5. relay_models TMS range reconciliation.
+
+SPRINT v0.27.13 — P3 quality:
+  1. motor_starting LoadType enum + Z_th complex.
+  2. relay_coordination range scan + electromechanical flag.
+  3. trt_analyzer filtro digital + slope negativo.
+  4. ansi_devices completar subset.
+  5. iec60255 curvas vendor.
+  6. DefaultsRegistry centralizado com normas.
+
+================================================================
+9. PONTOS FORTES (não regredir)
+================================================================
+
+* Cobertura de testes: 2652 / 15 skipped / 0 falhas.
+* Validações de inputs em iec60909, iec62271, nbr17227,
+  relay_coordination — robustas.
+* Tabelas IEC e IEEE reproduzidas como dados (não código)
+  → auditáveis vs PDF da norma.
+* Polimorfismo limpo em TcCurveSetting (IEC vs IEEE C37.112).
+* Frozen dataclasses em ShortCircuitResult, ArcFlashReport,
+  PowerFlowSolution, MotorStartingReport — imutabilidade
+  garantida.
+* References tuple em todos reports — auditabilidade
+  normativa.
+* Vendor formats SEL/ABB/Schneider com fallbacks. Auto-
+  selection de modelo por aplicação.
+* Modo standalone (SKM PTW) e PF-driven explícitos com
+  documentação de Table 1 IEC 60909.
+* Newton-Raphson convergência em 4 iter para Stevenson 3-bus
+  (1e-11 pu).
+* Acceptance categories IEEE 399 + NEMA MG-1 explícitos
+  com rationale gerado.
+
+================================================================
+10. CONCLUSÃO EXECUTIVA
+================================================================
+
+ATP Studio v0.27.11.1 está em estado MVP avançado, adequado
+para:
+  - Prototipagem e validação acadêmica (DOUTORADO UFMG).
+  - Demonstrações funcionais.
+  - Estudos preliminares com defaults conservadores.
+
+NÃO está pronto para:
+  - Laudos finais de arc-flash (P0.1 bloqueia).
+  - Estudos críticos de near-to-generator (P1.3).
+  - Sistemas malhados grandes (P1.4).
+  - Faltas LG/LL (P1.5).
+
+Próximas sprints sugeridas (v0.27.11.5, v0.27.12, v0.27.13)
+endereçam progressivamente P0 → P1 → P2 → P3.
+
+================================================================
+FIM DO RELATÓRIO
+================================================================

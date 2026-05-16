@@ -1,0 +1,208 @@
+# Transformador 3-enrolamentos (primário/secundário/terciário).
+
+schema_version: "1.0"
+code: Tr3
+label_pt: Transformador 3-enrol.
+label_en: 3-winding transformer
+description: |
+  Transformador de 3 enrolamentos — típico de subestações de
+  transmissão (H/M/B). A emissão atual é placeholder; a forma
+  completa via BCTRAN entra em v0.22.2. Note que o renderer atual
+  mostra apenas 2 enrolamentos visualmente; o terciário é
+  implícito via razão "a:b:c".
+
+category: coupled
+atp_supported: true
+
+symbol:
+  size: [80, 60]
+  bounding_box: [-40, -30, 80, 60]
+  renderer: TransformerSymbol
+
+pins:
+  - name: p1_top
+    label: Primário - superior
+    position: [-30, -20]
+  - name: p1_bot
+    label: Primário - inferior
+    position: [-30, 20]
+  - name: p2_top
+    label: Secundário - superior
+    position: [30, -20]
+  - name: p2_bot
+    label: Secundário - inferior
+    position: [30, 20]
+
+properties:
+  - name: ratio
+    label: Razão de transformação
+    type: string
+    default: "1:1:1"
+    visible: true
+    group: main
+    description: Razão a:b:c (ex 500:138:13.8)
+  - name: L_mag
+    label: Indutância magnetizante
+    unit: H
+    type: string
+    default: "1 mH"
+    visible: true
+    group: electrical
+
+  # v0.24.5: campos BCTRAN 3-enrolamento. Substituem os campos
+  # 2-enrolamento da v0.24.1 (que assumiam V_L único). Layout:
+  # H (high) / M (medium) / B (low / terciário). Tipicamente
+  # 500/138/13.8 kV em transmissão.
+  #
+  # Mínimo para emissão BCTRAN 3-winding: V_H, V_M, V_B, S_H,
+  # v_sc_HM_pct. Perdas e i_0/p_0 podem ser zero (= magnetização
+  # desprezível).
+  - name: V_H
+    label: Tensão nominal H
+    unit: V
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Tensão nominal do enrolamento de alta (V rms)
+  - name: V_M
+    label: Tensão nominal M
+    unit: V
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Tensão nominal do enrolamento médio (V rms)
+  - name: V_B
+    label: Tensão nominal B
+    unit: V
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Tensão nominal do terciário / baixa (V rms)
+  - name: S_H
+    label: Potência H
+    unit: VA
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: S_M
+    label: Potência M
+    unit: VA
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: S_B
+    label: Potência B
+    unit: VA
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: v_sc_HM_pct
+    label: Z curto H↔M
+    unit: "%"
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    max: 100.0
+    description: Impedância % no SC entre H e M
+  - name: p_sc_HM_kW
+    label: Perdas SC H↔M
+    unit: kW
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: v_sc_HB_pct
+    label: Z curto H↔B
+    unit: "%"
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    max: 100.0
+  - name: p_sc_HB_kW
+    label: Perdas SC H↔B
+    unit: kW
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: v_sc_MB_pct
+    label: Z curto M↔B
+    unit: "%"
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    max: 100.0
+  - name: p_sc_MB_kW
+    label: Perdas SC M↔B
+    unit: kW
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: i_0_pct
+    label: Corrente de excitação
+    unit: "%"
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    max: 100.0
+    description: I_0 no teste OC (lado H)
+  - name: p_0_kW
+    label: Perdas a vazio (OC)
+    unit: kW
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+  - name: clock
+    label: Clock group (h)
+    type: int
+    default: 0
+    visible: false
+    group: advanced
+    min: 0
+    max: 11
+    description: Defasagem em horas-relógio entre H e M (cada h = 30° elétricos)
+
+atp_emission:
+  kind: transformer_3w
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Subestação H/M/B (500/138/13.8 kV)
+    - Trafo de forno elétrico com terciário em delta
+    - Autotrafo com enrolamento de compensação
+  references:
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Ch. 6"
+    - "IEC 60076-1 — Power transformers, general"
+  common_mistakes:
+    - Esquecer que o terciário em delta afeta o zero-sequence
+    - Razão de 3 números exige ATP BCTRAN (emissão ainda placeholder)
+  alternatives:
+    - Tr — 2 enrolamentos
+    - BCTRAN / XFMR (v0.22.2) — trafo multi-enrolamento completo

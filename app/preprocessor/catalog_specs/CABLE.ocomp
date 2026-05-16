@@ -1,0 +1,118 @@
+# Cabo elétrico para feeders de potência (NBR 5410).
+# Modelagem concentrada R+jX com auto-dimensionamento.
+
+schema_version: "1.0"
+code: CABLE
+label_pt: Cabo (NBR 5410)
+label_en: Cable (NBR 5410)
+description: |
+  Cabo elétrico para feeders de potência. Modelagem
+  simplificada como impedância R+jX dependente da bitola
+  e isolação. Suporta auto-dimensionamento conforme
+  NBR 5410 §6 via módulo
+  ``app.postprocessor.cable_sizing``.
+
+  Diferente de BERG/JMARTI/TLIN (linhas de transmissão
+  para EMTP), o CABLE é um modelo concentrado para
+  análises de regime permanente (PF, SC, V-drop).
+
+  Cobertura normativa
+  ====================
+
+  * ABNT NBR 5410:2008+Em.1:2024 §6 — Dimensionamento
+  * IEC 60364-5-52:2009 — Selection and erection
+  * NEC 2023 §310 — Conductor ampacities
+
+category: passive
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: ResistorSymbol
+
+pins:
+  - name: T1
+    label: Terminal 1
+    position: [-30, 0]
+  - name: T2
+    label: Terminal 2
+    position: [30, 0]
+
+properties:
+  - name: section_mm2
+    label: Bitola
+    unit: "mm²"
+    type: float
+    default: 35.0
+    visible: true
+    group: main
+    description: Seção transversal do condutor
+  - name: length_m
+    label: Comprimento
+    unit: m
+    type: float
+    default: 30.0
+    visible: true
+    group: main
+    description: Comprimento do cabo
+  - name: material
+    label: Material
+    type: enum
+    default: Cu
+    visible: true
+    group: main
+    choices: [Cu, Al]
+    description: Cobre ou Alumínio
+  - name: insulation
+    label: Isolação
+    type: enum
+    default: PVC
+    visible: true
+    group: main
+    choices: [PVC, EPR, XLPE]
+    description: Tipo de isolação (impacta T_max)
+  - name: installation
+    label: Instalação
+    type: enum
+    default: B1
+    visible: false
+    group: advanced
+    choices: [A1, B1]
+    description: Método de instalação NBR 5410
+  - name: ambient_temp_C
+    label: T ambiente
+    unit: "°C"
+    type: float
+    default: 30.0
+    visible: false
+    group: advanced
+    description: Temperatura ambiente (impacta FC)
+  - name: n_circuits
+    label: Circuitos agrupados
+    type: int
+    default: 1
+    visible: false
+    group: advanced
+    description: Número de circuitos no agrupamento
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: cable_concentrated_no_atp
+
+llm_hints:
+  typical_applications:
+    - Conexão entre BUS e carga (motor, transformador)
+    - Feeder LV/MV
+    - Cabo de entrada de subestação
+  references:
+    - "ABNT NBR 5410:2008+Em.1:2024 §6"
+    - "IEC 60364-5-52:2009"
+  common_mistakes:
+    - "Esquecer FC de temperatura/agrupamento"
+    - "V-drop ignorado em cabos longos (>50m)"
+    - "Não verificar estresse térmico SC"
+  alternatives:
+    - "BERG / JMARTI — linhas de transmissão LCC distribuídas"
+    - "TLIN — linha simples"

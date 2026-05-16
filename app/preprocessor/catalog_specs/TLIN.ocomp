@@ -1,0 +1,143 @@
+# Linha PI nominal — modelo concentrado para estudos de steady-state.
+
+schema_version: "1.0"
+code: TLIN
+label_pt: Linha PI nominal
+label_en: Nominal PI line
+description: |
+  Linha de transmissão modelada como PI concentrado (R-L série +
+  C/2 em cada terminal). Adequado para estudos em frequência
+  industrial (50/60 Hz) onde os efeitos de propagação podem ser
+  ignorados. Para transientes rápidos, use BERG (Bergeron) ou
+  JMARTI (dependência de frequência).
+
+category: line
+atp_supported: true
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: LinePISymbol
+
+pins:
+  - name: p1
+    label: Terminal esquerdo
+    position: [-30, 0]
+  - name: p2
+    label: Terminal direito
+    position: [30, 0]
+
+properties:
+  - name: length
+    label: Comprimento
+    unit: km
+    type: string
+    default: "100 km"
+    visible: true
+    group: main
+    description: Comprimento da linha
+  - name: R_per_km
+    label: Resistência/km
+    unit: ohm/km
+    type: string
+    default: "0.05 Ohm/km"
+    visible: false
+    group: electrical
+    description: Resistência por unidade de comprimento (legacy; use campos LCC se preencher)
+  # v0.25.1: campos de geometria LCC (Line Constants). Se TODOS
+  # preenchidos, o bridge usa Carson-Deri-Tévan para calcular
+  # R/L/C de sequência positiva e emite uma branch R-L-C lumped
+  # equivalente.
+  - name: x_a
+    label: x fase A
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    description: Coordenada horizontal da fase A
+  - name: y_a
+    label: y fase A
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    min: 0.0
+    description: Altura da fase A acima do solo (m)
+  - name: x_b
+    label: x fase B
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+  - name: y_b
+    label: y fase B
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    min: 0.0
+  - name: x_c
+    label: x fase C
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+  - name: y_c
+    label: y fase C
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: geometry
+    min: 0.0
+  - name: cond_radius
+    label: Raio do condutor
+    unit: m
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Raio externo do condutor (ex 0.0091 = 9.1 mm)
+  - name: cond_R_dc
+    label: R DC do condutor
+    unit: ohm/km
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Resistência DC ou de baixa frequência do condutor
+  - name: soil_rho
+    label: Resistividade do solo
+    unit: ohm·m
+    type: float
+    default: 100.0
+    visible: false
+    group: electrical
+    min: 1.0
+    description: ρ (Ω·m). Tipicamente 100 (terra molhada), 1000 (média), 10000 (rocha)
+
+atp_emission:
+  kind: line_pi
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Load flow / curto-circuito (60 Hz)
+    - Linhas curtas onde propagação é desprezível
+    - Análise steady-state em regime permanente
+  references:
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Ch. 4"
+    - "ATP Rule Book, Section II.B (Lines)"
+  common_mistakes:
+    - Usar PI para transientes rápidos (erro de fase)
+    - Ignorar capacitância shunt em linhas longas
+  alternatives:
+    - BERG — Bergeron (distribuído, sem dependência de frequência)
+    - JMARTI — dependência de frequência Z(ω)

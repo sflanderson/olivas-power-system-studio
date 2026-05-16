@@ -1,0 +1,108 @@
+# Weighted sum — y = bias + k1·x1 + k2·x2 + ... (até 4 inputs no MVP).
+
+schema_version: "1.0"
+code: TSum
+label_pt: Somador ponderado
+label_en: Weighted sum
+description: |
+  Somador ponderado: y = bias + Σᵢ kᵢ·xᵢ. Emissão ATP: device-98
+  (TACS weighted sum).
+
+  Útil para subtratores (k1=1, k2=-1 → y = x1 - x2), somadores e
+  combinações lineares de sinais. ATP TACS aceita até 6 inputs;
+  o MVP do schema cobre 4 (basta pra controle clássico).
+
+  Use peso 0 para "desativar" um input não usado.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [50, 50]
+  bounding_box: [-25, -25, 50, 50]
+  renderer: TSumSymbol
+
+pins: []
+
+properties:
+  - name: output_name
+    label: Nome do sinal de saída
+    type: string
+    default: "y"
+    visible: true
+    group: main
+
+  - name: input1_name
+    label: Sinal 1
+    type: string
+    default: "ref"
+    visible: true
+    group: main
+
+  - name: input1_weight
+    label: Peso 1
+    type: float
+    default: "1.0"
+    visible: true
+    group: main
+
+  - name: input2_name
+    label: Sinal 2
+    type: string
+    default: "meas"
+    visible: true
+    group: main
+
+  - name: input2_weight
+    label: Peso 2
+    type: float
+    default: "-1.0"
+    visible: true
+    group: main
+
+  - name: input3_name
+    label: Sinal 3 (opcional)
+    type: string
+    default: ""
+    visible: false
+    group: advanced
+
+  - name: input3_weight
+    label: Peso 3
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+  - name: input4_name
+    label: Sinal 4 (opcional)
+    type: string
+    default: ""
+    visible: false
+    group: advanced
+
+  - name: input4_weight
+    label: Peso 4
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+  - name: bias
+    label: Bias (constante)
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Subtrator de erro (err = ref - meas)
+    - Adição de feedforward ao PID
+    - Combinação linear de sensores (kalman simples)
+  alternatives:
+    - TACS — expressão genérica via parser

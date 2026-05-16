@@ -1,0 +1,143 @@
+# Transformador 2-enrolamentos genérico.
+# Representa um TP/TC ou transformador de potência de 2 enrolamentos.
+
+schema_version: "1.0"
+code: Tr
+label_pt: Transformador 2-enrol.
+label_en: 2-winding transformer
+description: |
+  Transformador de 2 enrolamentos (primário-secundário). Na emissão
+  atual gera um placeholder de branch tipo 19 com warning — a
+  emissão completa via BCTRAN (com saturação e acoplamento mútuo
+  real) entra em v0.22.2.
+
+  Uso típico: trafos de potência em estudos de energização, TP/TC
+  em medição, trafos de aterramento.
+
+category: coupled
+atp_supported: true
+
+symbol:
+  size: [80, 60]
+  bounding_box: [-40, -30, 80, 60]
+  renderer: TransformerSymbol
+
+pins:
+  - name: p1_top
+    label: Primário - superior
+    position: [-30, -20]
+  - name: p1_bot
+    label: Primário - inferior
+    position: [-30, 20]
+  - name: p2_top
+    label: Secundário - superior
+    position: [30, -20]
+  - name: p2_bot
+    label: Secundário - inferior
+    position: [30, 20]
+
+properties:
+  - name: ratio
+    label: Razão de transformação
+    type: string
+    default: "1:1"
+    visible: true
+    group: main
+    description: Razão a:b (ex 13.8:0.22)
+  - name: L_mag
+    label: Indutância magnetizante
+    unit: H
+    type: string
+    default: "1 mH"
+    visible: true
+    group: electrical
+    description: Ramo magnetizante (fallback se dados BCTRAN ausentes)
+  # v0.24.1: campos de teste BCTRAN. Todos opcionais; se preenchidos,
+  # o bridge_to_atp emite cards tipo 51/52 via BCTRAN em vez do
+  # placeholder legacy.
+  - name: V_H
+    label: Tensão nominal H
+    unit: V
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Tensão nominal do enrolamento de alta (V rms)
+  - name: V_L
+    label: Tensão nominal L
+    unit: V
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Tensão nominal do enrolamento de baixa (V rms)
+  - name: S_nom
+    label: Potência nominal
+    unit: VA
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Potência aparente nominal (VA)
+  - name: v_sc_pct
+    label: Z de curto-circuito
+    unit: "%"
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    max: 100.0
+    description: Impedância percentual (teste SC). 5-15% para potência; 2-4% distribuição
+  - name: p_sc_kW
+    label: Perdas em cobre (SC)
+    unit: kW
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Perdas no teste de curto-circuito (≈ perdas Joule nos enrolamentos)
+  - name: i_0_pct
+    label: Corrente de excitação
+    unit: "%"
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    max: 100.0
+    description: I_0 no teste OC (típico 0.5-2%)
+  - name: p_0_kW
+    label: Perdas a vazio (OC)
+    unit: kW
+    type: float
+    default: 0.0
+    visible: false
+    group: electrical
+    min: 0.0
+    description: Perdas no núcleo (teste OC). ~0.5-1.5 kW/MVA
+
+atp_emission:
+  kind: transformer_2w
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Trafo de potência em estudos de energização
+    - TP/TC em medição
+    - Trafo de aterramento (zigue-zague)
+  references:
+    - "H. W. Dommel, EMTP Theory Book, BPA, 1986, Ch. 6"
+    - "ATP Rule Book, Section II.A (Transformers)"
+  common_mistakes:
+    - Modelar trafo sem indutância de dispersão (L_mag=0) causa curto
+    - Usar razão 1:1 em trafo de potência real — verificar tape
+    - Saturação não modelada — para estudos inrush use XFMR/BCTRAN
+  alternatives:
+    - sTr — trafo simples (sem ramo magnetizante)
+    - Tr3 — trafo de 3 enrolamentos
+    - MUT — indutores mutuamente acoplados

@@ -1,0 +1,37 @@
+# Análise AC — diretiva de simulação Qucs (fasorial).
+
+schema_version: "1.0"
+code: ".AC"
+label_pt: Análise AC
+label_en: AC (phasor) analysis
+description: |
+  Diretiva Qucs de análise fasorial AC (.AC) em regime permanente.
+  No ATP corresponde a FREQUENCY SCAN (cartão /FREQUENCY SCAN).
+  Preservada apenas para layout — não emitida diretamente.
+
+category: sim
+atp_supported: false
+
+symbol:
+  size: [60, 30]
+  bounding_box: [-30, -15, 60, 30]
+  renderer: TACSSourceSymbol
+
+pins: []
+
+properties: []
+
+atp_emission:
+  kind: custom
+  count: 0
+
+llm_hints:
+  typical_applications:
+    - Preservar análise fasorial Qucs ao importar .sch
+  references:
+    - "Qucs Reference Manual, Sec. 3.3 (AC)"
+    - "ATP Rule Book, Section IX (Frequency Scan)"
+  common_mistakes:
+    - .AC Qucs ≠ FREQUENCY SCAN ATP (não há conversão automática)
+  alternatives:
+    - Frequency Scan ATP (manual) para análise espectral

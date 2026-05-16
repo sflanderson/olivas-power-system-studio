@@ -1,0 +1,179 @@
+# Disjuntor de proteção controlado por relé (genérico).
+# v1.4.3: complementa o RELAY (sprint v1.4.1) — RELAY ativa
+# Trip_out → BREAKER.Trip_in para abrir o circuito.
+
+schema_version: "1.0"
+code: BREAKER
+label_pt: Disjuntor (controlado por relé)
+label_en: Circuit Breaker (relay-controlled)
+description: |
+  Disjuntor de proteção genérico controlado por relé externo
+  via sinal de trip. Distinto de:
+
+  * **VCB / VCB3** (legacy v0.27): específico para disjuntor
+    a vácuo com modelagem de reignição/chopping em ATP/EMTP.
+  * **SwIdeal / SwTACS** (legacy): chaves para simulação
+    transitória.
+
+  BREAKER (v1.4.3) é orientado a **análise eletrotécnica**
+  NBR/IEEE: combinado com RELAY pelo pin Trip_in, modela o
+  par "relé + disjuntor" típico em proteção 50/51 industrial.
+
+  Ratings
+  ========
+
+  * Tensão nominal (V_kV)
+  * Corrente nominal contínua (I_A)
+  * Capacidade de interrupção (kA simétrica)
+  * Mecanismo (vacuum, SF6, oil, air-magnetic, MCB)
+  * Tempo de operação (ms — mecânico, não inclui arc)
+
+  Cobertura normativa
+  ====================
+
+  * IEEE Std C37.04-2018 (Power Circuit Breakers)
+  * IEC 62271-100:2021 (HV switchgear)
+  * NBR IEC 62271-100 (Brasil)
+  * NEMA AB-1 (LV breakers)
+  * UL 489 (LV branch breakers)
+
+category: switch
+atp_supported: false
+
+symbol:
+  size: [40, 40]
+  bounding_box: [-20, -20, 40, 40]
+  renderer: CircuitBreakerSymbol
+
+pins:
+  - name: T1
+    label: Linha entrada
+    position: [-30, 0]
+  - name: T2
+    label: Linha saída
+    position: [30, 0]
+  - name: Trip_in
+    label: Trip do relé
+    position: [0, -25]
+
+properties:
+  - name: tag
+    label: TAG
+    type: string
+    default: "Q-01"
+    visible: true
+    group: main
+    description: Identificador
+  # v1.7.1: estado open/closed para análise de energização
+  # (bus_energization.compute_energization). Default closed
+  # (disjuntor fechado = condução normal).
+  - name: state
+    label: Estado
+    type: enum
+    default: closed
+    visible: true
+    group: main
+    choices: [closed, open]
+    description: |
+      Estado operacional do disjuntor:
+      * closed = conduzindo (default)
+      * open = aberto (interrompe energização downstream).
+  - name: vendor_model
+    label: Vendor / Model
+    type: string
+    default: ""
+    visible: true
+    group: main
+    description: |
+      Vendor + modelo (link à EquipmentLibrary).
+      Ex: "ABB HD4", "Siemens 8DA10", "WEG ALW".
+      Vazio = disjuntor genérico (ratings manuais).
+  - name: rated_voltage_kV
+    label: Tensão nominal
+    unit: kV
+    type: float
+    default: 15.0
+    visible: true
+    group: main
+    description: Tensão nominal (V_n)
+  - name: rated_current_A
+    label: Corrente nominal
+    unit: A
+    type: float
+    default: 1200.0
+    visible: true
+    group: main
+    description: Corrente nominal contínua (I_n)
+  - name: breaking_capacity_kA
+    label: Capacidade interrupção
+    unit: kA
+    type: float
+    default: 25.0
+    visible: true
+    group: main
+    description: Iccs simétrica (Iint)
+  - name: mechanism
+    label: Mecanismo
+    type: enum
+    default: vacuum
+    visible: true
+    group: main
+    choices: [vacuum, SF6, oil, air-magnetic, MCB]
+    description: |
+      Tipo de mecanismo de interrupção:
+      vacuum (MV típico), SF6 (HV), oil (legacy),
+      air-magnetic (LV power CB), MCB (miniatura LV).
+  - name: operating_time_ms
+    label: Tempo operação (mecânico)
+    unit: ms
+    type: float
+    default: 50.0
+    visible: false
+    group: timing
+    description: |
+      Tempo entre trip command e separação dos contatos
+      (não inclui arcing).
+  - name: arc_time_ms
+    label: Tempo arc
+    unit: ms
+    type: float
+    default: 17.0
+    visible: false
+    group: timing
+    description: |
+      Tempo até extinção do arco. Total clearing =
+      operating_time + arc_time.
+  - name: relay_link_tag
+    label: Relé associado (tag)
+    type: string
+    default: ""
+    visible: false
+    group: advanced
+    description: |
+      TAG do relé que comanda este disjuntor. Vazio =
+      sem relé (dispositivo apenas backup ou manual).
+
+atp_emission:
+  kind: custom
+  count: 0
+  custom_emitter: breaker_no_atp
+
+llm_hints:
+  typical_applications:
+    - Disjuntor de feeder MV (relé 50/51 + breaker vacuum)
+    - Disjuntor incoming de SE (87T relay + HV breaker SF6)
+    - LV power CB com relé eletrônico embedded
+    - Disjuntor de motor (relé 49/50 + contactor + breaker)
+  references:
+    - "IEEE Std C37.04-2018"
+    - "IEC 62271-100:2021"
+    - "ABNT NBR IEC 62271-100"
+    - "NEMA AB-1 / UL 489"
+  common_mistakes:
+    - "breaking_capacity_kA < I_fault → breaker explode em fault"
+    - "Esquecer relay_link_tag → análise não rastreia o trip"
+    - "MCB para fault > 10 kA → ineficaz"
+  alternatives:
+    - "FUSE para feeders LV simples"
+    - "Recloser para distribuição rural"
+    - "Contactor para chaveamento de motor (não-fault)"

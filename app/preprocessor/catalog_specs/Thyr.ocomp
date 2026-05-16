@@ -1,0 +1,68 @@
+# Tiristor (SCR) — diodo controlado por gate.
+
+schema_version: "1.0"
+code: Thyr
+label_pt: Tiristor
+label_en: Thyristor (SCR)
+description: |
+  Tiristor (Silicon Controlled Rectifier). Liga quando há pulso no
+  gate E V(anodo) > V(cátodo); permanece ligado até a corrente cair
+  abaixo do holding current. Emissão ATP: TYPE-11 (switch de 2
+  terminais controlado por tensão + gate lógico).
+
+category: power_el
+atp_supported: true
+
+symbol:
+  size: [60, 40]
+  bounding_box: [-30, -25, 60, 40]
+  renderer: ThyristorSymbol
+
+pins:
+  - name: anode
+    label: Ânodo
+    position: [-30, 0]
+  - name: cathode
+    label: Cátodo
+    position: [30, 0]
+  - name: gate
+    label: Gate
+    position: [10, -20]
+
+properties:
+  - name: V_forward
+    label: V_forward
+    unit: V
+    type: float
+    default: 0.7
+    visible: true
+    group: electrical
+    min: 0.0
+  - name: R_on
+    label: R_on
+    unit: ohm
+    type: float
+    default: 1.0e-3
+    visible: false
+    group: electrical
+    min: 0.0
+
+atp_emission:
+  kind: thyristor
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Retificador controlado (ponte tiristorizada)
+    - Chaveamento DC / partida suave
+    - HVDC (em ordens de 1 kA e dezenas de kV)
+  references:
+    - "ATP Rule Book, Section I.E (TYPE-11 thyristor)"
+  common_mistakes:
+    - Esquecer o pulso de gate (chave nunca liga)
+    - R_on = 0 causa instabilidade — mínimo 1e-3
+    - Ignorar holding current em aplicações DC
+  alternatives:
+    - Diode — sem controle de gate
+    - GTO — gate pode também desligar
+    - IGBT — totalmente controlado

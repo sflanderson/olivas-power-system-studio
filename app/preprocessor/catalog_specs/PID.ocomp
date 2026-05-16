@@ -1,0 +1,112 @@
+# PID controller — Kp + Ki/s + Kd·s with anti-windup saturation.
+
+schema_version: "1.0"
+code: PID
+label_pt: Controlador PID
+label_en: PID controller
+description: |
+  Bloco PID clássico: y = Kp·err + Ki·∫err·dt + Kd·d(err)/dt.
+  Emissão ATP: device-1 (general transfer function) na seção
+  /TACS HYBRID com numerator (Ki, Kp, Kd) e denominator (0, 1).
+
+  Saturação ``output_min``/``output_max`` é fortemente recomendada
+  para evitar windup do integrador.
+
+  Sem pinos elétricos — conecta via nome de sinal TACS.
+
+category: control
+atp_supported: true
+
+symbol:
+  size: [80, 40]
+  bounding_box: [-40, -20, 80, 40]
+  renderer: PIDSymbol
+
+pins: []
+
+properties:
+  - name: input_signal
+    label: Sinal de entrada (TACS)
+    type: string
+    default: "err"
+    visible: true
+    group: main
+    description: Nome do sinal TACS de entrada (≤ 6 chars).
+
+  - name: output_name
+    label: Nome do sinal de saída
+    type: string
+    default: "u"
+    visible: true
+    group: main
+    description: Nome do sinal TACS de saída (≤ 6 chars).
+
+  - name: Kp
+    label: Ganho proporcional Kp
+    type: float
+    default: "1.0"
+    visible: true
+    group: main
+    description: Ganho proporcional.
+
+  - name: Ki
+    label: Ganho integral Ki
+    type: float
+    default: "0.0"
+    visible: true
+    group: main
+    description: Ganho integral (1/s).
+
+  - name: Kd
+    label: Ganho derivativo Kd
+    type: float
+    default: "0.0"
+    visible: true
+    group: main
+    description: Ganho derivativo (s).
+
+  - name: output_min
+    label: Saturação min
+    type: float
+    default: ""
+    visible: false
+    group: advanced
+    description: Limite inferior da saída (vazio = sem limite).
+
+  - name: output_max
+    label: Saturação max
+    type: float
+    default: ""
+    visible: false
+    group: advanced
+    description: Limite superior da saída (vazio = sem limite).
+
+  - name: initial_output
+    label: Valor inicial
+    type: float
+    default: "0.0"
+    visible: false
+    group: advanced
+    description: Valor de saída em t = 0.
+
+atp_emission:
+  kind: tacs_signal
+  count: 1
+
+llm_hints:
+  typical_applications:
+    - Controle de tensão em STATCOM
+    - Controle de corrente em conversor PWM
+    - Controle de velocidade de máquina rotativa
+    - Controle de pressão/vazão em sistemas hidráulicos
+  references:
+    - "ATP Rule Book, Section V.4 (TACS pole/zero functions)"
+    - "Åström & Murray, Feedback Systems §10"
+  common_mistakes:
+    - Sem anti-windup → saturação faz integrador acumular sem limite
+    - Kd com sinal ruidoso amplifica ruído (use filtro passa-baixa antes)
+    - Sintonia trial-and-error sem método (Ziegler-Nichols ou IMC)
+  alternatives:
+    - LowPass — filtro só
+    - Integrator — só ação integral
+    - LeadLag — compensador de fase
