@@ -154,13 +154,29 @@ Declaradas em todos os laudos para defesa técnica:
 
 ## Tecnologia
 
-- **Python 3.13+**
+- **Python 3.13+** (compatível 3.11+)
 - **PySide6** (Qt6 GUI)
 - **matplotlib** (plots + PDF reports)
 - **pydantic** (validação de specs do catálogo)
-- **pytest** (3000+ tests)
+- **pytest** (5568 tests coletados; subset de ~300 CI-safe roda no GitHub Actions)
 
 Sem dependência em fornecedor proprietário (MATLAB, MathCAD, etc.).
+
+### Cobertura do CI público
+
+O badge **Tests** acima corresponde ao subset CI-safe rodado no GitHub
+Actions (Python 3.11/3.12/3.13 × Ubuntu/Windows): Sprints commercial,
+readiness checks, e os módulos com decoradores `@requires_feature`
+(audit trail, report HTML, Monte Carlo × 3).
+
+O sweep completo de **5568 testes** inclui testes legacy que dependem
+de display real (GUI dialogs modais sem mock) e requer ambiente local
+com PySide6 + Xvfb (Linux) ou X-Server real. Para rodar localmente:
+
+```bash
+pytest tests/              # sweep completo
+pytest tests/test_pp_v4_*  # apenas sprints v4.x (CI-safe)
+```
 
 ---
 
