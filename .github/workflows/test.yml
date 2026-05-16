@@ -49,6 +49,7 @@ jobs:
       - name: Run pytest with coverage
         env:
           QT_QPA_PLATFORM: offscreen
+        shell: bash
         run: |
           python -m pytest tests/ \
             --cov=app \

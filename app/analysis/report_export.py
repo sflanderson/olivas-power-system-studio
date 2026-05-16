@@ -202,6 +202,40 @@ def _render_html(
                 f"<td>{d.default_value or ''}</td></tr>\n"
             )
 
+    # --- Compose conditional sections (Python 3.11 compat:
+    # avoid nested f-strings with same-type quotes, PEP 701 only in 3.12+) ---
+    if val_rows:
+        val_section = (
+            '<table><thead><tr><th>Nível</th><th>Código</th>'
+            '<th>Mensagem</th></tr></thead><tbody>'
+            f'{val_rows}</tbody></table>'
+        )
+    else:
+        val_section = '<p>Nenhuma mensagem de validação.</p>'
+
+    if use_rows:
+        use_section = (
+            '<table><thead><tr><th>USE</th><th>Parâmetro</th>'
+            '<th>Valor</th><th>Default</th></tr></thead><tbody>'
+            f'{use_rows}</tbody></table>'
+        )
+    else:
+        use_section = '<p>Nenhum USE com DATA.</p>'
+
+    if metrics_rows:
+        metrics_section = (
+            '<h2>Métricas de Transitório</h2>\n'
+            '<table>\n'
+            '<thead><tr><th>Variável</th><th>Pico</th>'
+            '<th>t_pico (s)</th><th>Mínimo</th><th>RMS</th>'
+            '<th>Freq (Hz)</th><th>Amort.</th><th>Amostras</th>'
+            '</tr></thead>\n'
+            f'<tbody>{metrics_rows}</tbody>\n'
+            '</table>'
+        )
+    else:
+        metrics_section = ""
+
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -268,7 +302,7 @@ def _render_html(
 
 <h2>Validação</h2>
 <div class="val-summary">{val_summary}</div>
-{f'<table><thead><tr><th>Nível</th><th>Código</th><th>Mensagem</th></tr></thead><tbody>{val_rows}</tbody></table>' if val_rows else '<p>Nenhuma mensagem de validação.</p>'}
+{val_section}
 
 <h2>Componentes por Tipo</h2>
 <table>
@@ -277,15 +311,11 @@ def _render_html(
 </table>
 
 <h2>Parâmetros USE DATA</h2>
-{f'<table><thead><tr><th>USE</th><th>Parâmetro</th><th>Valor</th><th>Default</th></tr></thead><tbody>{use_rows}</tbody></table>' if use_rows else '<p>Nenhum USE com DATA.</p>'}
+{use_section}
 
 {pl4_info}
 
-{f"""<h2>Métricas de Transitório</h2>
-<table>
-<thead><tr><th>Variável</th><th>Pico</th><th>t_pico (s)</th><th>Mínimo</th><th>RMS</th><th>Freq (Hz)</th><th>Amort.</th><th>Amostras</th></tr></thead>
-<tbody>{metrics_rows}</tbody>
-</table>""" if metrics_rows else ""}
+{metrics_section}
 
 <div class="footer">
   Olivas Power System Studio &bull; Relatório gerado automaticamente
