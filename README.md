@@ -2,9 +2,13 @@
 
 > **Software profissional de análise elétrica** — alternativa nacional a SKM PTW / ETAP / EasyPower.
 
-[![version](https://img.shields.io/badge/version-0.93.0-7E2BA8.svg)]()
-[![python](https://img.shields.io/badge/python-3.13+-blue.svg)]()
-[![Qt](https://img.shields.io/badge/Qt-PySide6-41CD52.svg)]()
+[![Tests](https://github.com/sflanderson/olivas-power-system-studio/actions/workflows/test.yml/badge.svg)](https://github.com/sflanderson/olivas-power-system-studio/actions/workflows/test.yml)
+[![Lint](https://github.com/sflanderson/olivas-power-system-studio/actions/workflows/lint.yml/badge.svg)](https://github.com/sflanderson/olivas-power-system-studio/actions/workflows/lint.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
+[![release](https://img.shields.io/github/v/release/sflanderson/olivas-power-system-studio?include_prereleases&color=7E2BA8)](https://github.com/sflanderson/olivas-power-system-studio/releases)
+[![python](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue.svg)](https://www.python.org/)
+[![Qt](https://img.shields.io/badge/Qt-PySide6-41CD52.svg)](https://www.qt.io/qt-for-python)
+[![Made in Brazil](https://img.shields.io/badge/made%20in-Brasil%20%F0%9F%87%A7%F0%9F%87%B7-009C3B.svg)](https://github.com/sflanderson/olivas-power-system-studio)
 
 ---
 
@@ -105,24 +109,30 @@ python -m app.main
 
 ## Status do projeto
 
-- **v0.93.0 (atual)** — NEW módulo de saturação de TC em 3 níveis
-  (ANSI estático / IEC joelho / Dinâmico RK4) portado de
-  ferramenta proprietária MATLAB. Cobre IEEE C57.13.1-2017,
-  IEC 61869-2:2012 e CIGRÉ WG 23-15.
-- **v0.92.2** — Robustez (logging, validation), rebrand para
-  "Olivas Power System Studio"
-- **v0.92.1** — Bus PTW (linha grossa contínua, multi-conexão, drag-resize),
-  desvinculação total da integração ATP
-- **v0.92.0** — Audit trail (SHA256 + responsável + citações + limitações)
-- **v0.91.x** — 12 hotfixes de threading, ATP file format, templates
-- **v0.83–0.91** — Brand "Oliveira", auto-save, datablocks, welcome templates
+- **v4.0.0-beta (atual)** — Public release: UAT preparation,
+  i18n EN/ES parity (133/133 keys), CHANGELOG.md consolidado,
+  26 production readiness tests, sweep total 245/245 verdes
+- **v4.0.0-alpha** — 🏆 **Paridade total v1 com SKM PTW v11**
+  atingida; SKIPPED_BACKLOG zerado (4/4 categorias 100%);
+  fault distance walker IEC 60909-0:2016 §3.7
+- **v3.9.0** — Auto-classify fault distance NEAR/FAR
+- **v3.8.x** — TCC 3-tab pages, IEEE 14-bus fixture, Q-limit
+  switching (IEEE 399 §5.3.4), Reliability Monte Carlo
+- **v3.7.x** — Real branch impedance Tr/CABLE/TLIN
+  (IEC 60076 + IEC 60364), bus_role explicit slack/pv/pq
+- **v3.6.x** — Reliability module SAIFI/SAIDI/CAIDI/ASAI
+  (IEEE 1366), TCC C-lines + protection filter
+- **v3.5.x** — Scenario Manager + 8ª garantia
+  (CONTEXT_PRESERVATION_PROTOCOL), wire path-based detection,
+  AddLinkTag + document registry
 
-Histórico completo: [CHANGELOG_ATP_STUDIO.txt](CHANGELOG_ATP_STUDIO.txt)
-Backlog: [TASKS_ATP_STUDIO.txt](TASKS_ATP_STUDIO.txt)
+Histórico completo: [CHANGELOG.md](CHANGELOG.md)
+Roadmap: [ROADMAP.md](ROADMAP.md)
+Release v4.0.0-beta: [releases/tag/v4.0.0-beta](https://github.com/sflanderson/olivas-power-system-studio/releases/tag/v4.0.0-beta)
 
 ---
 
-## Limitações conhecidas (v0.92.2)
+## Limitações conhecidas (v4.0.0-beta)
 
 Declaradas em todos os laudos para defesa técnica:
 
@@ -168,7 +178,7 @@ inclua o checksum SHA256 dos inputs na seção de auditoria do relatório
 (é gerado automaticamente).
 
 ```
-Software: Olivas Power System Studio v0.92.2
+Software: Olivas Power System Studio v4.0.0-beta
 Checksum (inputs): SHA256:abc123...
 Engenheiro responsável: ____ (CREA-MG ____)
 ```
