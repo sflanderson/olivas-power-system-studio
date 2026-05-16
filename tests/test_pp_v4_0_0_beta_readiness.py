@@ -201,12 +201,28 @@ class TestCriticalImports:
 
 
 class TestRestorePointsInfra:
+    """
+    ``restore_points/`` é infraestrutura de desenvolvimento local
+    (snapshots versionados). Em 404a995 foi adicionada ao
+    ``.gitignore`` para o public release — não estará presente
+    em CI nem em clones públicos. Skip-tolerant para não bloquear
+    a pipeline em ambientes onde a infra dev não é replicada.
+    """
+
     def test_restore_points_dir_exists(self) -> None:
         rp = PROJECT_ROOT / "restore_points"
-        assert rp.exists() and rp.is_dir()
+        if not rp.exists():
+            pytest.skip(
+                "restore_points/ is dev-local infra, gitignored in public repo"
+            )
+        assert rp.is_dir()
 
     def test_at_least_one_v3_baseline_exists(self) -> None:
         rp = PROJECT_ROOT / "restore_points"
+        if not rp.exists():
+            pytest.skip(
+                "restore_points/ is dev-local infra, gitignored in public repo"
+            )
         v3_baselines = list(rp.glob("v3.*_baseline"))
         assert len(v3_baselines) >= 1
 
