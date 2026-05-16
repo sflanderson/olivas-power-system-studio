@@ -14,7 +14,14 @@ REF_FILE = str(Path(__file__).parent.parent / "trt_all_motors_dt_ea.atp")
 
 @pytest.fixture(scope="session")
 def ref_project() -> AtpProject:
-    """Parse the reference ATP file once per test session."""
+    """Parse the reference ATP file once per test session.
+
+    Skip-tolerant: se ``trt_all_motors_dt_ea.atp`` não está no
+    working tree (removido em 404a995 do public release), pula
+    os testes que pedem este fixture em vez de quebrar a coleta.
+    """
+    if not Path(REF_FILE).is_file():
+        pytest.skip(f"REF_FILE not available in this checkout: {REF_FILE}")
     return parse_file(REF_FILE)
 
 
