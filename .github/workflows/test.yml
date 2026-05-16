@@ -76,12 +76,12 @@ jobs:
             tests/test_pp_v0_44_monte_carlo.py \
             tests/test_pp_v0_80_pf_monte_carlo.py \
             tests/test_pp_v3_8_0_reliability_mc.py \
-            --cov=app/commercial \
-            --cov=app/postprocessor/audit_trail \
-            --cov=app/postprocessor/report_html \
-            --cov=app/postprocessor/reliability_monte_carlo \
-            --cov=app/postprocessor/arc_flash_monte_carlo \
-            --cov=app/postprocessor/power_flow_monte_carlo \
+            --cov=app.commercial \
+            --cov=app.postprocessor.audit_trail \
+            --cov=app.postprocessor.report_html \
+            --cov=app.postprocessor.reliability_monte_carlo \
+            --cov=app.postprocessor.arc_flash_monte_carlo \
+            --cov=app.postprocessor.power_flow_monte_carlo \
             --cov-report=xml \
             --cov-report=term-missing:skip-covered \
             --timeout=60 \
