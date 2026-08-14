@@ -3,13 +3,21 @@
 Figuras usadas nos slides **15 · VFD · Lado da rede** e
 **16 · VFD · Lado do motor** do Catálogo Técnico.
 
+## Para que servem
+
+O Catálogo Técnico usa, nesses slides, as **capturas da própria GUI**
+do Olivas PSS v7.x. As figuras deste diretório não vão para o deck:
+elas são uma **verificação independente** dos números que o módulo
+publica — reconstroem o caso a partir das premissas declaradas e
+chegam aos mesmos resultados por um caminho separado.
+
 ## Procedência (leia antes de reusar)
 
 Reproduzem o caso **VFD-01** (75 kW @ 480 V, retificador de 6 pulsos,
 motor a 150 m de cabo) a partir das premissas declaradas no estudo —
 banco de 0,050 Mvar, reator de dessintonia de 0,50 %, X/R = 11,9,
 t_subida de 0,1 µs. **Foram calculadas por este script**, não
-exportadas da GUI do Olivas PSS.
+exportadas da GUI.
 
 Os quatro resultados de saída conferem com a execução do Olivas PSS
 v7.x, o que valida os parâmetros de entrada reconstruídos:
@@ -22,8 +30,9 @@ v7.x, o que valida os parâmetros de entrada reconstruídos:
 | Pico no terminal do motor | 1358 V | 1358 V |
 | Comprimento crítico do cabo | 7,5 m | 7,5 m |
 
-Para material comercial que precise atribuir o resultado ao produto,
-substitua por capturas da própria aplicação.
+A divergência de 0,2 Ω no pico é amortecimento: a altura do pico
+depende do X/R e do Q do reator, e o próprio módulo declara que
+"a POSIÇÃO do pico é robusta; a ALTURA depende do amortecimento".
 
 ## Modelo
 
