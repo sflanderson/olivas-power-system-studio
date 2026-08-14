@@ -135,3 +135,15 @@ auto-save/
 # gerados pelo autor e permitidos
 # ------------------------------------------------------------
 !tests/fixtures/*.atp
+
+# ------------------------------------------------------------
+# Capturas de tela da GUI usadas no Catálogo Técnico.
+#
+# São telas do build comercial (v7.x), enquanto este repositório é
+# público e publica a v4.0.0-beta. Versioná-las aqui divulgaria
+# interface ainda não lançada, então ficam apenas locais — os slides
+# que as consomem são montados fora do repositório.
+#
+# Para versionar (decisão do mantenedor), remova esta linha.
+# ------------------------------------------------------------
+docs/assets/gui/
