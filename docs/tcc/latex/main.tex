@@ -1,0 +1,918 @@
+%==============================================================================
+% Proposta de Trabalho de Conclusao de Curso
+% Modelo aberto de conversor HVDC-VSC (MMC meia-ponte) para ATP-EMTP
+%
+% Compila em pdfLaTeX no Overleaf, sem arquivos auxiliares.
+% Menu do Overleaf: Compiler = pdfLaTeX.
+%==============================================================================
+\documentclass[12pt,a4paper]{article}
+
+%------------------------------------------------------------------ idioma ---
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+
+%------------------------------------------------------------------ fontes ---
+% Times-like (padrao mais aceito em normas ABNT).
+% Para voltar a fonte padrao do LaTeX, comente a linha abaixo.
+\usepackage{newtxtext,newtxmath}
+\usepackage{microtype}
+
+%------------------------------------------------------------------ layout ---
+\usepackage[left=3cm,right=2cm,top=3cm,bottom=2cm]{geometry}
+\usepackage{setspace}
+\usepackage{indentfirst}
+\usepackage{ragged2e}
+
+%------------------------------------------------------------------ tabelas --
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{xltabular}
+\usepackage{array}
+\usepackage{multirow}
+
+%------------------------------------------------------------------- outros --
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{csquotes}
+\usepackage{textcomp}
+\usepackage{hyperref}
+
+%--------------------------------------------------------------- aparencia ---
+\definecolor{tinta}{HTML}{1A1A1A}
+\definecolor{acento}{HTML}{28418C}
+\definecolor{cobre}{HTML}{9C4A1E}
+\definecolor{regra}{HTML}{BFC6D2}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=acento,
+  urlcolor=acento,
+  citecolor=acento,
+  pdftitle={Proposta de TCC -- Modelo aberto de conversor HVDC-VSC para ATP-EMTP},
+  pdfsubject={Modelagem EMT de conversor VSC-MMC meia-ponte em ATP-EMTP},
+  pdfkeywords={HVDC-VSC, MMC, ATP-EMTP, transitorios eletromagneticos, EPE, ONS}
+}
+
+\titleformat{\section}{\normalfont\large\bfseries\color{acento}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.7em}{}
+\titlespacing*{\section}{0pt}{2.2ex plus 1ex minus .2ex}{1.4ex plus .2ex}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize Proposta de TCC \textbar{} Modelo aberto HVDC-VSC para ATP-EMTP}
+\fancyhead[R]{\footnotesize\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\setlength{\parindent}{1.25cm}
+\onehalfspacing
+
+% listas mais compactas
+\setlist[itemize]{itemsep=2pt,topsep=4pt,parsep=0pt}
+\setlist[enumerate]{itemsep=2pt,topsep=4pt,parsep=0pt}
+
+% citacao longa no estilo ABNT (recuo 4 cm, corpo menor, espaco simples)
+\newenvironment{citacao}
+  {\begin{quote}\singlespacing\small\setlength{\leftskip}{2.5cm}\noindent}
+  {\par\end{quote}}
+
+% fonte da citacao
+\newcommand{\fonte}[1]{\par\vspace{2pt}\noindent{\footnotesize\textcolor{gray}{#1}}}
+
+% caixa de destaque simples (sem dependencia de tcolorbox)
+\newenvironment{destaque}[1]
+  {\par\vspace{6pt}\begin{list}{}{%
+     \setlength{\leftmargin}{0.8cm}\setlength{\rightmargin}{0cm}%
+     \setlength{\labelwidth}{0pt}\setlength{\labelsep}{0pt}}%
+   \item[]\textcolor{acento}{\rule[-1pt]{2pt}{10pt}}\ \textbf{#1}\par\vspace{2pt}\small}
+  {\end{list}\vspace{6pt}}
+
+% caminho de arquivo / identificador de codigo
+\newcommand{\arq}[1]{\texttt{\small #1}}
+
+\newcommand{\pag}[1]{{\footnotesize\textcolor{gray}{p.~#1}}}
+
+\renewcommand{\arraystretch}{1.22}
+
+%==============================================================================
+\begin{document}
+%==============================================================================
+
+%------------------------------------------------------------------- capa ----
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+
+{\footnotesize\textsc{Proposta de Trabalho de Conclusão de Curso}\par}
+\vspace{0.4cm}
+{\footnotesize Engenharia Elétrica\par}
+
+\vspace{2.5cm}
+
+{\LARGE\bfseries Modelo aberto de conversor HVDC-VSC\\[0.25cm]
+(MMC meia-ponte) para ATP-EMTP\par}
+
+\vspace{0.9cm}
+
+{\large Benchmark reprodutível do bipolo $\pm$600~kV Angicos--Itaporanga~2\\
+e integração ao Olivas Power System Studio\par}
+
+\vspace{2.5cm}
+
+\begin{minipage}{0.92\textwidth}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{4.2cm}X@{}}
+\toprule
+Documento-base   & EPE-DEE-RE-071/2025-rev0 --- \textit{Estudo de Expansão das Interligações Regionais, Parte III} (nov.~2025, 509~p.) \\
+Caso de estudo   & Bipolo Nordeste~II --- $\pm$600~kV, 3.000~MW, $\sim$2.500~km \\
+Ferramenta       & ATP-EMTP + linguagem MODELS, integrado ao Olivas EPS \\
+Empresa parceira & Olivas --- produto Olivas Power System Studio \\
+Período previsto & set./2026 a jun./2027 (TCC~1 e TCC~2) \\
+Autor            & \rule{5cm}{0.4pt} \\
+Orientador(a)    & \rule{5cm}{0.4pt} \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+
+\vfill
+{\footnotesize 27 de agosto de 2026\par}
+\end{titlepage}
+
+%------------------------------------------------------------------ sumario --
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+%==============================================================================
+\section{Sumário executivo}
+%==============================================================================
+
+O relatório R1 da Empresa de Pesquisa Energética recomenda o \textbf{bipolo Nordeste~II}:
+HVDC-VSC, $\pm$600~kV, 3.000~MW, cerca de 2.500~km de linha aérea entre Angicos (RN) e
+Itaporanga~2 (SP), com entrada em operação em 2033, dentro de um pacote de
+\textbf{R\$~26,5 bilhões} --- dos quais R\$~17,1 bilhões, ou 65\%, em instalações de corrente
+contínua. Será o primeiro elo VSC do Sistema Interligado Nacional; os seis bipolos em operação e o
+sétimo em implantação são todos LCC.
+
+No mesmo documento, a EPE registra por escrito a lacuna que dá origem a este trabalho:
+
+\begin{citacao}
+\enquote{A ausência de modelos oficiais validados para conversores VSC constituiu um desafio
+relevante à realização das análises dinâmicas deste estudo. Tal fato dificultou, inclusive, o
+desenvolvimento de \textbf{modelos genéricos}\footnote{Nota de rodapé 8 do relatório:
+\enquote{Modelo concebido com os elementos contidos nas concepções atualizadas de VSC dos
+principais fabricantes, de forma a não privilegiar concepções específicas.}}, em virtude da
+\textbf{ausência de um benchmark} a ser utilizado como referência para comparação de resultados.}
+\fonte{EPE-DEE-RE-071/2025-rev0, p.~21, \S1.5.5.}
+\end{citacao}
+
+A nota de rodapé 8 do relatório é, literalmente, a especificação do produto proposto aqui.
+
+\subsection{Tema recomendado}
+
+Desenvolver, validar e publicar sob licença permissiva um modelo genérico de estação conversora
+HVDC-VSC com submódulos 100\% meia-ponte, executável em \textbf{ATP-EMTP}, acompanhado de um
+\textbf{benchmark aberto e reprodutível} do bipolo Nordeste~II, e integrá-lo ao Olivas EPS como
+componente de catálogo, emissor de cartões, estudo automatizado e laudo auditável.
+
+\subsection{Resposta aos dois pontos levantados}
+
+\begin{destaque}{Ponto 1 --- modelo público integrável ao Olivas EPS}
+\textbf{Sim, com três precisões.} O termo correto é \emph{aberto sob licença permissiva}
+(Apache-2.0 e CC-BY-4.0), e não \enquote{domínio público}: a Lei 9.610/98 não admite renúncia a
+direitos morais, e instrumentos de dedicação ao domínio público são de tradição estrangeira. O
+entregável é um \textbf{par}: um artefato que roda em ATP puro, independente do produto, e uma
+camada de integração no Olivas EPS. E o gargalo real não é o MMC: é o acoplamento automático entre
+MODELS e a rede, que hoje \textbf{não existe} no produto (Seção~\ref{sec:integracao}). Ele é a
+primeira tarefa técnica e o gate de viabilidade.
+\end{destaque}
+
+\begin{destaque}{Ponto 2 --- viabilidade de mercado}
+\textbf{Sim, por um caminho diferente do imaginado.} A premissa \enquote{só o PSCAD tem modelo
+VSC} é \textbf{falsa} como afirmação geral e \textbf{verdadeira} em três recortes. O recorte
+decisivo foi verificado na fonte primária: o ONS \textbf{obriga a entrega de modelo detalhado do
+elo CC em ATP}, mesmo quando o estudo foi feito em PSCAD, e determina que os estudos de manobra do
+pátio CA das conversoras sejam realizados \textbf{na ferramenta ATP}. Existe obrigação regulatória
+de produzir modelo HVDC em ATP e não existe modelo VSC público em ATP. O dimensionamento honesto do
+mercado está na Seção~\ref{sec:mercado}.
+\end{destaque}
+
+%==============================================================================
+\section{Contexto: o que a EPE decidiu}
+%==============================================================================
+
+\subsection{A solução de referência}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.1cm}Xr@{}}
+\toprule
+\textbf{Item} & \textbf{Valor} & \textbf{Pág.} \\
+\midrule
+Denominação            & Bipolo Nordeste~II --- LT 600~kV CC Angicos (RN) -- Itaporanga~2 (SP) & 25 \\
+Tecnologia             & HVDC-VSC, MMC \textbf{100\% Half-Bridge}                              & 20, 251 \\
+Tensão e potência      & $\pm$600~kV, 3.000~MW (inversora 2.880~MW; reversa 2.800~MW)          & 84, 251 \\
+Extensão               & $\sim$2.500~km em linha aérea                                          & 25, 252 \\
+Condutor               & 6 $\times$ CAA 2167~MCM (Kiwi) por polo; 17~m entre polos; 14~m ao solo & 250, 252 \\
+Resistência do polo    & 0,00425~$\Omega$/km a 20~\textcelsius; 0,00476~$\Omega$/km a 50~\textcelsius & 252 \\
+Corrente e perdas na LT & 2,5~kA direta; 2,34~kA reversa; 132,7~MW                              & 252 \\
+Controle               & \emph{Grid-Following} nas simulações; \emph{Grid-Forming} como requisito & 118, 42 \\
+Modos de operação      & bipolar; monopolar com retorno por eletrodo; monopolar com retorno metálico & 42 \\
+SCR de projeto         & operação exigida entre \textbf{1,5 e 6,5}                              & 43 \\
+SCR calculado          & Angicos 4,08--6,07 (\textbf{1,92} na N-2 Açu~III--Angicos); Itaporanga~2 5,47--5,64 & 263--265 \\
+SCR do modelo EMT      & equivalente de Thévenin com SCR = 2,5                                  & 205 \\
+Investimento           & R\$~26,5 bi --- R\$~9,7 bi na LT CC e R\$~3,7 bi por conversora        & 23 \\
+Entrada em operação    & 2033 (obras determinativas)                                            & 25 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Requisitos funcionais inéditos para o SIN (\S3.4[8], p.~42--43): modo \textbf{STATCOM}, injeção de
+corrente reativa sob defeito, \textbf{grid-forming}, \textbf{black-start bidirecional}, transmissão
+em potência reversa, operação a 85\% da tensão nominal e sobrecarga de 400~MW pela capacidade
+inerente dos submódulos.
+
+\subsection{Requisitos de desempenho que ainda não existem em norma}
+
+O item \S3.4[9] exige reenergização do bipolo em \textbf{$\leq$~2,5~s} após a detecção da falta CC e
+recuperação de 90\% da potência em \textbf{$\leq$~5~s}, e reconhece:
+
+\begin{citacao}
+\enquote{será necessária a flexibilização dos tempos atualmente previstos em procedimentos de rede
+para elos de corrente contínua (que abarcam apenas a tecnologia LCC) --- que são da ordem de
+350~ms --- ou a criação de procedimentos específicos para instalações VSC.}
+\fonte{EPE-DEE-RE-071/2025-rev0, p.~43.}
+\end{citacao}
+
+Um requisito normativo novo terá de ser escrito, e sua verificação é, por natureza, uma simulação
+de transitórios eletromagnéticos.
+
+%==============================================================================
+\section{O problema}
+%==============================================================================
+
+\subsection{O encadeamento de contorno adotado pela EPE}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}p{3.1cm}p{4.4cm}X@{}}
+\toprule
+\textbf{Etapa} & \textbf{Representação usada} & \textbf{Limitação declarada} \\
+\midrule
+Fluxo de potência &
+Barras PV com limites de reativo de $\sim$30\% da potência nominal &
+Simplificação (p.~118--119) \\
+Estabilidade eletromecânica (RMS) &
+\textbf{Carga ZIP: 60\% de potência constante e 40\% de corrente constante} no ANATEM &
+\enquote{não se mostrou suficiente para a realização de análises elétricas conclusivas nem para a
+recomendação de reforços sistêmicos} (p.~119) \\
+Estabilidade, segunda geração &
+Modelo de fasores dinâmicos do MMC, \textbf{contratado ao CEPEL} &
+\enquote{ainda não estivesse totalmente apto} a faltas CC (p.~119) \\
+\textbf{Transitórios (EMT)} &
+\textbf{PSCAD/EMTDC}, a partir do benchmark \emph{VSC-MMC Half Bridge} de 320~kV e 1.200~MW,
+reescalado para 600~kV e 3.000~MW com apoio dos fabricantes &
+Rede CA representada apenas por equivalentes de Thévenin (p.~206) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+O desfecho, na conclusão do Capítulo 12 do relatório:
+
+\begin{citacao}
+\enquote{Atualmente, o modelo desenvolvido em ANATEM para representação do bipolo não representa de
+forma adequada este tipo de dinâmica, portanto não foi possível avaliar este fenômeno nas análises
+de estabilidade eletromecânica.}
+\fonte{EPE-DEE-RE-071/2025-rev0, p.~203.}
+\end{citacao}
+
+\begin{destaque}{O detalhe que importa para quem vai implementar}
+O primeiro escalonamento do benchmark \textbf{falhou}: o modelo \enquote{mostrou desempenho
+insuficiente para resposta a faltas na linha CC, apresentando sobretensões inadequadas e
+irrealistas} (p.~199). Só se tornou funcional após a inserção de para-raios CC, da lógica de
+abertura do NBS e de uma sequência coordenada de eventos de proteção. Essa é a parte difícil do
+problema --- e ela está documentada.
+\end{destaque}
+
+\subsection{Enunciado}
+
+O país vai construir o maior elo HVDC-VSC em linha aérea já contratado e, hoje:
+
+\begin{itemize}
+  \item não existe modelo VSC-MMC aberto, auditável e neutro em relação a fabricante para estudos
+        EMT no Brasil;
+  \item não existe benchmark público que permita a um terceiro reproduzir ou contestar os
+        resultados publicados --- o utilizado pela EPE está dentro de um software proprietário;
+  \item os modelos \enquote{realistas} recomendados são, por construção, caixas-pretas de
+        fabricante, com restrição de compartilhamento \enquote{por questão de confidencialidade e
+        proteção ao segredo industrial} (p.~22, nota 10);
+  \item o avanço do CEPEL ocorre no flanco \textbf{RMS/fasorial}, não no flanco EMT.
+\end{itemize}
+
+\subsection{Pergunta de pesquisa}
+
+\begin{destaque}{Pergunta de pesquisa}
+É possível construir um modelo genérico de conversor HVDC-VSC (MMC meia-ponte), implementado em
+ATP-EMTP e acoplado à rede por fonte controlada por MODELS, publicado sob licença permissiva e
+integrado ao Olivas EPS, capaz de: (i)~reproduzir um modelo chaveado detalhado construído no próprio
+ATP com NRMSE $\leq$~2\%; (ii)~reproduzir o balanço de regime permanente publicado pela EPE com erro
+$\leq$~1\%; e (iii)~reproduzir, \emph{em envelope paramétrico}, os marcos transitórios de falta
+polo-terra na linha CC do Capítulo 12 --- tudo isso sem qualquer dado confidencial de fabricante e
+com rastreabilidade auditável?
+\end{destaque}
+
+%==============================================================================
+\section{Objetivos}
+%==============================================================================
+
+\subsection{Objetivo geral}
+
+Desenvolver, validar quantitativamente e publicar sob licença permissiva um modelo eletromagnético
+transitório genérico de estação conversora HVDC-VSC com submódulos 100\% meia-ponte --- braço com
+estados de capacitor observáveis, bloqueio por diodos de braço, controle \emph{grid-following} e
+sequência de proteção e religamento de falta CC --- executável em ATP-EMTP e integrado ao Olivas
+Power System Studio, acompanhado de um benchmark aberto e reprodutível do bipolo $\pm$600~kV,
+3.000~MW e 2.500~km Angicos--Itaporanga~2.
+
+\subsection{Objetivos específicos (partição MoSCoW)}
+
+\paragraph{Obrigatórios (\emph{must}) --- núcleo mínimo defensável.}
+\begin{enumerate}[label=\textbf{OE\arabic*.}, leftmargin=1.6cm]
+  \item Consolidar as premissas públicas do bipolo em arquivo versionado, com \textbf{campo de fonte
+        e faixa de incerteza por parâmetro}, registrando as divergências internas reais do relatório.
+  \item Executar, como \textbf{primeira tarefa técnica e com decisão \emph{go/no-go} formal}, a prova
+        de conceito do acoplamento MODELS para a rede no ATP, e implementar o acoplamento automático
+        que hoje não existe no produto.
+  \item Formular e verificar o braço MMC meia-ponte com estados de capacitor por submódulo, com
+        oráculo numérico independente em Python/NumPy.
+  \item Implementar o estado bloqueado, com condução pelos diodos de braço --- o mecanismo em que o
+        modelo escalado da EPE falhou.
+  \item Derivar os parâmetros internos não publicados a partir de regras de projeto de literatura
+        aberta, com \textbf{faixa declarada}: tensão de submódulo, número de submódulos, constante de
+        energia, indutância de braço e impedância do transformador conversor.
+  \item Gerar a linha CC de 2.500 km por modelo JMarti, usando o caso de dados LINE CONSTANTS do
+        próprio ATP.
+  \item Implementar em MODELS o controle \emph{grid-following}: SRF-PLL, laços de corrente em eixo
+        \emph{dq}, limitador com base declarada, curva de capacidade P-Q, operação a 85\% da tensão
+        nominal e modo STATCOM.
+  \item Implementar a sequência de proteção e religamento com \textbf{todas as temporizações
+        parametrizadas}.
+  \item Publicar repositório aberto com DOI e manifesto SHA256.
+\end{enumerate}
+
+\paragraph{Desejáveis (\emph{should}).}
+Estudo de agregação de submódulos com fronteira de Pareto entre exatidão e custo computacional;
+varredura de sensibilidade das temporizações de proteção; e decomposição do erro de representação do
+conversor, comparando o modelo completo à aproximação por carga ZIP 60/40 que a EPE foi obrigada a
+adotar.
+
+\paragraph{Opcionais (\emph{could}).}
+Integração aditiva ao Olivas EPS, métricas de conversor e codificação executável dos requisitos da
+EPE.
+
+%==============================================================================
+\section{Delimitação de escopo}
+%==============================================================================
+
+\subsection{Incluído}
+
+\begin{itemize}
+  \item MMC 100\% meia-ponte, com braço acoplado à rede por \textbf{fonte controlada por MODELS},
+        com atraso de um passo declarado e verificado quanto à estabilidade.
+  \item \textbf{Modelo chaveado detalhado de referência construído no próprio ATP} (8 a 12
+        submódulos por braço, com \emph{snubbers}), usado como verdade-terreno interna --- e
+        reexecutável pela banca sem licença de terceiros.
+  \item Topologia CC completa: dois polos independentes, reator de alisamento, reator de braço,
+        resistor de pré-inserção, \emph{Neutral Bus Switch}, para-raios CC, ramo de aterramento,
+        eletrodo de terra e retorno metálico, com os três modos de operação comutáveis.
+  \item Linha CC de 2.500 km em JMarti, com verificação de velocidade de modo aéreo e tempo de
+        trânsito ($\approx$~8,5~ms).
+  \item Transformador conversor via BCTRAN; redes CA por equivalentes de Thévenin com \textbf{SCR
+        paramétrico}: 2,50, 4,08, 5,47 e 6,07, com 1,92 reportado.
+  \item Varreduras de nível de tensão CC em 525, 600 e 640~kV, cobrindo os três cenários de mercado
+        do \S1.5.4 do relatório.
+\end{itemize}
+
+\subsection{Excluído, e por quê}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}p{5.1cm}X@{}}
+\toprule
+\textbf{Item excluído} & \textbf{Motivo} \\
+\midrule
+Componente Type-94 e elementos baseados em compensação &
+o modo THEV admite um único elemento por sub-rede eletricamente conectada, e o bipolo tem 24 braços
+em, no máximo, duas sub-redes separadas pela linha \\
+Controle \emph{grid-forming} &
+a própria EPE registra que \enquote{não há uma definição consensada} de requisitos (\S15.2.15,
+p.~256); validar contra requisito instável é indefensável --- vira tema-satélite \\
+Full-bridge, arranjos mistos, híbridos LCC+VSC, acima de 640~kV, multiterminais &
+descartados pelo grupo de trabalho EPE-ONS (\S6.4, p.~79) \\
+Disjuntores CC &
+não fazem parte da solução meia-ponte de referência \\
+Espectro harmônico de comutação e conformidade IEEE 519 &
+um modelo com submódulos agregados não reproduz o espectro de comutação; prometer isso destrói a
+credibilidade técnica \\
+Estabilidade dirigida por conversores, varredura de impedância e passividade &
+tema-satélite \\
+Coordenação de isolamento e dimensionamento de para-raios, \emph{chopper} e resistores &
+tema-satélite; o modelo entrega as formas de onda, não o dimensionamento \\
+Modelos \emph{replica} de fabricante e padrão IEEE/CIGRÉ DLL &
+tema-satélite e item de roadmap comercial \\
+Refatoração do núcleo do Olivas EPS &
+a integração é estritamente aditiva \\
+Redistribuição do solver ATP &
+publicam-se dados e modelos, nunca o executável \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+%==============================================================================
+\section{Metodologia e cronograma}
+%==============================================================================
+
+Dois marcos são gates de decisão, e não entregas. O \textbf{M1} decide se a arquitetura é viável
+antes de qualquer investimento em controle; o \textbf{M5} é o núcleo mínimo defensável --- sozinho,
+já constitui um TCC aprovável e um artigo submetível.
+
+{\small
+\begin{xltabular}{\textwidth}{@{}p{2.1cm}p{1.6cm}X@{}}
+\toprule
+\textbf{Período} & \textbf{Marco} & \textbf{Conteúdo e critério de passagem} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Período} & \textbf{Marco} & \textbf{Conteúdo e critério de passagem} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+set./2026 & M0 &
+Extração rastreável das premissas; benchmark especificado em cinco casos de ensaio; critérios
+pré-registrados. \emph{Premissas e requisitos aprovados pelo orientador.} \\
+out./2026 & \textbf{M1} \newline \emph{gate} &
+\textbf{Go/no-go em 31/10/2026.} Prova de conceito do acoplamento MODELS para fonte controlada;
+oráculo numérico em Python; memorial de dimensionamento. \emph{A prova de conceito executa e o laço
+realimentado com atraso de um passo é estável.} \\
+nov./2026 & M2 &
+Linha CC em JMarti; braço em MODELS com estados de submódulo; emissor em formato colunar estrito.
+\emph{Erro $\leq$~1\% nos parâmetros de linha; $\tau \approx$~8,5~ms.} \\
+dez./2026 & M3 &
+Verdade-terreno interna no próprio ATP; teste de conservação de energia de braço; \emph{preprint}
+com DOI. \emph{TCC~1 aprovado; NRMSE $\leq$~2\%.} \\
+jan./2027 & M4 &
+Controle \emph{grid-following}; sintonia por alocação de largura de banda; curva de capacidade;
+modo STATCOM. \emph{Degrau de 0,1 a 1,0~pu com sobressinal $\leq$~10\% e acomodação $\leq$~100~ms.} \\
+fev./2027 & \textbf{M5} \newline \emph{gate} &
+\textbf{Núcleo mínimo defensável, 28/02/2027.} Bipolo completo; inicialização determinística e
+\emph{soft-start}; regime permanente validado. \emph{Balanço das Tabelas 15-6 e 15-7 com erro
+$\leq$~1\%.} \\
+mar./2027 & M6 &
+Máquina de estados de proteção; ensaio de falta polo-terra na linha CC. \emph{Data de corte de
+escopo. Temporizações reproduzidas com erro $\leq$~2~ms; sobretensão $\leq$~1,5~pu.} \\
+abr./2027 & M7 &
+Agregação de submódulos; varredura do passo de integração e das temporizações; decomposição do erro
+de representação. \emph{Par recomendado de número de submódulos equivalentes e passo; artigo
+submetido.} \\
+mai.--jun./2027 & M8 e M9 &
+Integração aditiva ao Olivas EPS; varreduras de SCR e de tensão CC; redação e defesa.
+\emph{Pull request com integração contínua verde; TCC defendido; versão 1.0 com DOI.} \\
+\end{xltabular}}
+
+%==============================================================================
+\section{Plano de validação}
+%==============================================================================
+
+Todos os critérios numéricos são \textbf{pré-registrados} antes da execução dos ensaios, com métrica
+única declarada, e \textbf{todos os desvios são publicados}, inclusive os reprovados. Duas classes de
+tolerância são mantidas rigorosamente separadas: \emph{verificação de implementação}, que testa o
+código e admite tolerância apertada, e \emph{validação física}, que testa o modelo contra grandezas
+dependentes de parâmetros internos não publicados e exige tolerância larga com demonstração em
+envelope.
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}p{1.1cm}p{4.3cm}Xp{2.1cm}@{}}
+\toprule
+\textbf{Nível} & \textbf{O que testa} & \textbf{Critério} & \textbf{Terceiros?} \\
+\midrule
+V0 & Conservação de energia de braço & desvio $<$~0,5\% da energia nominal em 1~s & não (analítico) \\
+V1 & Parâmetros da linha CC & $R$ a 20 e 50~\textcelsius\ com erro $\leq$~1\%; $\tau \approx$~8,5~ms & não \\
+V2 & Verdade-terreno construída no próprio ATP & NRMSE $\leq$~2\%; erro de tensão de capacitor $\leq$~1\% & não \\
+V3 & Regime permanente (Tabelas 15-6 e 15-7) & erro $\leq$~1\% nas grandezas CC; 2,5~kA e 2,34~kA & não \\
+V4 & Desempenho de controle & sobressinal $\leq$~10\%; margem de fase $\geq$~45\textdegree & não \\
+V5 & Falta CC (Capítulo 12) & temporizações com erro $\leq$~2~ms; sobretensão $\leq$~1,5~pu; picos \emph{em envelope} & não \\
+V6 & Referência externa (Simulink ou PSCAD acadêmico) & complementar, declarado como tal & opcional \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{destaque}{A validação não depende de licença de terceiros}
+V0 é analítica; V2 usa como referência um modelo construído no próprio ATP; V1, V3 e V5 usam números
+publicados pela EPE. V6 é bônus. Isso remove o risco mais comum desse tipo de trabalho: ficar refém
+de uma licença que a universidade pode não ter.
+\end{destaque}
+
+Uma correção metodológica relevante: \textbf{os parâmetros internos do MMC não são públicos} ---
+número de submódulos, capacitância, indutância de braço e dados do transformador. A resposta não é
+arbitrar valores e comparar ponto a ponto, e sim \textbf{varrer as faixas de projeto declaradas e
+demonstrar que o resultado da EPE cai dentro do envelope produzido}, separando erro de método de erro
+de premissa.
+
+%==============================================================================
+\section{Integração ao Olivas Power System Studio}
+\label{sec:integracao}
+%==============================================================================
+
+\subsection{O que já existe (verificado no repositório)}
+
+O Olivas EPS já é um front-end e pré/pós-processador completo de ATP-EMTP:
+
+\begin{itemize}
+  \item \arq{app/preprocessor/atp\_format.py} --- emissão em \textbf{formato colunar estrito}
+        (até 80 colunas, campo de nó de 6 caracteres), conforme o \emph{ATP Rule Book}, volume 2;
+  \item \arq{app/preprocessor/bridge\_to\_atp.py} (2.461 linhas) --- tradutor de unifilar para
+        cartões, com despacho por tipo de componente;
+  \item \arq{app/preprocessor/spec/} e \textbf{59 arquivos \arq{.ocomp}} em \arq{catalog\_specs/}
+        --- registro declarativo de componentes;
+  \item \arq{tacs.py}, \arq{tacs\_blocks.py}, \arq{tacs\_tf.py} e \arq{tacs\_interface.py} ---
+        blocos TACS e ponte entre o solver e o TACS;
+  \item \arq{vcb\_model\_emitter.py} e \arq{atp\_templates/vcb\_reignition.mod} ---
+        \textbf{precedente direto}: um algoritmo complexo (CIGRE WG A3.26) já é entregue como
+        template em linguagem \textbf{ATP MODELS};
+  \item \arq{lcc.py}, \arq{jmarti\_pch.py} e \arq{vector\_fitting.py} --- LINE CONSTANTS, JMarti e
+        ajuste racional; \arq{bctran.py} --- transformador;
+  \item \arq{simulation/runner.py} e \arq{results\_reader.py} --- execução do ATP e leitura de PL4;
+  \item \arq{postprocessor/audit\_trail.py} --- laudo com SHA256 dos dados de entrada e bloco de
+        limitações automático.
+\end{itemize}
+
+\subsection{O delta do TCC e três achados de auditoria}
+
+Nenhum dos 59 componentes do catálogo é de corrente contínua: não há conversor, não há polo CC, e a
+enumeração de fases admite apenas A, B, C, neutro e nenhuma. Além disso:
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}p{5.4cm}X@{}}
+\toprule
+\textbf{Achado} & \textbf{Consequência} \\
+\midrule
+\textbf{Não existe acoplamento MODELS--rede automatizado.} O próprio
+\arq{vcb\_reignition.mod} declara que \enquote{o wiring TACS [\ldots] é manual}. &
+É o gargalo estrutural e a \textbf{primeira tarefa técnica}. Isoladamente, vale mais para o produto
+do que o próprio módulo HVDC: destrava qualquer modelo futuro que precise de lógica --- proteção,
+FACTS, religador, gerador com conversor. \\
+\arq{tacs\_interface.py} documenta a fonte comandada por TACS como \enquote{SOURCE TYPE-13 (V) ou
+TYPE-14 (I)}. &
+No ATP, o Type-13 é fonte rampa de dupla inclinação e o Type-14 é fonte cossenoidal; a fonte
+comandada por TACS/MODELS é o \textbf{Type-60}. É exatamente o tipo de erro que faz uma prova de
+conceito falhar pelo motivo errado. \\
+\arq{tests/test\_pp\_registry\_guard.py} espera 49 arquivos \arq{.ocomp}; existem 59. &
+Drift pré-existente do teste de guarda, a corrigir em \emph{pull request} separado, e não como
+carona do PR de HVDC. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Entregáveis de integração, todos aditivos}
+
+Quatro arquivos \arq{.ocomp} (conversor, linha CC, NBS e eletrodo); renderizadores gráficos; ramos de
+despacho no tradutor; extensão da enumeração de fases com polos CC e retorno; emissão estrita do
+para-raios CC; módulo de métricas de conversor; codificação executável dos requisitos \S3.4[8] e
+\S3.4[9] com citação de página; e um estudo em lote com veredito de aprovação encadeado ao laudo
+auditável que o produto já emite.
+
+%==============================================================================
+\section{Viabilidade de mercado}
+\label{sec:mercado}
+%==============================================================================
+
+\subsection{A premissa precisa ser corrigida antes de virar argumento}
+
+\textbf{\enquote{Hoje só o PSCAD tem modelo voltado para HVDC-VSC} é falso como afirmação geral.}
+Têm modelo MMC nativo, no mínimo: EMTP-RV, com documentação pública de 2014 descrevendo quatro níveis
+de modelo; DIgSILENT PowerFactory, com meia-ponte e ponte completa cobrindo os tipos 3 a 7 da CIGRÉ
+TB~604; MATLAB/Simulink com Simscape Electrical; PLECS; RTDS/RSCAD; OPAL-RT/HYPERSIM; e Typhoon HIL.
+Sustentar a premissa original em banca --- ou em material de venda --- é entregar o flanco ao
+primeiro interlocutor que consultar a documentação desses fornecedores.
+
+\medskip
+\noindent\textbf{A premissa é verdadeira em três recortes}, e é deles que o trabalho vive:
+
+\begin{enumerate}
+  \item \textbf{Ecossistema ATP-EMTP/ATPDraw:} não foi localizado nenhum modelo MMC/VSC público,
+        distribuído ou de biblioteca. Há artigos de conferência sem entrega de arquivos.
+        \emph{Exigência metodológica: isso só entra no texto como \enquote{não foi localizado até
+        [data]}, com script de busca versionado --- tarefa do primeiro mês.}
+  \item \textbf{Ecossistema aberto:} Dynawo, DPsim, ANDES, OpenIPSL, PowerSimulationsDynamics.jl,
+        GridPACK e pandapower param em modelos fasoriais ou médios. Nenhum MMC EMT chaveado.
+  \item \textbf{Prática regulatória brasileira:} nas 509 páginas do relatório da EPE há
+        \textbf{15 ocorrências de \enquote{PSCAD}} e \textbf{zero} de ATP, EMTP, ATPDraw,
+        PowerFactory, Simulink, RTDS ou HYPERSIM.
+\end{enumerate}
+
+\subsection{O argumento forte, verificado na fonte primária}
+
+O gargalo brasileiro \textbf{não é o PSCAD; é o ATP}. Nos Procedimentos de Rede do ONS, Submódulo 2.5
+(\emph{Requisitos mínimos para elos de corrente contínua}, revisão 2016.12):
+
+\begin{citacao}
+\enquote{Mesmo que os estudos tenham sido realizados por meio do PSCAD, a transmissora deve entregar
+ao ONS, até o início dos estudos pré-operacionais, um modelo detalhado do elo CC incluindo todos os
+controles também para o programa ATP. Este modelo deve ser acompanhado pelo manual correspondente e
+pelos testes de validação executados confrontados com os resultados obtidos pelo Simulador CC.}
+\fonte{ONS, Submódulo 2.5, \S7.15.1.10, p.~36.}
+\end{citacao}
+
+\begin{citacao}
+Sobre os estudos de manobra do pátio CA das conversoras --- energização de transformadores
+conversores, tensão de restabelecimento transitória de disjuntores, energização de linhas e
+religamentos: \enquote{As simulações devem ser realizadas na ferramenta ATP.}
+\fonte{ONS, Submódulo 2.5, \S7.15.3.4, p.~37.}
+\end{citacao}
+
+E no Submódulo 18.2 (\emph{Modelos computacionais}, revisão 2020.01), item 4.2.4: \enquote{ATP ---
+Denominação de referência: Modelo para análise de transitórios eletromagnéticos. Propriedade: uso
+livre}, referenciado em 15 submódulos. \textbf{O PSCAD não consta da lista oficial de ferramentas do
+ONS.}
+
+\begin{destaque}{Conclusão}
+Existe \textbf{obrigação regulatória} de produzir modelo detalhado de elo CC em ATP e, para o
+primeiro bipolo VSC do SIN, alguém terá de construir um MMC em ATP. Hoje esse trabalho é feito
+artesanalmente, sem ferramental de autoria, e não há modelo público de partida.
+
+\medskip
+\emph{Diligência:} os Procedimentos de Rede passaram por revisões recentes. A numeração acima foi
+verificada nas versões citadas; reconfirmar na revisão vigente antes de qualquer uso externo.
+\end{destaque}
+
+\subsection{Dimensionamento honesto}
+
+\begin{destaque}{O que não é mercado}
+Os R\$~26,5 bilhões de investimento recomendado, dos quais R\$~17,1 bilhões em instalações CC, são
+\textbf{CAPEX de obra}. Usá-los como mercado endereçável de software é o erro de dimensionamento mais
+fácil de desmontar numa reunião. O gasto brasileiro realmente endereçável em ferramenta de estudo EMT
+de HVDC é da ordem de \textbf{poucos milhões de reais por ano, entre menos de dez organizações} ---
+a maioria já com PSCAD instalado e, a partir do relatório R2, obrigada a usar modelo \emph{replica}
+de fabricante.
+\end{destaque}
+
+\noindent\textbf{Onde está o retorno, em ordem de concretude:}
+
+\begin{enumerate}
+  \item \textbf{A linha de montagem normativa.} Transformar os requisitos \S3.4[8] e \S3.4[9] em
+        critérios executáveis, com veredito de aprovação e laudo auditável. O modelo físico qualquer
+        engenheiro competente reproduz da literatura; a codificação normativa versionada e
+        rastreável, não.
+  \item \textbf{Infraestrutura que vale mais que o módulo.} O acoplamento MODELS--rede destrava
+        qualquer modelo futuro que precise de lógica e habilita módulos de terceiros.
+  \item \textbf{Alavanca sobre o que já vende:} tensão de restabelecimento transitória segundo a
+        IEC 62271-100 nos disjuntores CA das conversoras --- que são precisamente o meio de
+        eliminação de falta CC na solução meia-ponte --- e sobretensões agora também do lado CC.
+  \item \textbf{Funil acadêmico:} universidades sem licença de PSCAD passam a poder ensinar HVDC-VSC
+        com ATP e Olivas EPS. É aquisição barata, não receita.
+\end{enumerate}
+
+\textbf{Teto declarado, por escrito e por código:} nenhum modelo genérico aberto substitui o
+\emph{replica} do fabricante em relatório R2, detalhamento ou comissionamento. O nicho é
+planejamento, anteprojeto, verificação independente e ensino --- exatamente onde a EPE ficou sem
+ferramenta. O laudo emite esse bloco de limitações automaticamente.
+
+\textbf{Gate comercial antes de maio de 2027:} lista nominal de dez organizações-alvo, hipótese de
+preço por assento ou por estudo, e duas cartas de interesse assinadas. Sem isso, o módulo deve ser
+orçado como marketing técnico e funil acadêmico --- o que continua sendo bom investimento, com a
+expectativa correta.
+
+\begin{destaque}{Um risco jurídico que precede este TCC}
+A licença de uso do ATP-EMTP é concedida individualmente por grupos regionais de usuários e exige
+declaração de \textbf{não participação no \enquote{comércio do EMTP}}, além de vedar a
+redistribuição do material. Isso é exposição \textbf{pré-existente e de nível de empresa}: a Olivas
+já comercializa hoje um front-end de ATP, sem qualquer módulo HVDC. O parecer jurídico e a consulta
+ao grupo de usuários devem ser conduzidos pela empresa agora, por causa do produto existente, e
+nenhuma peça deste trabalho deve alegar que o módulo HVDC agrava a exposição. O que o TCC publica são
+\textbf{dados e modelos}, nunca o solver.
+\end{destaque}
+
+%==============================================================================
+\section{Estratégia de licenciamento}
+%==============================================================================
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}p{2.9cm}Xp{2.6cm}@{}}
+\toprule
+\textbf{Camada} & \textbf{Conteúdo} & \textbf{Licença} \\
+\midrule
+\textbf{Aberta} \newline (repositório com DOI) &
+Modelo, templates MODELS, cartões ATP, oráculo numérico, premissas, conjunto de dados de validação,
+figuras e documentação &
+Apache-2.0 \newline CC-BY-4.0 \\
+\textbf{Produto} \newline (Olivas EPS) &
+Estudo automatizado com veredito de aprovação, codificação normativa, motor de varredura
+paramétrica, laudo profissional com auditoria e SHA256, biblioteca curada de casos e suporte &
+proprietária \\
+\textbf{Infraestrutura} &
+Acoplamento MODELS--rede e registro de emissores, contribuídos ao núcleo de forma estritamente
+aditiva &
+Apache-2.0 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Racional: a barreira de entrada de um concorrente \textbf{não é o modelo} --- é a cadeia
+\emph{unifilar $\rightarrow$ cartão ATP $\rightarrow$ execução $\rightarrow$ laudo assinável}. Abrir o
+modelo maximiza adoção, citação e confiança; o produto captura valor no fluxo de trabalho.
+
+%==============================================================================
+\section{Riscos e mitigação}
+%==============================================================================
+
+{\footnotesize
+\begin{xltabular}{\textwidth}{@{}p{4.4cm}p{1.1cm}p{1.9cm}X@{}}
+\toprule
+\textbf{Risco} & \textbf{Prob.} & \textbf{Impacto} & \textbf{Mitigação} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Risco} & \textbf{Prob.} & \textbf{Impacto} & \textbf{Mitigação} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Acoplamento MODELS para fonte controlada não funcionar, ou o laço com atraso de um passo ser instável
+& média & alto &
+Prova de conceito como primeira tarefa, com \emph{go/no-go} em 31/10/2026, antes de qualquer
+investimento em controle \\
+Custo computacional inviabilizar as varreduras, já que MODELS é interpretado
+& média & médio &
+Envelope declarado desde o início: submódulos agregados, passo de 20~$\mu$s e reordenação apenas nas
+transições de nível \\
+Nenhum parâmetro interno do MMC é publicado
+& certa & médio &
+Dimensionamento por regras públicas com faixa declarada, e validação demonstrada em envelope \\
+Modelo não reproduzir a falta CC --- falha que o próprio benchmark do PSCAD apresentou
+& média & alto &
+Estado bloqueado validado isoladamente em circuito reduzido antes do caso completo \\
+Escopo excessivo para autor único em dez meses
+& alta & alto &
+Partição MoSCoW assinada e gate M5, que sozinho já constitui TCC aprovável \\
+Perda de ineditismo durante a execução
+& média & médio &
+Revisão exaustiva do estado da arte no primeiro mês; \emph{preprint} com DOI em dezembro de 2026
+para fixar prioridade \\
+Indisponibilidade de ferramenta de referência externa
+& média & baixo &
+A validação principal é autossuficiente (V0 a V5) \\
+Cláusula de comércio do EMTP na licença do ATP
+& média & alto para o negócio; nulo para a validade acadêmica &
+Parecer jurídico conduzido pela empresa agora, por causa do produto existente \\
+Modelo aberto ser percebido como substituto do \emph{replica} de fabricante
+& média & médio &
+Teto declarado por escrito \textbf{e por código}: bloco de limitações automático no laudo \\
+Quebra da integração contínua na integração ao produto
+& alta & baixo &
+Correção do drift do teste de guarda em PR separado; código novo importável sem dependência de GUI \\
+\end{xltabular}}
+
+%==============================================================================
+\section{Questões deliberadamente em aberto}
+%==============================================================================
+
+Levantadas na revisão crítica desta proposta e \textbf{não resolvidas aqui} --- são o conteúdo das
+primeiras seis semanas de trabalho.
+
+\begin{enumerate}
+  \item \textbf{Taxonomia do modelo.} Um braço com vetor de tensões de capacitor, modulação por nível
+        mais próximo e balanceamento por ordenação é mais próximo do \emph{Detailed Equivalent Model}
+        \cite{gnanarathna2011} com submódulos agregados do que do \emph{Switching Function of Arm}.
+        A rotulagem correta muda a alegação de contribuição e precisa ser fechada antes da redação.
+  \item \textbf{Topologia do estado bloqueado.} Um diodo de \emph{bypass} em paralelo com uma fonte de
+        tensão ideal controlada curto-circuita a fonte ao conduzir, produzindo matriz singular. A
+        implementação viável provavelmente é chavear o \emph{valor} da fonte dentro do MODELS conforme
+        o sinal da corrente de braço, com resistência série explícita. É onde o trabalho pode queimar
+        semanas --- e onde o modelo da EPE falhou.
+  \item \textbf{Tipo de cartão da fonte comandada:} Type-60, e não Type-13 ou Type-14 como o
+        repositório documenta.
+  \item \textbf{Requisito de reenergização.} A leitura de que \enquote{a EPE não atenderia ao próprio
+        requisito} \textbf{não se sustenta}: o \S15.2.13 (p.~256) mostra que os 2,5~s e os 5~s foram
+        \emph{derivados} dos aproximadamente 2~s de reenergização e 4~s de recuperação observados no
+        PSCAD. Resta uma ambiguidade de definição de \enquote{reenergização} --- nota de rodapé, e não
+        pilar de originalidade.
+  \item \textbf{Divergências internas do relatório} a registrar, e não a \enquote{explicar}: 3~kA
+        (p.~254) contra aproximadamente 2,85~kA (p.~123) de corrente máxima de IGBT; \S3.4[8].b
+        (\enquote{corrente total} não superior a 1~pu) contra \S15.2.9 (limite de 1~pu de corrente
+        \emph{CC}); condutor Kiwi com formação 72/7 contra 45/7 entre tabelas; e
+        \enquote{R\$~199,96/MWh} (p.~242) contra \enquote{/MW} (p.~246 e 259).
+\end{enumerate}
+
+%==============================================================================
+\section{Temas-satélite}
+%==============================================================================
+
+Próximos trabalhos sobre a mesma base. O modelo aberto na versão 1.0 é pré-requisito de todos.
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{@{}p{4.6cm}Xp{2.7cm}@{}}
+\toprule
+\textbf{Tema} & \textbf{O que ataca} & \textbf{Perfil} \\
+\midrule
+\textbf{Grid-forming sobre o modelo aberto} --- droop, máquina virtual síncrona e dVOC em MODELS &
+O regime em que o \emph{grid-following} falha por construção: SCR abaixo de 2, exatamente a
+contingência N-2 Açu~III--Angicos &
+Graduação com base forte em controle, ou mestrado \\
+\textbf{Estabilidade dirigida por conversores em Angicos} --- varredura de impedância e passividade &
+Recomendação \S3.4[11] e \S15.2.14: interações de controle e harmônicas com os parques eólicos e
+solares vizinhos &
+Mestrado; maior valor comercial \\
+\textbf{Curto-circuito de unidade com conversor pleno} --- IEC 60909-0:2016, \S6.7 &
+Fecha o ciclo com o módulo de curto-circuito que o Olivas EPS já comercializa e que hoje não
+implementa o \S6.7 &
+Graduação; maior conversão imediata \\
+\textbf{Coordenação de isolamento do pátio CC $\pm$600~kV} &
+Recomendação \S3.4[10]: para-raios, resistor de amortecimento e \emph{chopper} &
+Graduação com perfil de alta tensão \\
+\textbf{Padrão IEEE/CIGRÉ DLL} (TB~958, 2025) em fluxo ATP-EMTP &
+O único caminho que \emph{resolve}, em vez de substituir, o problema do modelo certificado de
+fabricante &
+Roadmap de produto, não pesquisa de graduação \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+%==============================================================================
+\section{Decisões pendentes}
+%==============================================================================
+
+\begin{enumerate}
+  \item \textbf{Orientador e instituição} --- o trabalho exige alguém confortável com transitórios
+        eletromagnéticos e com o ATP.
+  \item \textbf{Ferramenta de referência externa} --- verificar se a universidade dispõe de PSCAD
+        educacional ou de MATLAB com Simscape. Não é bloqueante, mas fortalece a validação.
+  \item \textbf{Declaração de vínculo} --- o autor é ligado à Olivas; isso deve constar da folha de
+        rosto e de seção própria da monografia.
+  \item \textbf{Parecer jurídico sobre a licença do ATP} --- tarefa da empresa, imediata e
+        independente do TCC.
+  \item \textbf{Onde publicar o repositório aberto} --- organização própria ou institucional, com DOI
+        no Zenodo.
+\end{enumerate}
+
+%==============================================================================
+\begin{thebibliography}{99}
+\addcontentsline{toc}{section}{Referências}
+
+\bibitem{epe2025}
+EMPRESA DE PESQUISA ENERGÉTICA. \textbf{EPE-DEE-RE-071/2025-rev0 --- Estudo de Expansão das
+Interligações Regionais, Parte III: Expansão da Capacidade de Exportação da Região Nordeste e
+Importação da Região Sul}. Rio de Janeiro: EPE, nov. 2025. 509~p.
+
+\bibitem{ons25}
+OPERADOR NACIONAL DO SISTEMA ELÉTRICO. \textbf{Procedimentos de Rede --- Submódulo 2.5: Requisitos
+mínimos para elos de corrente contínua}. Revisão 2016.12.
+
+\bibitem{ons182}
+OPERADOR NACIONAL DO SISTEMA ELÉTRICO. \textbf{Procedimentos de Rede --- Submódulo 18.2: Modelos
+computacionais}. Revisão 2020.01.
+
+\bibitem{epe2020}
+EMPRESA DE PESQUISA ENERGÉTICA. \textbf{EPE-DEE-DEA-NT-004/2020 --- Diretrizes para a elaboração dos
+relatórios técnicos para a licitação de novas instalações da Rede Básica: estrutura e conteúdo dos
+relatórios R1, R2, R3, R4 e R5}. 2020.
+
+\bibitem{gnanarathna2011}
+GNANARATHNA, U.~N.; GOLE, A.~M.; JAYASINGHE, R.~P. Efficient Modeling of Modular Multilevel HVDC
+Converters (MMC) on Electromagnetic Transient Simulation Programs. \textbf{IEEE Transactions on Power
+Delivery}, v.~26, n.~1, p.~316--324, 2011.
+
+\bibitem{cigre604}
+CIGRÉ WORKING GROUP B4.57. \textbf{Technical Brochure 604 --- Guide for the Development of Models for
+HVDC Converters in a HVDC Grid}. Paris: CIGRÉ, 2014.
+
+\bibitem{cigre958}
+CIGRÉ JOINT WORKING GROUP B4.82. \textbf{Technical Brochure 958 --- Guidelines for Use of Real-Code in
+EMT Models for HVDC, FACTS and Inverter-Based Generators in Power Systems Analysis}. Paris: CIGRÉ,
+2025.
+
+\bibitem{saad2014}
+SAAD, H.; MAHSEREDJIAN, J.; DENNETIÈRE, S. et al. \textbf{MMC Documentation}. EMTP-RV, 2014.
+
+\bibitem{ieee2021}
+HATZIARGYRIOU, N. et al. Definition and Classification of Power System Stability --- Revisited and
+Extended. \textbf{IEEE Transactions on Power Systems}, v.~36, n.~4, p.~3271--3281, 2021.
+
+\bibitem{dommel}
+DOMMEL, H.~W. \textbf{EMTP Theory Book}. Portland: Bonneville Power Administration.
+
+\bibitem{rulebook}
+LEUVEN EMTP CENTER. \textbf{ATP Rule Book}, volumes 1 e 2.
+
+\end{thebibliography}
+
+\end{document}
