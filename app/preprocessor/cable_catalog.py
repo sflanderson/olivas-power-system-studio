@@ -113,6 +113,10 @@ class CatalogCable:
     ampacity_buried_A: float = 0.0
     icw_kA_1s: float = 0.0
     notes: str = ""
+    # Proveniência (entradas digitalizadas de datasheet oficial).
+    # Vazio = valor representativo genérico (entradas legadas v0.43).
+    manufacturer: str = ""
+    source: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -335,9 +339,108 @@ _CU_BARE: tuple[CatalogCable, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Catálogo: Induscabos INDULINK 3,6/6 kV — parâmetros elétricos oficiais
+# Fonte: Induscabos, "Parâmetros Elétricos — Cabos de Média Tensão"
+# (2023-04). Cu, 90 °C, 60 Hz, NBR 14039. Colunas usadas: RCC 20 °C,
+# RCA 90 °C (3 cond., S=D), Xl trifólio, C, I ao ar (trifólio, 30 °C),
+# I enterrado (trifólio, 25 °C). Xl para S=D e S=2D em ``notes``.
+# icw = 0.143·S (K=143 Cu, convenção deste módulo).
+# ---------------------------------------------------------------------------
+
+_INDUSCABOS_SRC = "Induscabos — Parâmetros Elétricos Cabos MT (2023-04), INDULINK 3,6/6 kV"
+
+
+def _induscabos(
+    s: float, rdc20: float, rac90: float, x_tri: float, c: float,
+    i_air: float, i_bur: float, x_sd: float, x_s2d: float,
+) -> CatalogCable:
+    return CatalogCable(
+        name=f"Induscabos INDULINK Cu {s:g}mm² 3.6/6kV",
+        conductor_material=ConductorMaterial.COPPER,
+        insulation=InsulationType.XLPE,
+        rated_voltage_kV=6.0, cross_section_mm2=s,
+        R_dc_ohm_per_km_at_20C=rdc20, R_ac_ohm_per_km_at_90C=rac90,
+        X_ohm_per_km=x_tri, C_uF_per_km=c,
+        ampacity_air_A=i_air, ampacity_buried_A=i_bur,
+        icw_kA_1s=round(0.143 * s, 3),
+        notes=(
+            f"Xl S=D {x_sd} Ω/km; Xl S=2D {x_s2d} Ω/km (trifólio em X). "
+            "Isolação assumida XLPE (tabela só informa 90 °C)."
+        ),
+        manufacturer="Induscabos", source=_INDUSCABOS_SRC,
+    )
+
+
+_INDUSCABOS_INDULINK_6kV: tuple[CatalogCable, ...] = (
+    _induscabos(10, 1.830, 2.33350, 0.17615, 0.2004, 87, 65, 0.19355, 0.24575),
+    _induscabos(16, 1.150, 1.46648, 0.16331, 0.2291, 114, 84, 0.18071, 0.23292),
+    _induscabos(25, 0.727, 0.92719, 0.15184, 0.2634, 150, 107, 0.16924, 0.22145),
+    _induscabos(35, 0.524, 0.66844, 0.14375, 0.2946, 183, 128, 0.16115, 0.21335),
+    _induscabos(50, 0.387, 0.49389, 0.13668, 0.3285, 221, 150, 0.15409, 0.20629),
+    _induscabos(70, 0.268, 0.34239, 0.13051, 0.3651, 275, 183, 0.14791, 0.20011),
+    _induscabos(95, 0.193, 0.24708, 0.12471, 0.4128, 337, 218, 0.14211, 0.19431),
+    _induscabos(120, 0.153, 0.19640, 0.12097, 0.4520, 390, 247, 0.13837, 0.19057),
+    _induscabos(150, 0.124, 0.15980, 0.11800, 0.4828, 445, 276, 0.13540, 0.18761),
+    _induscabos(185, 0.0991, 0.12857, 0.11462, 0.5303, 510, 311, 0.13202, 0.18422),
+    _induscabos(240, 0.0754, 0.09923, 0.10970, 0.5902, 602, 358, 0.12711, 0.17931),
+    _induscabos(300, 0.0601, 0.08055, 0.10791, 0.6050, 687, 402, 0.12531, 0.17751),
+    _induscabos(400, 0.0470, 0.06492, 0.10596, 0.6340, 796, 453, 0.12337, 0.17557),
+    _induscabos(500, 0.0366, 0.05298, 0.10373, 0.6660, 907, 506, 0.12113, 0.17333),
+)
+
+
+# ---------------------------------------------------------------------------
+# Catálogo: Nexans (NZ/AU) TR-XLPE 6.35/11 (12) kV unipolar Cu, tela de fios
+# Fonte: Nexans "Medium Voltage TR-XLPE Cables, Section Four", Product
+# Sheet 231-13 B (AS/NZS 1429.1, 50 Hz). R_ac a 90 °C, X_L a 50 Hz, C
+# condutor-tela. ampacity_air = 1ª coluna de corrente (duto multivias;
+# configuração exata não decodificada). R_dc 20 °C NÃO consta na folha:
+# valor nominal IEC 60228 classe 2 (coincide com Prysmian Tab. 18 e
+# Induscabos para as seções comuns).
+# ---------------------------------------------------------------------------
+
+_NEXANS_SRC = "Nexans NZ — MV TR-XLPE Cables Section Four, sheet 231-13 B (11 kV Cu)"
+
+
+def _nexans(s: float, rdc20_iec: float, rac90: float, x: float, c: float,
+            i1: float) -> CatalogCable:
+    return CatalogCable(
+        name=f"Nexans TR-XLPE Cu {s:g}mm² 6.35/11kV",
+        conductor_material=ConductorMaterial.COPPER,
+        insulation=InsulationType.XLPE,
+        rated_voltage_kV=11.0, cross_section_mm2=s,
+        R_dc_ohm_per_km_at_20C=rdc20_iec, R_ac_ohm_per_km_at_90C=rac90,
+        X_ohm_per_km=x, C_uF_per_km=c,
+        ampacity_air_A=i1, ampacity_buried_A=0.0,
+        icw_kA_1s=round(0.143 * s, 3),
+        notes="50 Hz. R_dc = IEC 60228 cl. 2 (não consta na folha Nexans).",
+        manufacturer="Nexans", source=_NEXANS_SRC,
+    )
+
+
+_NEXANS_TRXLPE_11kV: tuple[CatalogCable, ...] = (
+    _nexans(16, 1.15, 1.47, 0.154, 0.18, 125),
+    _nexans(25, 0.727, 0.927, 0.144, 0.21, 163),
+    _nexans(35, 0.524, 0.668, 0.137, 0.23, 197),
+    _nexans(50, 0.387, 0.494, 0.130, 0.26, 237),
+    _nexans(70, 0.268, 0.342, 0.121, 0.29, 294),
+    _nexans(95, 0.193, 0.247, 0.115, 0.33, 359),
+    _nexans(120, 0.153, 0.196, 0.111, 0.36, 413),
+    _nexans(150, 0.124, 0.159, 0.107, 0.39, 470),
+    _nexans(185, 0.0991, 0.128, 0.103, 0.43, 539),
+    _nexans(240, 0.0754, 0.0981, 0.099, 0.47, 636),
+    _nexans(300, 0.0601, 0.0791, 0.096, 0.52, 730),
+    _nexans(400, 0.0470, 0.0632, 0.093, 0.59, 847),
+    _nexans(500, 0.0366, 0.0510, 0.090, 0.66, 978),
+    _nexans(630, 0.0283, 0.0416, 0.087, 0.74, 1122),
+)
+
+
 # Catálogo total
 CABLE_CATALOG: tuple[CatalogCable, ...] = (
     _CU_PVC_LV + _CU_EPR_15kV + _CU_XLPE_20kV + _CU_BARE
+    + _INDUSCABOS_INDULINK_6kV + _NEXANS_TRXLPE_11kV
 )
 
 

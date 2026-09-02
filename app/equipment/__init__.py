@@ -22,6 +22,11 @@ de equipamentos reais com:
   WEG Distribution (5–50 MVA)
 * **Disjuntores** (30+) — ABB HD4/HV4, Siemens 8DJH/8DA,
   ortyr 3WL (LV)
+* **Unidades de disparo LSIG** — ABB Ekip, Schneider Micrologic,
+  WEG ABW-OCR, Eaton PXR/Digitrip, Siemens ETU (faixas de
+  Ir/tr/Isd/tsd/Ii/Ig/tg de datasheets oficiais)
+* **Fusíveis** — Bussmann NH gG/aM e 12 kV, SIBA HHM, ABB CEF/CMF,
+  WEG aR (I²t de pré-arco/total por corrente nominal)
 
 Cada entry em YAML estruturado com:
 

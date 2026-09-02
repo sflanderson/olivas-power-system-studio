@@ -4,6 +4,24 @@ Todas as mudanças notáveis deste projeto. O formato segue [Keep a Changelog](h
 
 ---
 
+## [Unreleased]
+
+### Added — Catálogo de engenharia com dados de fabricantes (FASES 1-5)
+
+Digitalização de manuais/datasheets oficiais (ABB, Schneider, WEG, Eaton, Siemens, SEL, GE, Bussmann, SIBA, Prysmian, Nexans, Induscabos), com proveniência por entrada. Todas as mudanças são aditivas.
+
+- `app/equipment/library.py`: novos dataclasses `SettingRange`, `TripUnitModel` (funções LSIG de unidades de disparo MCCB/ACB — faixas de Ir/tr/Isd/tsd/Ii/Ig/tg, opções de curva, I²t ON/OFF), `FuseRating` e `FuseModel` (I²t de pré-arco/total, I1/I3, perdas). APIs `list_trip_units`/`get_trip_unit`/`list_fuses`/`get_fuse`; `stats()` e `list_vendors()` passam a incluir as novas categorias.
+- `app/standards/relay_models.py`: novas entradas no registry — `ABB-REF615R`, `Siemens-7SJ82`, `GE-850`, `Schneider-MiCOM-P127`, `WEG-SRW01` (faixas de pickup/TMS/TD e funções ANSI conforme manuais).
+- `app/standards/vendor_curve_constants.py` (novo): constantes de curva publicadas por SEL (C1-C5, U1-U5), GE (IEEE 4-34, ANSI 4-36, IEC 4-38, IAC 4-40) e ABB (defaults da curva programável), com família e fonte explícitas.
+- `app/preprocessor/cable_catalog.py`: campos opcionais `manufacturer`/`source` em `CatalogCable`; cabos Induscabos INDULINK 3,6/6 kV (14 seções, parâmetros completos NBR 14039, 60 Hz) e Nexans TR-XLPE 6,35/11 kV (14 seções).
+- `tests/test_pp_v4_1_0_vendor_catalog.py`: cobertura das novas entradas e invariantes físicos (Ir ≤ 1×In, I²t total ≥ pré-arco, Rca > Rcc, coincidência de constantes entre fontes independentes).
+
+### Documented (sem alteração de código)
+- Duas famílias numéricas distintas circulam sob os nomes "Moderately/Very/Extremely Inverse": IEEE C37.112 Anexo A (ABB/GE) e legada US/CO (SEL U1-U5 = GE ANSI 4-36, `tr` idêntico). `iec60255.IEEE_CURVE_COEFFICIENTS` mistura as duas e divide por 7 — registrado em `vendor_curve_constants.py`, não alterado.
+- R0/X0 de cabos não é parâmetro de catálogo (depende do aterramento da blindagem e do solo) — confirmado em 3 fabricantes; permanece cálculo por instalação.
+
+---
+
 ## [4.0.0-beta] — 2026-05-01
 
 ### 🏆 Milestone preparation
