@@ -966,7 +966,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
         S_pickup_Isd=_sr(0.6, 10.0, 0.1, unit="xIn"),
         S_delay_tsd=_sr(0.05, 0.8, 0.01, unit="s"),
         S_i2t_selectable=True,
-        I_pickup_Ii=_sr(1.5, 15.0, 0.1),
+        I_pickup_Ii=_sr(1.5, 15.0, 0.1, off=True),
         G_pickup_Ig=_sr(0.1, 1.0, 0.001, off=True),
         G_delay_tg=_sr(0.1, 1.0, 0.05, unit="s"),
         G_i2t_selectable=True,
@@ -994,7 +994,17 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "coeficientes a/b/k acima são os PRÓPRIOS da ABB para este "
             "produto — não coincidem com os universais (SI k=0.14 vs "
             "0.16·0.15873≈0.0254 aqui); ver vendor_curve_constants.py para "
-            "a família IEC universal usada pelos relés IED. G no modo "
+            "a família IEC universal usada pelos relés IED. ATENÇÃO: o "
+            "manual-fonte imprime a fórmula de forma inconsistente entre a "
+            "tabela-resumo (pág. 12: expoente 'k') e a tabela detalhada de "
+            "coeficientes (pág. 13: expoente 'a', usada acima); o exemplo "
+            "numérico da própria fonte para SI (I1=0.4In, t1=3s, If=0.8In → "
+            "tt=4.78s) não fecha com nenhuma das duas leituras — provável "
+            "erro tipográfico/de extração do PDF original da ABB, não do "
+            "código (mantida a leitura estruturalmente mais plausível, com "
+            "expoente 'a' consistente com os universais α=0.02/1/2/4). I "
+            "possui estado Off (mutuamente exclusivo com MCR, notas (2)/(3) "
+            "da fonte) — off_selectable=True. G no modo "
             "t=k/I2 (51N): fórmula impressa usa constante fixa '2', "
             "aparentemente independente do ajuste t4 (0.1-1 s) — "
             "inconsistência da própria fonte, preservada como impressa "

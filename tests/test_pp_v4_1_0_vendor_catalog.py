@@ -114,6 +114,8 @@ class TestTripUnits:
         assert t.S_i2t_selectable and t.G_i2t_selectable
         assert "E1.2" in t.breaker_family and "E6.2" in t.breaker_family
         assert any("k=0.16" in c for c in t.curve_options)   # SI ABB ≠ SI universal (k=0.14)
+        # I é mutuamente exclusivo com MCR (notas (2)/(3) da fonte) → possui Off
+        assert t.I_pickup_Ii.off_selectable
 
     def test_ir_never_exceeds_1xIn(self):
         """Ir ≤ 1.0 × In em todas as unidades (IEC/UL): sobrecarga
