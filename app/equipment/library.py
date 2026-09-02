@@ -906,6 +906,104 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "9AKK108468A2168 (não digitalizada)."
         ),
     ),
+    # ABB — SACE Tmax XT7, Ekip Touch/Hi-Touch (IEC) — TCC/manual
+    # Fonte: ABB 1SDH001821A1002 Rev. B (Ekip Touch user manual, XT7),
+    # págs. 5-6 (famílias), 40-44 (L/S/S2/I/G), 84-85 (fórmulas/tolerâncias)
+    TripUnitModel(
+        model_id="ABB-XT7-EKIP-TOUCH-LSIG",
+        manufacturer="ABB",
+        full_name="SACE Tmax XT7 Ekip Touch / Hi-Touch / G-Hi-Touch LSIG",
+        breaker_family="Tmax XT7 (800-1600 A)",
+        category="MCCB",
+        market_standard="IEC 60947-2",
+        source_doc="ABB 1SDH001821A1002 Rev. B (Ekip Touch user manual, XT7)",
+        adjustment_mode="fine_digital",
+        functions_available=("L", "S", "S2", "I", "G"),
+        L_pickup_Ir=_sr(0.4, 1.0, 0.001, default=1.0),
+        L_delay_tr=_sr(3.0, 144.0, 1.0, unit="s", default=144.0),
+        tr_reference_multiple=3.0,
+        S_pickup_Isd=_sr(0.6, 10.0, 0.1, unit="xIn", default=2.0, off=True),
+        S_delay_tsd=_sr(0.05, 0.8, 0.01, unit="s", default=0.05),
+        S_i2t_selectable=True,
+        I_pickup_Ii=_sr(1.5, 15.0, 0.1, default=4.0, off=True),
+        G_pickup_Ig=_sr(0.1, 1.0, 0.001, default=0.2, off=True),
+        G_delay_tg=_sr(0.1, 1.0, 0.05, unit="s", default=0.4),
+        G_i2t_selectable=True,
+        curve_options=(
+            "L: t=k/I2 (IEC 60947-2)", "L: IEC 60255-151 SI",
+            "L: IEC 60255-151 VI", "L: IEC 60255-151 EI", "L: t=k/I4",
+            "S/G: t=k ou t=k/I2",
+        ),
+        rated_voltage_V=690.0,
+        notes=(
+            "Isd/Ii/Ig em xIn (não xIn da placa de corrente do rating "
+            "plug, mas do próprio In configurado). Fórmula L (t=k/I2): "
+            "tt = 9·t1/(If/I1)^2 (t1 = tempo em 3×I1, idêntica à XT2-XT4). "
+            "S2 (I5 0.6-10 xIn, t5 0.05-0.8 s) estágio independente de S. "
+            "tt forçado a 1 s se If>12 In. S, I e G possuem parâmetro "
+            "Enable ON/OFF (default OFF). Frame 800-1600 A (rating plug). "
+            "Protações adicionais não modeladas neste dataclass (fora do "
+            "escopo LSIG): MCR, 2I, IU[46] desbalanço, D[67] direcional, "
+            "UV/OV[27/59], UF/OF[81], RP[32R] — ver fonte."
+        ),
+    ),
+    # ABB — SACE Emax 2 E1.2/E2.2/E4.2/E6.2, Ekip Touch/Hi-Touch (IEC)
+    # Fonte: ABB 1SDH001316R0002 Rev. C, pág. 12-14 (tabela-resumo de
+    # proteções básicas + tabela de parâmetros IEC 60255-151 a/b/k)
+    TripUnitModel(
+        model_id="ABB-EMAX2-EKIP-TOUCH-LSIG-IEC",
+        manufacturer="ABB",
+        full_name="SACE Emax 2 Ekip Touch / Hi-Touch / G-Hi-Touch LSIG (IEC)",
+        breaker_family="Emax 2 E1.2/E2.2/E4.2/E6.2 (400-6300 A)",
+        category="ACB",
+        market_standard="IEC 60947-2",
+        source_doc="ABB 1SDH001316R0002 Rev. C (Ekip Touch instructions, Emax 2)",
+        adjustment_mode="fine_digital",
+        functions_available=("L", "S", "I", "G"),
+        L_pickup_Ir=_sr(0.4, 1.0, 0.001),
+        L_delay_tr=_sr(3.0, 144.0, 1.0, unit="s"),
+        tr_reference_multiple=3.0,
+        S_pickup_Isd=_sr(0.6, 10.0, 0.1, unit="xIn"),
+        S_delay_tsd=_sr(0.05, 0.8, 0.01, unit="s"),
+        S_i2t_selectable=True,
+        I_pickup_Ii=_sr(1.5, 15.0, 0.1),
+        G_pickup_Ig=_sr(0.1, 1.0, 0.001, off=True),
+        G_delay_tg=_sr(0.1, 1.0, 0.05, unit="s"),
+        G_i2t_selectable=True,
+        curve_options=(
+            "L: t=k/I2 (IEC 60947-2), tt=9·t1/(If/I1)^2",
+            "L: IEC 60255-151 SI (a=0.02 b=0.15873 k=0.16)",
+            "L: IEC 60255-151 VI (a=1 b=0.148148 k=13.7)",
+            "L: IEC 60255-151 EI (a=2 b=0.1 k=82)",
+            "L: t=k/I4 (a=4 b=1 k=82)",
+            "S: t=k ou t=k/I2 (tt=100·t2/If^2, If em xIn)",
+            "G: t=k ou t=k/I2 (tt=2/(If/I4)^2 — constante fixa, não escala com t4 na fonte)",
+        ),
+        rated_voltage_V=1150.0,
+        notes=(
+            "Tabela-resumo válida para E1.2/E2.2/E4.2/E6.2 (mesma plataforma "
+            "Ekip Touch; In real definido pelo rating plug por frame: E1.2 "
+            "400-1600 A, E4.2 400-4000 A, E6.2 400-6300 A). Ue padrão "
+            "690 V, disponível até 1150 V AC conforme catálogo técnico. "
+            "Defaults de fábrica não digitalizados (remetidos ao 'Engineering "
+            "Manual' 1SDH001330R0002, não obtido). G: mínimo real de "
+            "autoalimentação 0.3 In (In=100 A) / 0.25 In (In=400 A) / 0.2 In "
+            "(demais). I3/I31 (2I) não ajustáveis em tempo (<30 ms); MCR "
+            "40-500 ms não modelado. Curva IEC 60255-151 usa t1 (s) direto "
+            "como escala (não TMS 0-1): fórmula tt=(t1·k·b)/((If/I1)^a-1), "
+            "coeficientes a/b/k acima são os PRÓPRIOS da ABB para este "
+            "produto — não coincidem com os universais (SI k=0.14 vs "
+            "0.16·0.15873≈0.0254 aqui); ver vendor_curve_constants.py para "
+            "a família IEC universal usada pelos relés IED. G no modo "
+            "t=k/I2 (51N): fórmula impressa usa constante fixa '2', "
+            "aparentemente independente do ajuste t4 (0.1-1 s) — "
+            "inconsistência da própria fonte, preservada como impressa "
+            "(verificada por exemplo numérico do manual: I4=0.8In, t4=0.2s, "
+            "If=2In → tt=0.32s = 2/(2/0.8)²). Variante UL do mesmo produto: "
+            "teto de tg 0.4 s e de Ig 1200 A (não modelada aqui — ver "
+            "ABB-EMAX-E2.2-EKIP-TOUCH-LSI-LSIG-UL para a entrada UL)."
+        ),
+    ),
     # Schneider — ComPact NSX Micrologic 5/6/7 (IEC) — DOCA0141EN-03
     TripUnitModel(
         model_id="SE-NSX-MICROLOGIC-5-6-7",

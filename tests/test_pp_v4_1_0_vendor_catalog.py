@@ -94,6 +94,27 @@ class TestTripUnits:
         assert library.get_trip_unit("se-mtz-micrologic-x") is not None
         assert library.get_trip_unit("NOPE-000") is None
 
+    def test_abb_xt7_ekip_touch(self):
+        t = library.get_trip_unit("ABB-XT7-EKIP-TOUCH-LSIG")
+        assert t is not None
+        assert t.category == "MCCB"
+        assert t.L_delay_tr.max == 144.0          # XT7 vai além do teto 60s da XT2-XT4
+        assert t.I_pickup_Ii.max == 15.0           # XT7 vai além do teto 10xIn da XT2-XT4
+        assert t.S_pickup_Isd.off_selectable and t.I_pickup_Ii.off_selectable
+        assert t.G_pickup_Ig.off_selectable
+        assert t.tr_reference_multiple == 3.0
+        assert t.rated_voltage_V == 690.0
+
+    def test_abb_emax2_ekip_touch_iec(self):
+        t = library.get_trip_unit("ABB-EMAX2-EKIP-TOUCH-LSIG-IEC")
+        assert t is not None
+        assert t.category == "ACB"
+        assert t.L_pickup_Ir.min == 0.4 and t.L_pickup_Ir.max == 1.0
+        assert t.L_delay_tr.min == 3.0 and t.L_delay_tr.max == 144.0
+        assert t.S_i2t_selectable and t.G_i2t_selectable
+        assert "E1.2" in t.breaker_family and "E6.2" in t.breaker_family
+        assert any("k=0.16" in c for c in t.curve_options)   # SI ABB ≠ SI universal (k=0.14)
+
     def test_ir_never_exceeds_1xIn(self):
         """Ir ≤ 1.0 × In em todas as unidades (IEC/UL): sobrecarga
         nunca acima da corrente nominal do disparador."""
