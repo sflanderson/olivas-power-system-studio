@@ -450,6 +450,15 @@ SCHNEIDER_P3U10 = RelayModel(
 # publica faixas distintas por família (SEL-751: US 0.50-15.00,
 # IEC 0.05-1.50), isto está registrado em ``description``.
 # ``manual_path`` guarda a referência documental (PDF não incluído).
+#
+# Achado da verificação contra o datasheet SEL-751 (não alterado — a
+# entrada pré-existente ``SEL_751`` acima tem testes legados que a
+# codificam, ex. ``validate_pickup_per_in(SEL_751, 16.0)``):
+#   * ``pickup_range_per_in=(0.5, 16.0)`` reproduz a faixa em ampères
+#     SECUNDÁRIOS do modelo 5 A (0.50-16.00 A); em múltiplos de In a
+#     faixa é 0.10-3.20 xIn (modelo 1 A: 0.10-3.20 A).
+#   * ``tms_range=(0.05, 1.0)``: o datasheet publica IEC 0.05-1.50.
+# Decisão de correção cabe ao mantenedor (impacto em coordenação).
 
 
 # ABB Relion 615 — REF615R (versão ANSI, norte-americana)
@@ -463,7 +472,9 @@ ABB_REF615R = RelayModel(
     manual_path="ABB 1MRS240050-IB Rev C — REF615R Technical Manual (ANSI)",
     ansi_functions=(
         "51P", "50P", "51N", "50N", "51G", "50G", "50P-3", "50N-3",
-        "46", "27", "59", "59N", "47", "81", "79", "86", "50BF",
+        "67/51P", "67/50P", "67/51N", "67/50N", "50SEF", "51LT",
+        "46", "46PD", "37", "49F", "32P", "32N", "27", "59", "59N", "59G",
+        "47", "24", "81", "81LSH", "79", "25", "87LOZREF", "50BF",
     ),
     tc_curve_standards=(
         CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.ANSI,
@@ -475,18 +486,22 @@ ABB_REF615R = RelayModel(
     ),
     ieee_curves_supported=(
         IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
-        IeeeCurveType.EXTREMELY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE, IeeeCurveType.INVERSE,
     ),
-    pickup_range_per_in=(0.05, 5.0),
+    pickup_range_per_in=(0.05, 40.0),
     tms_range=(0.05, 15.0),
     time_dial_range=(0.05, 15.0),
     description=(
+        "Funções ANSI da Tabela 1 (nem todas aplicáveis a toda configuração). "
         "51P: pickup 0.05-5.00 xIn passo 0.01; 50P-1/2: 0.10-40.00 xIn; "
-        "51N/G: 0.010-5.000 xIn passo 0.005. Time multiplier 0.05-15.00 "
-        "passo 0.01 (IEC e ANSI). Trip delay DT 40-200000 ms. 19 tipos de "
-        "curva (7 IEEE C37.112, 6 IEC 60255-3, LT Inv, RI, RD, programável). "
-        "Curva programável A/B/C/D/E com defaults 28.2/0.1217/2.0/29.1/1.0 "
-        "(= IEEE Extremely Inverse). Blocos IEC 61850: PHLPTOC/PHHPTOC/PHIPTOC."
+        "50P-3: 1.00-40.00 xIn; 51N/G: 0.010-5.000 xIn passo 0.005 "
+        "(pickup_range_per_in abrange 51+50, convenção das entradas ABB). "
+        "Time multiplier 0.05-15.00 passo 0.01 (IEC e ANSI). Trip delay DT "
+        "40-200000 ms. 18 tipos de curva selecionáveis (índices 1-19, sem 16): "
+        "ANSI Ext/Very/Norm/Mod Inv + ANSI DT, Long Time Ext/Very/Inv, IEC "
+        "Norm/Very/Inv/Ext/ST/LT Inv + IEC DT, programável, RI, RD. Curva "
+        "programável A/B/C/D/E com defaults 28.2/0.1217/2.0/29.1/1.0 (= ANSI "
+        "Extremely Inverse). Blocos IEC 61850: PHLPTOC/PHHPTOC/PHIPTOC."
     ),
 )
 
@@ -502,7 +517,7 @@ SIEMENS_7SJ82 = RelayModel(
     manual_path="Siemens C53000-G5040-C017-8 — SIPROTEC 5 Overcurrent Protection 7SJ82/7SJ85 Technical Data",
     ansi_functions=(
         "50", "51", "50N", "51N", "67", "67N", "51V", "46", "49",
-        "27", "59", "81", "79", "50BF", "86", "25",
+        "27", "59", "81", "79", "50BF", "25",
     ),
     tc_curve_standards=(
         CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.ANSI,
@@ -514,24 +529,30 @@ SIEMENS_7SJ82 = RelayModel(
     ),
     ieee_curves_supported=(
         IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
-        IeeeCurveType.EXTREMELY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE, IeeeCurveType.INVERSE,
+        IeeeCurveType.SHORT_TIME_INVERSE,
     ),
     pickup_range_per_in=(0.03, 35.0),
-    tms_range=(0.05, 15.0),
-    time_dial_range=(0.05, 15.0),
+    tms_range=(0.0, 15.0),
+    time_dial_range=(0.0, 15.0),
     description=(
-        "Pickup em A absoluto por banda de TC: 1 A @50/100×Irated 0.030-35.000 A "
-        "(passo 0.001 A); 5 A: 0.15-175.00 A; modo 1.6×Irated: 0.001-1.600 A "
-        "(1 A). Time multiplier fase 0.05-15.00, terra 0.00-15.00 (passo 0.01). "
-        "Curvas IEC: Normal Inverse (A), Very (B), Extremely (C), Long-Time (B); "
-        "ANSI: Moderately/Very/Extremely/Definite Inverse. Curva programável "
-        "por 2-30 pares (X 1.00-20.00 pu, Y 0-999 s). Dropout 95% de 1.1×limiar."
+        "Dados técnicos da família SIPROTEC 5 (Cap. 12); lista ANSI restrita "
+        "ao escopo verificável do 7SJ82. Pickup em A absoluto por banda de "
+        "TC: 1 A @50/100×Irated 0.030-35.000 A (passo 0.001 A); 5 A: "
+        "0.15-175.00 A; modo 1.6×Irated: 0.001-1.600 A (1 A). Time multiplier "
+        "0.00-15.00 passo 0.01 (estágio inverso IEC/ANSI, fase §12.5.2 e "
+        "terra §12.7.2); estágio de curva definida pelo usuário (§12.5.3) e "
+        "51V: 0.05-15.00. Curvas IEC: Normal Inverse (A), Very (B), Extremely "
+        "(C), Long-Time (B); ANSI/IEEE: Inverse (tipo C), Short, Long, "
+        "Moderately, Very, Extremely, Definite Inverse. Curva programável por "
+        "2-30 pares (X 1.00-20.00 pu, Y 0-999 s). Dropout 95% de 1.1×limiar."
     ),
 )
 
 
 # GE Multilin 850 — Feeder Protection System
-# Fonte: 850 Instruction Manual, §Phase TOC (pp. 4-115…4-123)
+# Fonte: 850 Instruction Manual, §Inverse Time Overcurrent Curves
+# (pp. 4-114…4-122) e §Phase Time Overcurrent Protection (pp. 4-123/124)
 GE_850 = RelayModel(
     manufacturer="GE",
     model="850",
@@ -541,7 +562,8 @@ GE_850 = RelayModel(
     manual_path="GE Multilin 850 Feeder Protection System Instruction Manual",
     ansi_functions=(
         "50", "51", "50N", "51N", "50G", "51G", "67", "67N", "46", "49",
-        "51V", "27", "59", "59N", "81", "79", "50BF", "86", "25", "32",
+        "51V", "27", "59", "59N", "81", "81R", "79", "50BF", "25", "32",
+        "32N", "55", "87G",
     ),
     tc_curve_standards=(
         CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.ANSI,
@@ -563,8 +585,10 @@ GE_850 = RelayModel(
         "TDM 0.05-600.00 passo 0.01. Famílias: IEEE (Ext/Very/Mod Inverse, "
         "Tab. 4-34), ANSI 5 constantes (Ext/Very/Normally/Mod, Tab. 4-36), "
         "IEC A/B/C + Short Inverse (Tab. 4-38), IAC (Tab. 4-40), FlexCurve "
-        "A-D, I2t, I4t, DT. Reset instantâneo ou temporizado. Voltage "
-        "restraint opcional. Constantes em vendor_curve_constants.py."
+        "A-D, I2t, I4t, DT. Reset instantâneo ou temporizado. '51V' = ajuste "
+        "Voltage Restraint do Phase TOC (não é número ANSI na Tab. 1-1); "
+        "latches não-voláteis não listados como 86. Constantes em "
+        "vendor_curve_constants.py."
     ),
 )
 
@@ -579,8 +603,9 @@ SCHNEIDER_MICOM_P127 = RelayModel(
     firmware_version="—",
     manual_path="Schneider NRJED112402EN — MiCOM P122/P123/P127 Technical Data",
     ansi_functions=(
-        "27", "59", "32N", "67W", "37", "46BC", "46", "47", "49",
-        "50N", "51N", "50", "51", "50BF", "51V", "67", "67N",
+        "27", "59", "59N", "32N", "67W", "37", "46BC", "46", "47", "49",
+        "50N", "51N", "50", "51", "50BF", "51V", "64N", "67", "67N",
+        "79", "81U/O", "81R", "86",
     ),
     tc_curve_standards=(
         CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.DEFINITE_TIME,
@@ -592,7 +617,8 @@ SCHNEIDER_MICOM_P127 = RelayModel(
     ),
     ieee_curves_supported=(
         IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
-        IeeeCurveType.EXTREMELY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE, IeeeCurveType.INVERSE,
+        IeeeCurveType.SHORT_TIME_INVERSE,
     ),
     pickup_range_per_in=(0.1, 25.0),
     tms_range=(0.025, 1.5),
@@ -600,36 +626,47 @@ SCHNEIDER_MICOM_P127 = RelayModel(
     description=(
         "[51] I> 0.1-25 xIn, I>> e I>>> 0.5-40 xIn (passo 0.01); tI 0-150 s; "
         "TMS 0.025-1.5 passo 0.001; RTMS 0.025-1.5 (terra 0.025-3.2); tReset "
-        "0-600 s; K(RI) 0.1-10. [50N/51N] Ie> média sens. 0.01-2 xIen, baixa "
-        "0.1-25 xIen; 4 estágios. Curvas: IEC_STI/SI/VI/EI/LTI, C02, C08, "
-        "IEEE_MI/VI/EI, RI, RECT, RXIDG (opcional). Interlock I>/>>/>>> "
-        "explícito (No/Yes). P122/P123: subconjunto sem 27/59/32N/47/51V/67."
+        "0-600 s; K(RI) 0.1-10. Tabela [67] específica do P127 (estágios "
+        "direcionais): I>>/I>>> 0.1-40 xIn, RTMS 0.025-3.2 passo 0.025, tReset "
+        "0-100 s, Ie> direcional 0.01-1 xIen. [50N/51N] Ie> média sens. "
+        "0.01-2 xIen, baixa 0.1-25 xIen; 4 estágios. Curvas: IEC_STI/SI/VI/EI/"
+        "LTI, C02, C08, IEEE_MI/VI/EI, RI, RECT, RXIDG (opcional). Interlock "
+        "I>/>>/>>> explícito (No/Yes). P122/P123 (tabela ANSI codes): sem "
+        "27/59/59N/32N/47/51V/67/67N/81U-O/81R/CTS/VTS; P122 também sem "
+        "79/SOTF."
     ),
 )
 
 
 # WEG SRW01 — Relé Inteligente de proteção de motores
-# Fonte: WEG SRW01 Manual do Usuário v4.x, §5.7 (Tabela 5.10, P640-P647)
+# Fonte: WEG SRW01 Manual do Usuário 0899.5838/06 (firmware V4.0X),
+# §5.7 Parâmetros de Configuração das Proteções (§5.7.11 Sobrecarga,
+# P640-P647; Referência Rápida P6xx)
 WEG_SRW01 = RelayModel(
     manufacturer="WEG",
     model="SRW01",
     family="WEG Relé Inteligente",
     application="motor",
-    firmware_version="4.x",
-    manual_path="WEG SRW01 Manual do Usuário 10000445381 v4.x",
+    firmware_version="V4.0X",
+    manual_path="WEG SRW01 Manual do Usuário, documento 0899.5838/06 (V4.0X)",
     ansi_functions=(
-        "49", "46", "47", "37", "50G", "51G", "50GS", "49T", "27", "59",
+        "49", "46", "47", "37", "50", "50G", "51G", "50GS", "49T", "27", "59",
         "32", "37P", "55", "81", "51LR",
     ),
     tc_curve_standards=(CurveStandard.DEFINITE_TIME,),
     description=(
-        "Proteção de motores (não é relé de linha — WEG não fabrica IED de "
-        "alimentador MT/AT). Mapeamento ANSI inferido da nomenclatura em "
-        "português do manual. Sobrecarga (49) por classe de disparo P640 "
-        "{5,10,15,20,25,30,35,40,45} (default 10 = tempo de partida 10 s); "
-        "pré-alarme P646 0-99% (default 80%), auto-reset P647 (default 75%). "
-        "Faixas de pickup (FLA) não digitalizadas — ranges padrão do dataclass "
-        "não se aplicam."
+        "Proteção de motores (não é relé de linha; nenhum IED de alimentador "
+        "WEG foi localizado nas fontes consultadas). O manual não usa códigos "
+        "ANSI: mapeamento inferido da nomenclatura em português (Falta a "
+        "Terra calculada → 50G/51G; Fuga a Terra por sensor externo P632 "
+        "0.3-5 A / P633 0.1-99 s → 50GS; Sobrecorrente P622 50-1000 % de "
+        "P401, 1-99 s, default 400 % = rotor bloqueado → 50/51LR). Sobrecarga "
+        "(49) por classe de disparo P640 {5,10,15,20,25,30,35,40,45} (default "
+        "10) com curvas térmicas de aquecimento/resfriamento (não é tempo "
+        "definido; DT descreve as demais proteções P6xx com tempo 1-99 s); "
+        "pré-alarme P646 0-99 % (default 80 %), auto-reset P647 (default "
+        "75 %). Corrente nominal do motor P401/P402: 0.0-5000.0 A (default "
+        "0.5 A) — ranges padrão do dataclass (xIn) não se aplicam."
     ),
 )
 

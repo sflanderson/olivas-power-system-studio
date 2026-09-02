@@ -16,8 +16,13 @@ Digitalização de manuais/datasheets oficiais (ABB, Schneider, WEG, Eaton, Siem
 - `app/preprocessor/cable_catalog.py`: campos opcionais `manufacturer`/`source` em `CatalogCable`; cabos Induscabos INDULINK 3,6/6 kV (14 seções, parâmetros completos NBR 14039, 60 Hz) e Nexans TR-XLPE 6,35/11 kV (14 seções).
 - `tests/test_pp_v4_1_0_vendor_catalog.py`: cobertura das novas entradas e invariantes físicos (Ir ≤ 1×In, I²t total ≥ pré-arco, Rca > Rcc, coincidência de constantes entre fontes independentes).
 
+### Verified
+- Passagem adversarial de verificação (9 revisores independentes, somente leitura) de cada literal transcrito contra o texto extraído dos datasheets: ~1.400 campos conferidos. Correções aplicadas: I²t pré-arco do Bussmann 12TDLEJ6.3 (98 A²s, não 980 — expoente sobrescrito), Ig do Siemens 3VA ETU560/860 (faixa contínua 0,2-1,0×In, não dial de 5 posições), passos do Eaton Digitrip 1150 (Ir 0,05; Isd 0,5 + M1), funções S/I/G desligáveis (ABB Ekip Touch, Siemens 3WL), tensão nominal dos Bussmann aM (500 V; sufixo -690 para 690 V), CEF reclassificado como back-up, part numbers ABB CMF/CEF substituídos pelos códigos de pedido do catálogo, ampacidade enterrada/duto Nexans (legenda de ícones decodificada da página renderizada), Time multiplier do 7SJ82 (0,00-15,00) e listas ANSI (REF615R, P127, GE 850).
+- `vendor_curve_constants.operate_time_ge_5param_s`: forma de 5 constantes das curvas GE ANSI/IAC (`T = TDM·[A + B/(M−C) + D/(M−C)² + E/(M−C)³]`), validada contra as Tabelas 4-37/4-41 do manual.
+
 ### Documented (sem alteração de código)
-- Duas famílias numéricas distintas circulam sob os nomes "Moderately/Very/Extremely Inverse": IEEE C37.112 Anexo A (ABB/GE) e legada US/CO (SEL U1-U5 = GE ANSI 4-36, `tr` idêntico). `iec60255.IEEE_CURVE_COEFFICIENTS` mistura as duas e divide por 7 — registrado em `vendor_curve_constants.py`, não alterado.
+- Duas famílias numéricas distintas circulam sob os nomes "Moderately/Very/Extremely Inverse": IEEE C37.112 Anexo A (ABB/GE) e "US" (SEL U1-U5 e GE ANSI 4-36 partilham `tr`, mas os tempos de operação diferem até ~22 %). `iec60255.IEEE_CURVE_COEFFICIENTS` mistura as duas e divide por 7 — registrado em `vendor_curve_constants.py`, não alterado.
+- `relay_models.SEL_751` (pré-existente): `pickup_range_per_in=(0.5, 16.0)` reproduz ampères secundários do modelo 5 A (0,10-3,20×In no datasheet) e `tms_range` máx. 1,0 vs 1,50 publicado. Não alterado (testes legados codificam 16×In); decisão do mantenedor.
 - R0/X0 de cabos não é parâmetro de catálogo (depende do aterramento da blindagem e do solo) — confirmado em 3 fabricantes; permanece cálculo por instalação.
 
 ---

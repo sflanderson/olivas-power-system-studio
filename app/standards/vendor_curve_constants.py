@@ -15,19 +15,31 @@ mesmos nomes descritivos ("Moderately / Very / Extremely
 Inverse"):
 
 1. **IEEE C37.112-1996 Anexo A** ("família nova") —
-   ``t = TD · [A/(M^p − 1) + B]``. Confirmada em três fontes
-   independentes: constantes públicas da norma, *defaults* da
-   curva programável do ABB REF615R (A=28.2, B=0.1217, D=29.1)
-   e Tabela 4-34 do manual GE 850.
-2. **Família legada "US/CO"** (réplica de relés eletromecânicos
-   Westinghouse/GE CO) — publicada pela SEL (curvas U1–U5, forma
-   de 3 constantes) e pela GE (Tabela 4-36 "ANSI", forma de 5
-   constantes A–E). As duas descrevem a **mesma curva física**:
-   a constante de reset ``tr`` coincide exatamente entre SEL e GE
-   (EI 5.67, VI 3.88, Inverse 5.95, MI 1.08).
+   ``t = TD · [A/(M^p − 1) + B]``. Confirmada em duas fontes de
+   fabricantes independentes: *defaults* da curva programável do
+   ABB REF615R (A=28.2, B=0.1217, D=29.1; a ABB rotula a família
+   como "ANSI") e Tabela 4-34 do manual GE 850. O texto da norma
+   não foi consultado diretamente.
+2. **Família "US"** — publicada pela SEL (curvas U1–U5, forma de
+   3 constantes, "in accordance with IEEE C37.112-1996") e pela
+   GE (Tabela 4-36 "ANSI", atribuída a ANSI C37.90, forma de 5
+   constantes A–E). As constantes de reset ``tr`` coincidem
+   exatamente entre SEL e GE (EI 5.67, VI 3.88, Inverse 5.95,
+   MI 1.08), mas os **tempos de operação não coincidem**: para
+   TD = TDM = 1 a razão SEL/GE varia entre ~0.93 e ~1.23 conforme
+   curva e múltiplo (ex. U4/ANSI-EI em M=5: 0.271 s vs 0.247 s).
+   São ajustes distintos da mesma família, não a mesma curva. A
+   atribuição histórica a relés eletromecânicos tipo CO não consta
+   das fontes digitalizadas.
 
 As duas famílias **não são intercambiáveis**. Este módulo guarda
 cada conjunto com a sua fonte e não tenta unificá-los.
+
+Curvas de reset: as constantes ``tr`` da GE conferem literalmente
+com o manual, mas a equação de reset da GE está em imagem no PDF
+(texto extraído vazio); o denominador ``1 − M²`` é o publicado
+pela SEL (Eq. 2) e assumido para a GE. A ABB (Eq. 37) escreve
+``D / ((I/I>)² − 1) · k`` — mesma magnitude, sinal invertido.
 
 Nota sobre ``iec60255.IEEE_CURVE_COEFFICIENTS`` (pré-existente)
 -----------------------------------------------------------------
@@ -45,9 +57,9 @@ puramente aditivo.
 
 Constantes IEC de **operação** (k, α) são universais e coincidem
 em todas as fontes (SI 0.14/0.02, VI 13.5/1, EI 80/2). As
-constantes IEC de **reset** são específicas de cada fabricante
-(SEL: 13.5/47.3/80; GE: 9.7/43.2/58.2) — a norma padroniza a
-curva de operação, não a de reset.
+constantes IEC de **reset** divergem entre fabricantes (SEL:
+13.5/47.3/80; GE: 9.7/43.2/58.2) — constatação empírica das
+fontes; o texto da IEC 60255-151 não foi consultado.
 
 Fontes (documentos oficiais)
 ============================
@@ -84,8 +96,13 @@ class VendorCurveConstants:
 
     Forma de 3 constantes (IEC, IEEE Anexo A, SEL):
         ``t = TD · (a / (M^p − 1) + b)``  (IEC: b = 0)
-    Forma de 5 constantes (GE ANSI / IAC): a–e conforme manual GE,
-    fórmula fechada não transcrita (apenas a tabela).
+    Forma de 5 constantes (GE ANSI / IAC), com A..E do manual GE
+    mapeados em ``a, b, p, d, e`` (``p`` recebe o coeficiente C, que
+    nesta forma é um **deslocamento de corrente**, não um expoente):
+        ``t = TDM · [A + B/(M − C) + D/(M − C)² + E/(M − C)³]``
+    A equação da GE está em imagem no PDF; a forma acima reproduz a
+    3 casas decimais os 80 pontos TDM = 1 das Tabelas 4-37 e 4-41
+    (ver ``operate_time_ge_5param_s``).
 
     Attributes
     ----------
@@ -97,12 +114,12 @@ class VendorCurveConstants:
     vendor: str
     code: str            # C1..C5, U1..U5, IEEE-EI, ANSI-EI, IAC-EI…
     curve_name: str
-    a: float             # k (IEC) / A (IEEE) / B da SEL (numerador)
-    p: float             # α (IEC) / p (IEEE) / C da SEL (expoente)
-    b: float = 0.0       # β (IEEE) / A da SEL (termo constante)
-    c: float = 0.0       # GE 5-param apenas
-    d: float = 0.0
-    e: float = 0.0
+    a: float             # k (IEC) / A (IEEE) / B da SEL (numerador) / A (GE 5-p)
+    p: float             # α (IEC) / p (IEEE) / C da SEL (expoente) / C (GE 5-p: offset)
+    b: float = 0.0       # β (IEEE) / A da SEL (termo constante) / B (GE 5-p)
+    c: float = 0.0       # reservado (não usado)
+    d: float = 0.0       # D (GE 5-p)
+    e: float = 0.0       # E (GE 5-p)
     reset_tr: float = 0.0
     reset_denominator: str = "1-M^2"
     source: str = ""
@@ -208,12 +225,18 @@ GE_IAC_CURVES: tuple[VendorCurveConstants, ...] = (
 # ABB REF615R — defaults da curva programável (Tabela 78)
 # ---------------------------------------------------------------------------
 
+# ABB Eq. 34: t = (A / ((I/I>)^C − E) + B) · k ; Eq. 37 (reset):
+# t = D / ((I/I>)^2 − 1) · k. Defaults: A=28.2, B=0.1217, C=2.0,
+# D=29.10, E=1.0. Com E=1.0 a curva é exatamente a forma de 3
+# constantes; D é a constante de reset (→ reset_tr). Os campos d/e
+# (semântica GE 5-p) ficam em 0 para que operate_time_3param_s valha.
 ABB_REF615R_PROGRAMMABLE_DEFAULTS: VendorCurveConstants = VendorCurveConstants(
     CurveFamily.IEEE_C37112_ANNEX_A, "ABB", "PROG-DEFAULT",
     "Programmable curve factory defaults (= IEEE EI)",
-    a=28.2000, p=2.00, b=0.1217, d=29.10, e=1.0, reset_tr=29.10,
+    a=28.2000, p=2.00, b=0.1217, reset_tr=29.10,
+    reset_denominator="(I/I>)^2-1 (Eq. 37; sinal invertido vs 1-M^2)",
     source="ABB REF615R Technical Manual 1MRS240050-IB Rev C, Tab. 78 "
-           "(Curve parameter A/B/C/D/E defaults)",
+           "(Curve parameter A/B/C/D/E defaults: 28.2/0.1217/2.0/29.10/1.0)",
 )
 
 
@@ -246,19 +269,48 @@ def operate_time_3param_s(
 ) -> float:
     """
     ``t = TD · (a / (M^p − 1) + b)`` — forma de 3 constantes, **sem**
-    divisor de normalização, conforme publicado por SEL, GE (IEEE)
-    e ABB. Retorna ``inf`` se M ≤ 1. Só válido para curvas com
-    ``c = d = e = 0`` (as formas de 5 constantes da GE não têm
-    fórmula fechada transcrita neste módulo).
+    divisor de normalização, conforme publicado por SEL (Eq. 1),
+    GE (IEEE, "directly proportional to the time multiplier") e
+    ABB (Eq. 33/34 com E = 1). Retorna ``inf`` se M ≤ 1. Só válido
+    para curvas com ``d = e = 0``; para as formas de 5 constantes
+    da GE use ``operate_time_ge_5param_s``.
     """
     if pickup_A <= 0 or current_A <= 0:
         raise ValueError("pickup_A e current_A devem ser > 0")
     if curve.d != 0.0 or curve.e != 0.0:
         raise ValueError(
-            f"Curva {curve.code} usa forma de 5 constantes; fórmula "
-            "fechada não disponível neste módulo"
+            f"Curva {curve.code} usa forma de 5 constantes; use "
+            "operate_time_ge_5param_s"
         )
     m = current_A / pickup_A
     if m <= 1.0:
         return float("inf")
     return time_dial * (curve.a / (m ** curve.p - 1.0) + curve.b)
+
+
+def operate_time_ge_5param_s(
+    current_A: float, pickup_A: float, time_dial: float,
+    curve: VendorCurveConstants,
+) -> float:
+    """
+    Forma de 5 constantes das curvas GE ANSI (Tab. 4-36) e IAC
+    (Tab. 4-40): ``t = TDM · [A + B/(M − C) + D/(M − C)² + E/(M − C)³]``
+    com ``A=a, B=b, C=p, D=d, E=e``. Reproduz a 3 casas decimais os
+    pontos TDM = 1 das Tabelas 4-37 e 4-41 do manual GE 850 (a
+    equação original está em imagem no PDF). Retorna ``inf`` se
+    M ≤ 1 (a GE tabela a partir de M = 1.5).
+    """
+    if pickup_A <= 0 or current_A <= 0:
+        raise ValueError("pickup_A e current_A devem ser > 0")
+    if curve.d == 0.0 and curve.e == 0.0:
+        raise ValueError(
+            f"Curva {curve.code} usa forma de 3 constantes; use "
+            "operate_time_3param_s"
+        )
+    m = current_A / pickup_A
+    if m <= 1.0:
+        return float("inf")
+    x = m - curve.p
+    if x <= 0.0:
+        return float("inf")
+    return time_dial * (curve.a + curve.b / x + curve.d / x ** 2 + curve.e / x ** 3)

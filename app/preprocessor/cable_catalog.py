@@ -342,13 +342,16 @@ _CU_BARE: tuple[CatalogCable, ...] = (
 # ---------------------------------------------------------------------------
 # Catálogo: Induscabos INDULINK 3,6/6 kV — parâmetros elétricos oficiais
 # Fonte: Induscabos, "Parâmetros Elétricos — Cabos de Média Tensão"
-# (2023-04). Cu, 90 °C, 60 Hz, NBR 14039. Colunas usadas: RCC 20 °C,
-# RCA 90 °C (3 cond., S=D), Xl trifólio, C, I ao ar (trifólio, 30 °C),
-# I enterrado (trifólio, 25 °C). Xl para S=D e S=2D em ``notes``.
-# icw = 0.143·S (K=143 Cu, convenção deste módulo).
+# (sem data/revisão no texto do documento). Cu, 90 °C, 60 Hz, NBR 14039.
+# Colunas usadas: RCC 20 °C, RCA 90 °C (3 cond., S=D), Xl trifólio, C,
+# I ao ar (trifólio, 30 °C), I enterrado (trifólio, 25 °C). Xl para S=D
+# e S=2D em ``notes``. Tabela transcrita: "CABO INDULINK 3,6/6 kV" (a
+# tabela 6/10 kV do mesmo documento tem Xl/C distintos e NÃO foi
+# transcrita). Isolação não declarada (só "90 °C"): XLPE assumido.
+# icw = 0.143·S (K=143 Cu, convenção deste módulo; não consta na fonte).
 # ---------------------------------------------------------------------------
 
-_INDUSCABOS_SRC = "Induscabos — Parâmetros Elétricos Cabos MT (2023-04), INDULINK 3,6/6 kV"
+_INDUSCABOS_SRC = "Induscabos — Parâmetros Elétricos Cabos MT, tabela INDULINK 3,6/6 kV"
 
 
 def _induscabos(
@@ -393,18 +396,23 @@ _INDUSCABOS_INDULINK_6kV: tuple[CatalogCable, ...] = (
 # ---------------------------------------------------------------------------
 # Catálogo: Nexans (NZ/AU) TR-XLPE 6.35/11 (12) kV unipolar Cu, tela de fios
 # Fonte: Nexans "Medium Voltage TR-XLPE Cables, Section Four", Product
-# Sheet 231-13 B (AS/NZS 1429.1, 50 Hz). R_ac a 90 °C, X_L a 50 Hz, C
-# condutor-tela. ampacity_air = 1ª coluna de corrente (duto multivias;
-# configuração exata não decodificada). R_dc 20 °C NÃO consta na folha:
-# valor nominal IEC 60228 classe 2 (coincide com Prysmian Tab. 18 e
-# Induscabos para as seções comuns).
+# Sheet 231-13 B, Issue June 2019 (AS/NZS 1429.1, 50 Hz). R_ac a 90 °C,
+# X_L a 50 Hz, C condutor-tela (cabeçalho impresso "µF/km"). Correntes
+# (ícones da folha, decodificados na página renderizada): 1ª coluna =
+# ao ar (30 °C), 2ª = trifólio diretamente enterrado, 3ª = em duto
+# (solo 15 °C, 1.2 K·m/W, 1.0 m, telas aterradas nas duas pontas).
+# R_dc 20 °C NÃO consta na folha: valor nominal IEC 60228 classe 2
+# (coincide com Prysmian Tab. 18 e Induscabos para as seções comuns;
+# 630 mm² sem corroboração nas fontes digitalizadas). X a 50 Hz: em
+# sistemas 60 Hz escalar ×1.2. icw = 0.143·S (convenção do módulo; a
+# folha só dá a fórmula da tela, Isc = 148.6·S_tela/√t).
 # ---------------------------------------------------------------------------
 
-_NEXANS_SRC = "Nexans NZ — MV TR-XLPE Cables Section Four, sheet 231-13 B (11 kV Cu)"
+_NEXANS_SRC = "Nexans NZ — MV TR-XLPE Cables Section Four, sheet 231-13 B (11 kV Cu), Jun/2019"
 
 
 def _nexans(s: float, rdc20_iec: float, rac90: float, x: float, c: float,
-            i1: float) -> CatalogCable:
+            i_air: float, i_bur: float, i_duct: float) -> CatalogCable:
     return CatalogCable(
         name=f"Nexans TR-XLPE Cu {s:g}mm² 6.35/11kV",
         conductor_material=ConductorMaterial.COPPER,
@@ -412,28 +420,31 @@ def _nexans(s: float, rdc20_iec: float, rac90: float, x: float, c: float,
         rated_voltage_kV=11.0, cross_section_mm2=s,
         R_dc_ohm_per_km_at_20C=rdc20_iec, R_ac_ohm_per_km_at_90C=rac90,
         X_ohm_per_km=x, C_uF_per_km=c,
-        ampacity_air_A=i1, ampacity_buried_A=0.0,
+        ampacity_air_A=i_air, ampacity_buried_A=i_bur,
         icw_kA_1s=round(0.143 * s, 3),
-        notes="50 Hz. R_dc = IEC 60228 cl. 2 (não consta na folha Nexans).",
+        notes=(
+            f"50 Hz (X ×1.2 em 60 Hz). Em duto: {i_duct:g} A. "
+            "R_dc = IEC 60228 cl. 2 (não consta na folha Nexans)."
+        ),
         manufacturer="Nexans", source=_NEXANS_SRC,
     )
 
 
 _NEXANS_TRXLPE_11kV: tuple[CatalogCable, ...] = (
-    _nexans(16, 1.15, 1.47, 0.154, 0.18, 125),
-    _nexans(25, 0.727, 0.927, 0.144, 0.21, 163),
-    _nexans(35, 0.524, 0.668, 0.137, 0.23, 197),
-    _nexans(50, 0.387, 0.494, 0.130, 0.26, 237),
-    _nexans(70, 0.268, 0.342, 0.121, 0.29, 294),
-    _nexans(95, 0.193, 0.247, 0.115, 0.33, 359),
-    _nexans(120, 0.153, 0.196, 0.111, 0.36, 413),
-    _nexans(150, 0.124, 0.159, 0.107, 0.39, 470),
-    _nexans(185, 0.0991, 0.128, 0.103, 0.43, 539),
-    _nexans(240, 0.0754, 0.0981, 0.099, 0.47, 636),
-    _nexans(300, 0.0601, 0.0791, 0.096, 0.52, 730),
-    _nexans(400, 0.0470, 0.0632, 0.093, 0.59, 847),
-    _nexans(500, 0.0366, 0.0510, 0.090, 0.66, 978),
-    _nexans(630, 0.0283, 0.0416, 0.087, 0.74, 1122),
+    _nexans(16, 1.15, 1.47, 0.154, 0.18, 125, 120, 101),
+    _nexans(25, 0.727, 0.927, 0.144, 0.21, 163, 154, 129),
+    _nexans(35, 0.524, 0.668, 0.137, 0.23, 197, 183, 153),
+    _nexans(50, 0.387, 0.494, 0.130, 0.26, 237, 216, 181),
+    _nexans(70, 0.268, 0.342, 0.121, 0.29, 294, 263, 221),
+    _nexans(95, 0.193, 0.247, 0.115, 0.33, 359, 313, 264),
+    _nexans(120, 0.153, 0.196, 0.111, 0.36, 413, 355, 305),
+    _nexans(150, 0.124, 0.159, 0.107, 0.39, 470, 397, 341),
+    _nexans(185, 0.0991, 0.128, 0.103, 0.43, 539, 447, 384),
+    _nexans(240, 0.0754, 0.0981, 0.099, 0.47, 636, 516, 443),
+    _nexans(300, 0.0601, 0.0791, 0.096, 0.52, 730, 579, 509),
+    _nexans(400, 0.0470, 0.0632, 0.093, 0.59, 847, 655, 575),
+    _nexans(500, 0.0366, 0.0510, 0.090, 0.66, 978, 737, 647),
+    _nexans(630, 0.0283, 0.0416, 0.087, 0.74, 1122, 823, 722),
 )
 
 

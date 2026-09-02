@@ -823,7 +823,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
         model_id="ABB-XT2-XT4-EKIP-TOUCH-LSIG",
         manufacturer="ABB",
         full_name="SACE Tmax XT2-XT4 Ekip Touch / Hi-Touch LSIG",
-        breaker_family="Tmax XT2/XT3/XT4",
+        breaker_family="Tmax XT2/XT4",
         category="MCCB",
         market_standard="IEC 60947-2 (curvas IEC 60255-151 opcionais)",
         source_doc="ABB 1SDH002031A1002 Rev. B (Ekip Touch user manual)",
@@ -832,11 +832,11 @@ _TRIP_UNITS: list[TripUnitModel] = [
         L_pickup_Ir=_sr(0.4, 1.0, 0.001, default=1.0),
         L_delay_tr=_sr(3.0, 60.0, 1.0, unit="s", default=60.0),
         tr_reference_multiple=3.0,
-        S_pickup_Isd=_sr(0.6, 10.0, 0.1, unit="xIn", default=2.0),
+        S_pickup_Isd=_sr(0.6, 10.0, 0.1, unit="xIn", default=2.0, off=True),
         S_delay_tsd=_sr(0.05, 0.4, 0.01, unit="s", default=0.05),
         S_i2t_selectable=True,
-        I_pickup_Ii=_sr(1.5, 10.0, 0.1, default=4.0),
-        G_pickup_Ig=_sr(0.1, 1.0, 0.001, default=0.2),
+        I_pickup_Ii=_sr(1.5, 10.0, 0.1, default=4.0, off=True),
+        G_pickup_Ig=_sr(0.1, 1.0, 0.001, default=0.2, off=True),
         G_delay_tg=_sr(0.1, 1.0, 0.05, unit="s", default=0.4),
         G_i2t_selectable=True,
         curve_options=(
@@ -848,7 +848,9 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "Isd em xIn (não xIr). Fórmula L (t=k/I2): tt = 9·t1/(If/I1)^2 "
             "(t1 = tempo em 3×I1). Interlocks: I1<I2<I3. S2 (I5 0.6-10 xIn, "
             "t5 0.05-0.4 s) estágio independente. tt forçado a 1 s se "
-            "If>12 In."
+            "If>12 In. S, I e G possuem parâmetro Enable ON/OFF (default "
+            "OFF) — representado por off_selectable. Com curva t=k, t4 "
+            "também pode ser configurado como 'instantâneo'."
         ),
     ),
     # ABB — Tmax XT5 Ekip DIP (UL 489) — TCC 9AKK108468A0480 (abr/2023)
@@ -858,7 +860,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
         full_name="Tmax XT5 Ekip DIP LSI/LSIG (Short Time I2T OFF)",
         breaker_family="Tmax XT5 (250/400 A, 300/600 A)",
         category="MCCB",
-        market_standard="UL 489",
+        market_standard="UL (catálogo UL, 600 Vac; norma não declarada no TCC)",
         source_doc="ABB Electrification 9AKK108468A0480 (TCC, 2023-04)",
         adjustment_mode="discrete_dial",
         functions_available=("L", "S", "I"),
@@ -885,7 +887,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
         full_name="Emax E2.2 Ekip Touch/Hi-Touch LSI/LSIG (Short Time I2T OFF)",
         breaker_family="Emax E2.2 (In 250-1200 / 400-1600 / 800-2000 A)",
         category="ACB",
-        market_standard="UL 489/1066 (tsd conforme IEEE/ANSI C37.17)",
+        market_standard="UL (tsd conforme IEEE/ANSI C37.17; norma UL não declarada no TCC)",
         source_doc="ABB Electrification 9AKK108468A2275 (TCC, 2023-06)",
         adjustment_mode="fine_digital",
         functions_available=("L", "S", "I"),
@@ -898,9 +900,10 @@ _TRIP_UNITS: list[TripUnitModel] = [
         I_pickup_Ii=_sr(1.5, 15.0, 0.1),
         rated_voltage_V=635.0,
         notes=(
-            "Isd em xIn. Interrupting ratings UL 635 Vac: B-A/N-A/S-A 65 kA, "
-            "V-A/H-A 85 kA. Curva de terra em TCC 9AKK108468A2168 (não "
-            "digitalizada)."
+            "Isd em xIn. Voltage rating 635 Vac. Ajuste de pickup (override) "
+            "por interrupting rating: B-A/N-A/S-A 65 000 A (-15.38 %/+0 %), "
+            "V-A/H-A 85 000 A (-11.76 %/+0 %). Curva de terra em TCC "
+            "9AKK108468A2168 (não digitalizada)."
         ),
     ),
     # Schneider — ComPact NSX Micrologic 5/6/7 (IEC) — DOCA0141EN-03
@@ -921,18 +924,23 @@ _TRIP_UNITS: list[TripUnitModel] = [
                            unit="xIr", default=1.5),
         S_delay_tsd=_dial((0.0, 0.1, 0.2, 0.3, 0.4), unit="s", default=0.0),
         S_i2t_selectable=True,
-        I_pickup_Ii=_sr(1.5, 15.0, 0.5),
+        I_pickup_Ii=_sr(1.5, 15.0, 0.5, default=15.0),
         G_pickup_Ig=_sr(0.2, 1.0, 0.05, default=0.2, off=True),
         G_delay_tg=_dial((0.0, 0.1, 0.2, 0.3, 0.4), unit="s", default=0.0),
         G_i2t_selectable=True,
         notes=(
-            "Ir pré-ajustado por dial em A (ex. In=250 A: 100..250 A), "
-            "fino no teclado passo 1 A, mín. 0.9×menor dial; faixa 1.05-1.20 Ir. "
-            "tr tabela: 1.5×Ir {15,25,50,100,200,400} s; 7.2×Ir "
-            "{0.35,0.7,1.4,2.8,5.5,11} s. Isd teclado 1.5-10 xIr passo 0.5 "
-            "(ML6/7). Ii máx 15/12/11 xIn para In 100-160/250-400/630 A. "
-            "G só Micrologic 6/7; Ig mín 0.4 xIn para In=40 A. tsd hold "
-            "{20,80,140,230,350} ms, break máx {80,140,200,320,500} ms."
+            "Ir pré-ajustado por dial em A (ex. In=250 A: 100..250 A; dial "
+            "mín 0.4 xIn para In≥100 A, 18 A = 0.45 xIn para In=40 A), fino "
+            "no teclado passo 1 A, mín. 0.9×menor dial (In=400 A: mín 100 A); "
+            "faixa 1.05-1.20 Ir. tr tabela: 1.5×Ir {15,25,50,100,200,400} s; "
+            "7.2×Ir {0.35,0.7,1.4,2.8,5.5,11} s. Isd: dial ML5 (lista "
+            "discreta) com ajuste fino no teclado 1.5-dial passo 0.5 xIr; "
+            "ML6/7 teclado 1.5-10 xIr passo 0.5. Ii default = máximo do "
+            "rating: 15/12/11 xIn para In 100-160/250-400/630 A. tsd=0 e "
+            "tg=0 só com I2t OFF. G só Micrologic 6 (Micrologic 7: proteção "
+            "diferencial IΔn/Δt, não modelada); Ig mín 0.4 xIn para In=40 A. "
+            "tsd hold {20,80,140,230,350} ms (tg: 360 ms em 0.4 s), break "
+            "máx {80,140,200,320,500} ms."
         ),
     ),
     # Schneider — MasterPact MTZ Micrologic X — DOCA0102EN-07
@@ -942,8 +950,8 @@ _TRIP_UNITS: list[TripUnitModel] = [
         full_name="MasterPact MTZ Micrologic 2.0X/3.0X/5.0X/6.0X/7.0X",
         breaker_family="MasterPact MTZ1/MTZ2/MTZ3",
         category="ACB",
-        market_standard="IEC 60947-2 (2.0X/5.0X/6.0X/7.0X) e UL 489 (3.0X/5.0X/6.0X)",
-        source_doc="Schneider DOCA0102EN-07 (págs. 100-114, 159)",
+        market_standard="IEC (2.0X/5.0X/6.0X/7.0X) e UL (UL489SE; 3.0X/5.0X/6.0X)",
+        source_doc="Schneider DOCA0102EN-07 (págs. 100-114, 158-160)",
         adjustment_mode="fine_digital",
         functions_available=("L", "S", "I", "G"),
         L_pickup_Ir=_sr(0.4, 1.0, default=1.0),
@@ -957,17 +965,22 @@ _TRIP_UNITS: list[TripUnitModel] = [
         G_delay_tg=_sr(0.0, 0.4, 0.1, unit="s", default=0.0),
         G_i2t_selectable=True,
         curve_options=(
-            "L: térmica padrão", "IDMTL DT", "IDMTL SIT", "IDMTL VIT",
-            "IDMTL EIT", "IDMTL HVF (módulo ANSI 51 opcional)",
+            "L: térmica padrão",
+            "IDMTL DT / SIT / VIT / EIT / HVF (todas via módulo digital "
+            "ANSI 51 opcional, LV850037)",
         ),
         notes=(
-            "Passo de Ir/Isd/Ii/Ig em A absoluto (1 A) via display; 0.5 xIr / "
-            "0.5 xIn são os passos do menu básico. tr fábrica 0.5 s (impresso "
-            "duas vezes no manual; atipicamente rápido — confirmar em campo). "
-            "S/G só a partir de 5.0X/6.0X; Ii desabilitável só em 5.0X+. "
-            "Ig IEC 0.3-1 xIn se In≤400 A; UL In>1200 A: 500-1200 A absoluto. "
-            "Se tg=0 e I2t→ON, tg vai a 0.1 s. tr tabela 1.5×Ir "
-            "{12.5,25,50,100,200,300,400,500,600} s."
+            "Passos: Ir 1 A; Isd 0.5 xIr e Ii 0.5 xIn (resolução mais fina "
+            "via software EcoStruxure Power Commission/app, não pelo display); "
+            "Ig 10 A (IEC) ou 0.1 xIn (UL). tr fábrica 0.5 s (três ocorrências "
+            "consistentes no manual; atipicamente rápido — confirmar em campo). "
+            "S em 5.0X/6.0X/7.0X (IEC) e 5.0X/6.0X (UL); G apenas 6.0X (7.0X: "
+            "proteção diferencial IΔn, não modelada). Ii 2-15 xIn vale para "
+            "5.0X+; 3.0X (UL): 1.5-12 xIn, fábrica 1.5; 2.0X sem Ii. Ii "
+            "desabilitável só em 5.0X+. Ig OFF só na versão IEC (UL: sempre "
+            "ON). Ig 0.3-1 xIn se In≤400 A (IEC e UL); UL In>1200 A: 500-1200 A "
+            "absoluto. tsd=0 e tg=0 só com I2t OFF (se tg=0 e I2t→ON, tg vai "
+            "a 0.1 s). tr tabela 1.5×Ir {12.5,25,50,100,200,300,400,500,600} s."
         ),
     ),
     # WEG — ABW-OCR Tipo P (ACB) — Manual Disjuntor Aberto ABW, págs. 13-14
@@ -977,8 +990,8 @@ _TRIP_UNITS: list[TripUnitModel] = [
         full_name="ABW-OCR Tipo P (PC1/PC6) — unidade de proteção ACB",
         breaker_family="ABW16...63",
         category="ACB",
-        market_standard="NBR IEC 60947-2 (catálogo da linha)",
-        source_doc="WEG Disjuntor Aberto ABW — Manual de Instruções, págs. 13-14",
+        market_standard="IEC (norma não citada no catálogo digitalizado)",
+        source_doc="WEG Catálogo Disjuntor Aberto ABW 50011456.05/062010, págs. 13-14",
         adjustment_mode="discrete_dial",
         functions_available=("L", "S", "I", "G"),
         L_pickup_Ir=_dial((0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)),
@@ -993,9 +1006,11 @@ _TRIP_UNITS: list[TripUnitModel] = [
         G_pickup_Ig=_dial((0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0), off=True),
         G_delay_tg=_dial((0.05, 0.1, 0.2, 0.3, 0.4), unit="s"),
         G_i2t_selectable=True,
+        rated_voltage_V=690.0,
         notes=(
-            "tsd/tg impressos no manual como '(0,05-0,4) x Ir' — erro "
-            "tipográfico da fonte; unidade correta é segundos. I2t ON: "
+            "tsd impresso no catálogo como '(0,05-0,1-0,2-0,3-0,4) x Ir' e tg "
+            "sem unidade — erro tipográfico da fonte; a única unidade "
+            "fisicamente coerente para retardo é segundos. I2t ON: "
             "{0.1,0.2,0.3,0.4} s. Tipo A (AZ1/AC1) usa ajuste em dois "
             "estágios: Iu {0.5..1.0} xIn × Ir {0.8,0.83,0.85,0.88,0.89,0.9,"
             "0.93,0.95,0.98,1.0} xIu. Interlock Ir<Is<Ii não explicitado no "
@@ -1010,7 +1025,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
         breaker_family="NZM (EMEA)",
         category="MCCB",
         market_standard="IEC 60947-2",
-        source_doc="Eaton MN012005EN 01/22, Tabelas 2-4 (págs. 11-13)",
+        source_doc="Eaton MN012005EN 01/22, Tabelas 2-4 (págs. 12-13) e Fig. 2 (pág. 11)",
         adjustment_mode="fine_digital",
         functions_available=("L", "S", "I", "G"),
         L_pickup_Ir=_sr(0.4, 1.0),
@@ -1024,10 +1039,12 @@ _TRIP_UNITS: list[TripUnitModel] = [
         G_delay_tg=_sr(0.0, 1.0, 0.01, unit="s"),
         G_i2t_selectable=True,
         notes=(
-            "Incrementos de Ir/Isd/Ii/Ig em 1 A absoluto; tsd/tg 0-1000 ms "
-            "passo 10 ms; Ig Alarm/Trip/OFF. Disponibilidade por variante: "
-            "PXR10-AX (L+I), PXR20-MX (L+tr+I), PXR20-VX (+S), PXR20-VX-T "
-            "(+G), PXR25-PX (LSI), PXR25-PMX (L+I), PXR25-PX…-TZ (LSIG). "
+            "Incrementos de Ir/Isd/Ii/Ig em 1 A absoluto (Tabela 4; a tabela "
+            "de registros Modbus do mesmo manual indica passos de 0,1 xIr/xIn "
+            "para Isd/Ii/Ig); tsd/tg 0-1000 ms passo 10 ms; Ig Alarm/Trip/OFF. "
+            "Disponibilidade por variante: PXR10-AX (L+I), PXR20-MX (L+tr+I), "
+            "PXR20-VX (+S), PXR20-VX-T (+G), PXR25-PX (LSI), PXR25-PMX "
+            "(L+tr+I), PXR25-PX…-TZ (LSIG). "
             "Dial PXR10/20: Ir {0.4..1.0}, Isd {2,3,4,5,6,6.5,7,7.5,8,8.5,9,"
             "9.5,10} xIr, Ii {2,4,6,8,10,11..18} xIn, tr {2,4,5,6,7,8,10,12,"
             "14,16,18,20,∞} s."
@@ -1044,10 +1061,10 @@ _TRIP_UNITS: list[TripUnitModel] = [
         source_doc="Eaton I.L. 70C1036H04 (11/2003), §4.2.1",
         adjustment_mode="fine_digital",
         functions_available=("L", "S", "I", "G"),
-        L_pickup_Ir=_sr(0.4, 1.0),
+        L_pickup_Ir=_sr(0.4, 1.0, 0.05),
         L_delay_tr=_sr(2.0, 24.0, 0.5, unit="s"),
         tr_reference_multiple=6.0,
-        S_pickup_Isd=_sr(1.5, 10.0, unit="xIr"),
+        S_pickup_Isd=_sr(1.5, 10.0, 0.5, unit="xIr"),
         S_delay_tsd=_sr(0.10, 0.50, 0.05, unit="s"),
         S_i2t_selectable=True,
         I_pickup_Ii=_sr(2.0, 14.0, 0.5, off=True),
@@ -1059,8 +1076,12 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "IEEE MI/VI/EI (PC37.112)", "IEC-A/B/C (IEC 255)",
         ),
         notes=(
-            "Ir 13 ajustes discretos. Ii máx M1 por rating plug: 14 xIn "
-            "(100-1250 A), 12 (1600-2500 A), 10 (3000-3200 A). tsd I2T "
+            "Ir 13 ajustes discretos (passo 0.05). Isd 18 ajustes 1.5-10 xIr "
+            "(passo 0.5) e Ii 2-M1 (passo 0.5) mais o ajuste adicional M1, "
+            "aplicável a Isd e Ii; M1 por rating plug (Standard Breaker): "
+            "14× (100-1250 A), 12× (1600-2500 A), 10× (3000-3200 A); Double "
+            "Wide: 14× (2000-2500 A), 12× (3200-5000 A), 10× (6000-6300 A). "
+            "tsd I2T "
             "referenciado a 8×Ir, plano acima. Ig ANSI/UL limitado a 1200 A; "
             "IEC-EF 0.10-1.0 xIn. I2T de S indisponível com L em I4T/IEEE/IEC."
         ),
@@ -1083,12 +1104,15 @@ _TRIP_UNITS: list[TripUnitModel] = [
         S_delay_tsd=_sr(0.05, 0.5, 0.01, unit="s"),
         S_i2t_selectable=True,
         I_pickup_Ii=_sr(1.5, 12.0),
-        G_pickup_Ig=_dial((0.2, 0.25, 0.4, 0.6, 1.0), off=True),
+        G_pickup_Ig=_sr(0.2, 1.0, unit="xIn", off=True),
         G_delay_tg=_sr(0.05, 0.8, 0.01, unit="s"),
         G_i2t_selectable=True,
         notes=(
             "Isd em xIn. Passo Ir/Isd 0.5 A (<50 A) ou 1 A; Ii passo 1 A, "
-            "1.5-10/12 xIn para 100-400 A (630 A: tabela própria). tr máx "
+            "1.5-10/12 xIn para 100-400 A (630 A: tabela própria). Ig contínuo "
+            "em passos de 1 A, limite inferior 0.2/0.25/0.4/0.6 xIn conforme "
+            "tamanho (o dial de 5 posições 0.2/0.25/0.4/0.6/1.0 é do ETU330). "
+            "Isd máx 9/10 xIn e tr máx "
             "12/15/17/20/25 s conforme tamanho. tsd referenciado a Isd=8×Ir; "
             "tg a 2×Ig. Alarme IgA 0.2-1 xIn. Imagem térmica desativável. "
             "ETU350 LSI: Ii FIXO 9/10/11/12 xIn — possível sobreposição com "
@@ -1103,7 +1127,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
         breaker_family="SENTRON 3WL1 (tamanhos I/II/III)",
         category="ACB",
         market_standard="IEC 60947-2",
-        source_doc="Siemens SENTRON LV10-PH01 (04/2018), págs. 34-35",
+        source_doc="Siemens 3WL1 SENTRON Configuration Manual, ed. 04/2018 (PH 0718 60 En), págs. 34-35",
         adjustment_mode="discrete_dial",
         functions_available=("L", "S", "I", "N", "G"),
         L_pickup_Ir=_dial((0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0)),
@@ -1111,19 +1135,22 @@ _TRIP_UNITS: list[TripUnitModel] = [
                          unit="s"),
         tr_reference_multiple=6.0,
         S_pickup_Isd=_dial((1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0),
-                           unit="xIn"),
+                           unit="xIn", off=True),
         S_delay_tsd=_dial((0.02, 0.1, 0.2, 0.3, 0.4), unit="s"),
         S_i2t_selectable=True,
-        I_pickup_Ii=_dial((1.5, 2.2, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0)),
-        G_pickup_Ig=_dial((100.0, 300.0, 600.0, 900.0, 1200.0), unit="A"),
+        I_pickup_Ii=_dial((1.5, 2.2, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0), off=True),
+        G_pickup_Ig=_dial((100.0, 300.0, 600.0, 900.0, 1200.0), unit="A", off=True),
         G_delay_tg=_dial((0.1, 0.2, 0.3, 0.4, 0.5), unit="s"),
         G_i2t_selectable=True,
         notes=(
-            "Isd em xIn. tr I4t alternativo {1,2,3,4,5} s. tsd 0.02 s = "
-            "posição 'M' (proteção de motor, 20 ms). Ii teto 0.8×Ics. "
+            "Isd em xIn. S, I e G podem ser desligados (OFF). tr I4t "
+            "alternativo {1,2,3,4,5} s. tsd 0.02 s = posição 'M' (proteção "
+            "de motor, 20 ms), indisponível com I2t selecionado (I2t: 100-400 "
+            "ms). Ii possui posição adicional do dial '0.8×Ics' (depende do "
+            "Ics do disjuntor; não expressa em xIn). "
             "Ig letras A-E = 100/300/600/900/1200 A (tamanhos I/II); "
             "tamanho III: 400/600/800/1000/1200 A. G é módulo opcional "
-            "retrofit. ETU76B: faixas contínuas (Ir 0.4-1, tr 2-30 s, "
+            "retrofit (GFM AT 45B). ETU76B: faixas contínuas (Ir 0.4-1, tr 2-30 s, "
             "Isd 1.25×In-0.8×Icw, tsd 80-4000 ms, Ii 1.5×In-0.8×Ics)."
         ),
     ),
@@ -1210,7 +1237,7 @@ _FUSES: list[FuseModel] = [
         model_id="BUSSMANN-NH-AM-500-690V",
         manufacturer="Eaton",
         full_name="Bussmann NH aM 500/690 V a.c. (tamanhos 000-3)",
-        fuse_class="aM", rated_voltage_kV=0.69, breaking_capacity_kA=120.0,
+        fuse_class="aM", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
         standard="IEC 60269-2 / DIN 43620", source_doc=_BUSSMANN_10165,
         ratings=(
             _fr("6NHM000B", 6, 48, 650, 0.3), _fr("10NHM000B", 10, 200, 1800, 0.5),
@@ -1242,20 +1269,23 @@ _FUSES: list[FuseModel] = [
             _fr("500NHM3B", 500, 1050000, 2800000, 36),
         ),
         notes=(
-            "i2t_total a 690 V a.c. Anomalia da fonte: tam. 000 25 A "
-            "(3500 A²s) > 32 A (2200 A²s) no pré-arco — impresso assim no "
-            "datasheet, não corrigido. 315/355 A tam. 2 sob consulta."
+            "Part numbers '(A)NHM(tam)B' são a versão 500 V a.c.; a versão "
+            "690 V a.c. usa o sufixo '-690' (ex. 315NHM2B-690) com os mesmos "
+            "I²t e perdas. i2t_total cotado a 690 V a.c. Anomalia da fonte: "
+            "tam. 000 25 A (3500 A²s) > 32 A (2200 A²s) no pré-arco — "
+            "impresso assim no datasheet, não corrigido. 315/355 A tam. 2 "
+            "marcados com asterisco no catálogo (legenda ausente na extração)."
         ),
     ),
     FuseModel(
         model_id="BUSSMANN-12KV-DIN-MV",
         manufacturer="Eaton",
         full_name="Bussmann 12 kV DIN medium voltage fuse links (transformador)",
-        fuse_class="MV-backup", rated_voltage_kV=12.0, breaking_capacity_kA=63.0,
+        fuse_class="MV-backup", rated_voltage_kV=12.0, breaking_capacity_kA=50.0,
         standard="IEC 60282-1 (2005) / DIN 43625 / VDE 0670",
         source_doc=_BUSSMANN_720104, voltage_class=VoltageClass.MV,
         ratings=(
-            _fr("12TDLEJ6.3", 6.3, 980, 1000, 10, I3=23, kA=63, mohm=222),
+            _fr("12TDLEJ6.3", 6.3, 98, 1000, 10, I3=23, kA=63, mohm=222),
             _fr("12TDLEJ10", 10, 280, 2300, 16, I3=35, kA=63, mohm=131),
             _fr("12TDLEJ16", 16, 260, 3900, 16, I3=53, kA=63, mohm=54.6),
             _fr("12TDLEJ20", 20, 520, 5400, 18, I3=73, kA=63, mohm=39.1),
@@ -1274,8 +1304,10 @@ _FUSES: list[FuseModel] = [
             _fr("12TFMSJ160", 160, 50000, 350000, 139, I3=485, kA=50, mohm=3.65),
         ),
         notes=(
-            "Classe back-up. breaking_capacity por corrente em FuseRating "
-            "(AILSJ100 31.5 kA, TFMSJ160 50 kA; demais 63 kA). AILSJ não "
+            "Classe back-up. breaking_capacity_kA de família = 50 kA "
+            "('Technical data' do datasheet); o I1 por peça prevalece via "
+            "FuseRating.breaking_capacity_kA (AILSJ100 31.5 kA, TFMSJ160 "
+            "50 kA; demais 63 kA). AILSJ não "
             "adequado a uso externo; TXLEJ não conforme VDE 0670-402."
         ),
     ),
@@ -1284,7 +1316,7 @@ _FUSES: list[FuseModel] = [
         manufacturer="SIBA",
         full_name="SIBA HHBM 12 kV back-up, aplicação motor (A=587 mm)",
         fuse_class="HH-motor", rated_voltage_kV=12.0, breaking_capacity_kA=50.0,
-        standard="IEC 60282-1 / IEC 60644 / BS 2692-1", source_doc=_SIBA_HHM,
+        standard="IEC 60282-1 / BS 2692-1", source_doc=_SIBA_HHM,
         voltage_class=VoltageClass.MV,
         ratings=(
             _fr("3027456.50", 50, 3400, 23000, 55, I3=140, mohm=17),
@@ -1331,63 +1363,81 @@ _FUSES: list[FuseModel] = [
         model_id="ABB-CMF-3.6KV",
         manufacturer="ABB",
         full_name="ABB CMF 3.6 kV motor protection (K-factor IEC 644)",
-        fuse_class="aM-equivalente", rated_voltage_kV=3.6, breaking_capacity_kA=50.0,
+        fuse_class="HH-motor", rated_voltage_kV=3.6, breaking_capacity_kA=50.0,
         standard="IEC 60282-1 / IEC 644", source_doc=_ABB_CEF,
         voltage_class=VoltageClass.MV,
         ratings=(
-            _fr("CMF-3.6-100", 100, 14000, 170000, 49, I3=275, mohm=3.25),
-            _fr("CMF-3.6-160", 160, 38000, 500000, 75, I3=400, mohm=1.94),
-            _fr("CMF-3.6-200", 200, 76000, 710000, 75, I3=500, mohm=1.42),
-            _fr("CMF-3.6-250", 250, 140000, 1150000, 90, I3=760, mohm=1.03),
-            _fr("CMF-3.6-315", 315, 210000, 1800000, 122, I3=900, mohm=0.85),
+            _fr("1YMB531028M0001", 100, 14000, 170000, 49, I3=275, mohm=3.25),
+            _fr("1YMB531028M0002", 160, 38000, 500000, 75, I3=400, mohm=1.94),
+            _fr("1YMB531028M0003", 200, 76000, 710000, 75, I3=500, mohm=1.42),
+            _fr("1YMB531028M0004", 250, 140000, 1150000, 90, I3=760, mohm=1.03),
+            _fr("1YMB531028M0005", 315, 210000, 1800000, 122, I3=900, mohm=0.85),
         ),
-        notes="K-factor 0.75/0.7/0.7/0.6/0.6. part_number sintético (catálogo usa tabela por Un/In).",
+        notes=(
+            "K-factor 0.75/0.7/0.7/0.6/0.6. part_number = 'New No.' da tabela de "
+            "pedido (e=292 mm); 'Old No.' NHPL052760R1..NHPL052764R1."
+        ),
     ),
     FuseModel(
         model_id="ABB-CMF-7.2KV",
         manufacturer="ABB",
         full_name="ABB CMF 7.2 kV motor protection (K-factor IEC 644)",
-        fuse_class="aM-equivalente", rated_voltage_kV=7.2, breaking_capacity_kA=50.0,
+        fuse_class="HH-motor", rated_voltage_kV=7.2, breaking_capacity_kA=50.0,
         standard="IEC 60282-1 / IEC 644", source_doc=_ABB_CEF,
         voltage_class=VoltageClass.MV,
         ratings=(
-            _fr("CMF-7.2-63", 63, 4800, 65000, 45, I3=175, mohm=8.63),
-            _fr("CMF-7.2-100", 100, 14000, 180000, 67, I3=275, mohm=4.93),
-            _fr("CMF-7.2-160", 160, 38000, 540000, 119, I3=400, mohm=2.96),
-            _fr("CMF-7.2-200", 200, 76000, 750000, 118, I3=500, mohm=2.15),
-            _fr("CMF-7.2-250", 250, 140000, 1200000, 142, I3=800, mohm=1.56),
-            _fr("CMF-7.2-315", 315, 210000, 2200000, 193, I3=950, mohm=1.30),
+            _fr("1YMB531029M0001", 63, 4800, 65000, 45, I3=175, mohm=8.63),
+            _fr("1YMB531029M0002", 100, 14000, 180000, 67, I3=275, mohm=4.93),
+            _fr("1YMB531029M0003", 160, 38000, 540000, 119, I3=400, mohm=2.96),
+            _fr("1YMB531029M0004", 200, 76000, 750000, 118, I3=500, mohm=2.15),
+            _fr("1YMB531029M0005", 250, 140000, 1200000, 142, I3=800, mohm=1.56),
+            _fr("1YMB531029M0006", 315, 210000, 2200000, 193, I3=950, mohm=1.30),
+        ),
+        notes=(
+            "part_number = 'New No.' da tabela de pedido (e=442 mm); 'Old No.' "
+            "NHPL052770R1..NHPL052775R1."
         ),
     ),
     FuseModel(
         model_id="ABB-CMF-12KV",
         manufacturer="ABB",
         full_name="ABB CMF 12 kV motor protection (K-factor IEC 644)",
-        fuse_class="aM-equivalente", rated_voltage_kV=12.0, breaking_capacity_kA=50.0,
+        fuse_class="HH-motor", rated_voltage_kV=12.0, breaking_capacity_kA=50.0,
         standard="IEC 60282-1 / IEC 644", source_doc=_ABB_CEF,
         voltage_class=VoltageClass.MV,
         ratings=(
-            _fr("CMF-12-63", 63, 4800, 110000, 77, I3=190, mohm=13.3),
-            _fr("CMF-12-100", 100, 14000, 200000, 103, I3=275, mohm=6.72),
-            _fr("CMF-12-160", 160, 38000, 700000, 155, I3=480, mohm=4.04),
-            _fr("CMF-12-200", 200, 93000, 910000, 173, I3=560, mohm=2.89),
+            _fr("1YMB531030M0001", 63, 4800, 110000, 77, I3=190, mohm=13.3),
+            _fr("1YMB531030M0002", 100, 14000, 200000, 103, I3=275, mohm=6.72),
+            _fr("1YMB531030M0003", 160, 38000, 700000, 155, I3=480, mohm=4.04),
+            _fr("1YMB531030M0004", 200, 93000, 910000, 173, I3=560, mohm=2.89),
+        ),
+        notes=(
+            "part_number = 'New No.' da tabela de pedido (e=442 mm); 'Old No.' "
+            "NHPL052776R1..NHPL052779R1."
         ),
     ),
     FuseModel(
         model_id="ABB-CEF-12KV",
         manufacturer="ABB",
-        full_name="ABB CEF 12 kV current limiting (uso geral / transformador)",
-        fuse_class="gG-equivalente", rated_voltage_kV=12.0, breaking_capacity_kA=50.0,
+        full_name="ABB CEF 12 kV current limiting back-up (transformador / uso geral)",
+        fuse_class="MV-backup", rated_voltage_kV=12.0, breaking_capacity_kA=50.0,
         standard="IEC 60282-1", source_doc=_ABB_CEF, voltage_class=VoltageClass.MV,
         ratings=(
-            _fr("CEF-12-6", 6, W=41, I3=35, mohm=735), _fr("CEF-12-10", 10, W=33, I3=55, mohm=180),
-            _fr("CEF-12-16", 16, W=32, I3=55, mohm=105), _fr("CEF-12-25", 25, W=47, I3=77, mohm=52.6),
-            _fr("CEF-12-40", 40, W=52, I3=105, mohm=23.0), _fr("CEF-12-50", 50, W=70, I3=190, mohm=17.9),
-            _fr("CEF-12-63", 63, W=78, I3=190, mohm=13.4), _fr("CEF-12-80", 80, W=82, I3=250, mohm=9.2),
-            _fr("CEF-12-100", 100, W=103, I3=275, mohm=6.6), _fr("CEF-12-125", 125, W=125, I3=375, mohm=5.3),
-            _fr("CEF-12-160", 160, W=170, I3=480, mohm=3.9), _fr("CEF-12-200", 200, W=174, I3=650, mohm=2.7),
+            _fr("1YMB531002M0001", 6, W=41, I3=35, mohm=735), _fr("1YMB531002M0002", 10, W=33, I3=55, mohm=180),
+            _fr("1YMB531002M0003", 16, W=32, I3=55, mohm=105), _fr("1YMB531002M0004", 25, W=47, I3=77, mohm=52.6),
+            _fr("1YMB531002M0005", 40, W=52, I3=105, mohm=23.0), _fr("1YMB531002M0006", 50, W=70, I3=190, mohm=17.9),
+            _fr("1YMB531002M0007", 63, W=78, I3=190, mohm=13.4), _fr("1YMB531002M0008", 80, W=82, I3=250, mohm=9.2),
+            _fr("1YMB531002M0009", 100, W=103, I3=275, mohm=6.6), _fr("1YMB531002M0010", 125, W=125, I3=375, mohm=5.3),
+            _fr("1YMB531002M0011", 160, W=170, I3=480, mohm=3.9), _fr("1YMB531002M0012", 200, W=174, I3=650, mohm=2.7),
         ),
-        notes="Catálogo CEF não publica I²t (campos = 0). Outras tensões (3.6/7.2/17.5/24/27/36 kV) na fonte.",
+        notes=(
+            "Tipo back-up (zona entre corrente mínima de fusão e I3 em que o "
+            "elo pode não interromper). Catálogo CEF não publica I²t (campos "
+            "= 0). part_number = 'New No.' 1YMB531002M0001..M0012: 6-100 A "
+            "com e=292 mm (variante e=442 mm: 1YMB531035M0001..M0009); "
+            "125-200 A apenas e=442 mm. Outras tensões (3.6/7.2/17.5/24/27/"
+            "36 kV) na fonte."
+        ),
     ),
     FuseModel(
         model_id="WEG-AR-NH-CONTATO-FACA-100KA",

@@ -32,6 +32,7 @@ from app.standards.vendor_curve_constants import (
     ALL_VENDOR_CURVES, CurveFamily, GE_ANSI_CURVES, GE_IEC_CURVES,
     GE_IEEE_CURVES, SEL_IEC_CURVES, SEL_US_CURVES,
     ABB_REF615R_PROGRAMMABLE_DEFAULTS, find_curve, operate_time_3param_s,
+    operate_time_ge_5param_s,
 )
 
 
@@ -155,6 +156,33 @@ class TestTripUnits:
         assert s.G_pickup_Ig.unit == "A"
         assert s.G_pickup_Ig.discrete == (100.0, 300.0, 600.0, 900.0, 1200.0)
         assert s.L_delay_tr.discrete[-1] == 30.0
+        # S, I e G "can be switched on/off" (LV10 p.34-35)
+        assert s.S_pickup_Isd.off_selectable and s.I_pickup_Ii.off_selectable
+        assert s.G_pickup_Ig.off_selectable
+
+    def test_siemens_3va_ig_is_continuous(self):
+        """Ig do ETU560/860: contínuo em passos de 1 A até 1.0×In; o dial
+        de 5 posições pertence ao ETU330 (regressão de verificação)."""
+        t = library.get_trip_unit("SIEMENS-3VA-ETU560-ETU860")
+        assert not t.G_pickup_Ig.is_discrete
+        assert t.G_pickup_Ig.min == 0.2 and t.G_pickup_Ig.max == 1.0
+        assert t.G_pickup_Ig.off_selectable
+
+    def test_abb_ekip_touch_enable_parameters(self):
+        """S/I/G do Ekip Touch têm parâmetro Enable ON/OFF; família só XT2/XT4."""
+        t = library.get_trip_unit("ABB-XT2-XT4-EKIP-TOUCH-LSIG")
+        assert t.S_pickup_Isd.off_selectable and t.I_pickup_Ii.off_selectable
+        assert t.G_pickup_Ig.off_selectable
+        assert "XT3" not in t.breaker_family
+
+    def test_verification_pass_corrections(self):
+        nsx = library.get_trip_unit("SE-NSX-MICROLOGIC-5-6-7")
+        assert nsx.I_pickup_Ii.default == 15.0             # default = máximo
+        assert "Micrologic 6 (" in nsx.notes                # G não existe no ML7
+        mag = library.get_trip_unit("EATON-MAGNUM-DIGITRIP-1150")
+        assert mag.L_pickup_Ir.step == 0.05 and mag.S_pickup_Isd.step == 0.5
+        weg = library.get_trip_unit("WEG-ABW-OCR-TIPO-P")
+        assert weg.rated_voltage_V == 690.0
 
     def test_all_have_source_doc(self):
         for t in library.list_trip_units():
@@ -221,6 +249,36 @@ class TestFuses:
         assert by_pn["12TFMSJ160"].breaking_capacity_kA == 50.0
         assert by_pn["12TDLEJ6.3"].breaking_capacity_kA == 63.0
         assert len(f.ratings) == 17
+        # Cabeçalho = 50 kA ('Technical data'); I1 por peça prevalece.
+        assert f.breaking_capacity_kA == 50.0
+
+    def test_bussmann_12kv_6a3_prearcing_exponent(self):
+        """Datasheet imprime '9.8 x 10¹' (pdftotext: '9.8 x 101') → 98 A²s.
+        Regressão contra leitura errada como 980 (10×)."""
+        f = library.get_fuse("BUSSMANN-12KV-DIN-MV")
+        r = f.get_rating(6.3)
+        assert r.i2t_prearcing_A2s == 98
+        assert r.i2t_total_A2s == 1000
+        # Plausibilidade: pré-arco cresce ~In² dentro da mesma família TDLEJ
+        assert r.i2t_prearcing_A2s < f.get_rating(10).i2t_prearcing_A2s
+
+    def test_abb_mv_fuse_labels_and_order_numbers(self):
+        """CEF é back-up (não gG); part numbers = 'New No.' do catálogo."""
+        cef = library.get_fuse("ABB-CEF-12KV")
+        assert cef.fuse_class == "MV-backup"
+        assert all(r.part_number.startswith("1YMB531002M") for r in cef.ratings)
+        for mid in ("ABB-CMF-3.6KV", "ABB-CMF-7.2KV", "ABB-CMF-12KV"):
+            f = library.get_fuse(mid)
+            assert f.fuse_class == "HH-motor"
+            assert all(r.part_number.startswith("1YMB5310") for r in f.ratings)
+        assert "IEC 60644" not in library.get_fuse("SIBA-HHM-12KV").standard
+
+    def test_bussmann_am_part_numbers_are_500v_variant(self):
+        """'(A)NHM(tam)B' = 500 V; '-690' = 690 V (mesmos I²t)."""
+        f = library.get_fuse("BUSSMANN-NH-AM-500-690V")
+        assert f.rated_voltage_kV == 0.5
+        assert all(not r.part_number.endswith("-690") for r in f.ratings)
+        assert "-690" in f.notes
 
     def test_siba_same_element_across_voltages(self):
         """Mesma corrente → mesmo I3 e mesmo I²t de pré-arco em 3.6 e
@@ -270,16 +328,22 @@ class TestRelayRegistryAdditions:
 
     def test_ref615r_ranges(self):
         m = get_model("ABB-REF615R")
-        assert m.pickup_range_per_in == (0.05, 5.0)
+        # 51P 0.05-5.00 xIn + 50P 0.10-40.00 xIn (convenção das entradas ABB)
+        assert m.pickup_range_per_in == (0.05, 40.0)
         assert m.tms_range == (0.05, 15.0)
         assert validate_tms(m, 15.0) and not validate_tms(m, 15.01)
         assert supports_function(m, "51P") and supports_function(m, "50N-3")
+        assert supports_function(m, "67/51P") and supports_function(m, "87LOZREF")
+        assert "18 tipos" in m.description
 
     def test_tms_ceiling_convergence_abb_siemens(self):
         """Teto 15.00 idêntico em ABB REF615R e Siemens 7SJ82 (fontes
         independentes)."""
         assert get_model("ABB-REF615R").tms_range[1] == 15.0
         assert get_model("Siemens-7SJ82").tms_range[1] == 15.0
+        # §12.5.2: "Time multiplier 0.00 to 15.00" (0.05 é só na curva de usuário)
+        assert get_model("Siemens-7SJ82").tms_range[0] == 0.0
+        assert validate_tms(get_model("Siemens-7SJ82"), 0.0)
 
     def test_micom_tms_scale_differs(self):
         m = get_model("Schneider-MiCOM-P127")
@@ -337,14 +401,46 @@ class TestVendorCurveConstants:
         assert ge_ei.reset_tr == abb.reset_tr == 29.1
 
     def test_us_legacy_family_sel_equals_ge_by_reset(self):
-        """SEL U1-U4 e GE ANSI descrevem a mesma curva física: ``tr``
-        coincide exatamente entre os dois fabricantes."""
+        """SEL U1-U4 e GE ANSI pertencem à mesma família: ``tr`` coincide
+        exatamente entre os dois fabricantes — mas os tempos de operação
+        NÃO coincidem (ajustes distintos)."""
         sel = {c.curve_name: c for c in SEL_US_CURVES}
         ge = {c.curve_name.replace("ANSI ", ""): c for c in GE_ANSI_CURVES}
         assert sel["Extremely Inverse"].reset_tr == ge["Extremely Inverse"].reset_tr == 5.67
         assert sel["Very Inverse"].reset_tr == ge["Very Inverse"].reset_tr == 3.88
         assert sel["Inverse"].reset_tr == ge["Normally Inverse"].reset_tr == 5.95
         assert sel["Moderately Inverse"].reset_tr == ge["Moderately Inverse"].reset_tr == 1.08
+        t_sel = operate_time_3param_s(500, 100, 1.0, sel["Extremely Inverse"])
+        t_ge = operate_time_ge_5param_s(500, 100, 1.0, ge["Extremely Inverse"])
+        assert math.isclose(t_sel, 0.0352 + 5.67 / 24, rel_tol=1e-9)   # 0.2715 s
+        assert math.isclose(t_ge, 0.247, abs_tol=5e-4)                    # GE Tab. 4-37
+        assert abs(t_sel / t_ge - 1.0) > 0.05
+
+    def test_ge_5param_formula_reproduces_manual_tables(self):
+        """T = TDM·[A + B/(M−C) + D/(M−C)² + E/(M−C)³] contra as Tabelas
+        4-37 (ANSI) e 4-41 (IAC) do manual GE 850, TDM = 1.0."""
+        ansi_ei = find_curve(vendor="GE", code="ANSI-EI")[0]
+        iac_ei = find_curve(vendor="GE", code="IAC-EI")[0]
+        for m, expected in ((1.5, 4.001), (2.0, 1.744), (5.0, 0.247), (10.0, 0.098)):
+            assert math.isclose(operate_time_ge_5param_s(m * 100, 100, 1.0, ansi_ei),
+                                expected, abs_tol=6e-4), m
+        for m, expected in ((1.5, 3.398), (2.0, 1.498), (5.0, 0.246), (10.0, 0.093)):
+            assert math.isclose(operate_time_ge_5param_s(m * 100, 100, 1.0, iac_ei),
+                                expected, abs_tol=6e-4), m
+        # TDM=0.5 e 2.0 são proporcionais (Tab. 4-37: 2.000 / 8.002 em M=1.5)
+        assert math.isclose(operate_time_ge_5param_s(150, 100, 0.5, ansi_ei), 2.000, abs_tol=6e-4)
+        assert math.isclose(operate_time_ge_5param_s(150, 100, 2.0, ansi_ei), 8.002, abs_tol=6e-4)
+        with pytest.raises(ValueError):
+            operate_time_ge_5param_s(200, 100, 1.0, find_curve(vendor="SEL", code="C3")[0])
+
+    def test_abb_programmable_defaults_use_3param_form(self):
+        """ABB Eq. 34 com E=1 é a forma de 3 constantes; deve coincidir
+        com GE IEEE-EI (Tab. 4-35: TDM=1, M=5 → 1.297 s)."""
+        abb = ABB_REF615R_PROGRAMMABLE_DEFAULTS
+        assert abb.d == 0.0 and abb.e == 0.0
+        assert math.isclose(operate_time_3param_s(500, 100, 1.0, abb), 1.297, abs_tol=6e-4)
+        ge = find_curve(vendor="GE", code="IEEE-EI")[0]
+        assert operate_time_3param_s(500, 100, 1.0, abb) == operate_time_3param_s(500, 100, 1.0, ge)
 
     def test_two_families_are_numerically_distinct(self):
         """'Extremely Inverse' do Anexo A ≠ 'Extremely Inverse' legada."""
@@ -423,8 +519,12 @@ class TestCableCatalogAdditions:
         assert c630.R_ac_ohm_per_km_at_90C == 0.0416
         assert c630.X_ohm_per_km == 0.087
         assert c630.ampacity_air_A == 1122
+        assert c630.ampacity_buried_A == 823        # 2ª coluna: trifólio enterrado
+        assert "722" in c630.notes                  # 3ª coluna: em duto
         assert c630.rated_voltage_kV == 11.0
         assert "IEC 60228" in c630.notes
+        for c in nx:
+            assert c.ampacity_air_A > c.ampacity_buried_A > 0
 
     def test_common_sections_share_iec60228_rdc(self):
         """R_dc 20 °C das seções comuns coincide entre Induscabos (fonte)
