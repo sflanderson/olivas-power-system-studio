@@ -792,3 +792,103 @@ class TestLeiDeExtincaoDeWong:
         assert polo.didt_capability_at(10.0e-3) == pytest.approx(255.0)
         assert polo.didt_capability_at(11.0e-3) == pytest.approx(221.0)
         assert polo.didt_capability_at(17.5e-3) == pytest.approx(0.0, abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# 9. Reprodutibilidade do conjunto de dados publicado
+# ---------------------------------------------------------------------------
+
+
+class TestReprodutibilidadeDoConjuntoPublicado:
+    """A amostragem é contrato, não detalhe de implementação.
+
+    O conjunto de 900 realizações em
+    ``docs/research/rul_isolamento/anexos/dados/varredura_vcb_n150.json``
+    é o registro publicado do estudo, e os documentos citam seus números.
+    Qualquer mudança na ORDEM ou na quantidade de sorteios por realização
+    muda o que uma mesma semente produz e invalida esse registro — foi o
+    que aconteceu ao acrescentar a lei de extinção, e é o que este teste
+    impede de repetir.
+    """
+
+    SEMENTE = 20260903
+    PISO_S = 14.0e-3
+    ARQUIVO = (
+        "docs/research/rul_isolamento/anexos/dados/varredura_vcb_n150.json"
+    )
+
+    @classmethod
+    def _publicado(cls):
+        import json
+        from pathlib import Path
+
+        caminho = Path(__file__).resolve().parents[1] / cls.ARQUIVO
+        if not caminho.exists():  # pragma: no cover - conjunto opcional
+            pytest.skip(f"conjunto publicado ausente: {cls.ARQUIVO}")
+        return json.loads(caminho.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _zeros():
+        from app.simulation.emt.cases.atp_reference import (
+            FREQUENCY_HZ,
+            load_reference,
+        )
+
+        return tuple(
+            PoleCurrentZeros.from_phasor(i, FREQUENCY_HZ)
+            for i in load_reference().breaker_currents()
+        )
+
+    @pytest.mark.parametrize(
+        "nome, deslocamento", [("literatura", 0), ("medido", 1), ("caso_de_referencia", 2)]
+    )
+    def test_a_semente_reproduz_as_realizacoes_publicadas(self, nome, deslocamento):
+        publicado = self._publicado()
+        referencia = sorted(
+            (
+                l
+                for l in publicado["realizacoes"]
+                if l["cenario"] == nome and not l["com_snubber"]
+            ),
+            key=lambda l: l["indice"],
+        )
+        assert len(referencia) == 150
+
+        triplas = sweep_three_pole_samples(
+            SCENARIOS[nome],
+            n=150,
+            zeros_abc=self._zeros(),
+            arc_time_window_s=LITERATURE_WORST_ARC_TIME_S,
+            earliest_separation_s=self.PISO_S,
+            seed=self.SEMENTE + deslocamento,
+        )
+        for tripla, linha in zip(triplas, referencia):
+            assert tripla[0].separation_time_s == pytest.approx(
+                linha["separacao_s"], abs=1e-15
+            )
+            for k, amostra in enumerate(tripla):
+                assert amostra.chopping_current_A == pytest.approx(
+                    linha["corte_A"][k], rel=1e-12
+                )
+                assert amostra.didt_capability_A_per_us == pytest.approx(
+                    linha["didt_A_por_us"][k], rel=1e-12
+                )
+                assert amostra.rrds_a_kV_per_ms == pytest.approx(
+                    linha["rrds_kV_por_ms"][k], rel=1e-12
+                )
+
+    def test_a_ordem_dos_sorteios_e_corte_extincao_rrds(self):
+        """Fixa a ordem explicitamente, para além do conjunto publicado."""
+        rng_a = np.random.default_rng(7)
+        a = sample_vcb_parameters(
+            LITERATURE_SCENARIO, rng=rng_a, separation_window_s=JANELA
+        )
+        rng_b = np.random.default_rng(7)
+        corte = float(
+            rng_b.uniform(*LITERATURE_SCENARIO.chopping_A)
+        )
+        didt = float(rng_b.uniform(*LITERATURE_SCENARIO.didt_A_per_us))
+        rrds = float(rng_b.uniform(*LITERATURE_SCENARIO.rrds_kV_per_ms))
+        assert a.chopping_current_A == pytest.approx(corte, rel=1e-15)
+        assert a.didt_capability_A_per_us == pytest.approx(didt, rel=1e-15)
+        assert a.rrds_a_kV_per_ms == pytest.approx(rrds, rel=1e-15)

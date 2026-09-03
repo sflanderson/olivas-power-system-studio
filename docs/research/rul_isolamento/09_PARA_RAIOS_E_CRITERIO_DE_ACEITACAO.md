@@ -255,7 +255,53 @@ Consequência prática: a estatística de população (4 a 5 % das realizações
 que qualquer realização individual, e a cauda deve ser varrida com $\Delta t \le 0{,}2$ µs ou
 reportada como faixa.
 
-## 7. O que continua aberto
+## 7. Convergência em passo: o que a varredura fina fecha
+
+A ressalva da §6.3 foi levantada refazendo a varredura do cenário da literatura — 150
+realizações, três configurações — a $\Delta t = 0{,}2$ µs
+[`anexos/dados/varredura_vcb_n150_dt200ns.json`].
+
+### 7.1 Qual passo é adequado
+
+Vinte realizações **sem escalada**, nos três passos:
+
+| $\Delta t$ | 1,0 µs | 0,2 µs | 0,05 µs |
+|---|---|---|---|
+| Pico p50 [pu] | 1,7487 | 2,1220 | 2,1851 |
+| Pico médio [pu] | 1,7647 | 2,1406 | 2,1812 |
+| Desvio relativo mediano do passo anterior | — | **20,89 %** | **2,70 %** |
+
+O passo de 1 µs erra o corpo da distribuição em 21 %; o de 0,2 µs está a 2,7 % do de 0,05 µs.
+**$\Delta t = 0{,}2$ µs é o passo adequado para este caso**, e o de 1 µs não é
+[CÁLCULO PRÓPRIO].
+
+Consequência sobre a §2.1 do documento 08: a mediana convergida é **2,12 pu**, não 1,75. A
+concordância com Xemard *et al.* — 1,85 a 2,60 pu sem *chopping*/reignição [F24] — melhora: o
+valor convergido cai no meio da faixa publicada, e não na sua borda inferior.
+
+### 7.2 O que é robusto ao passo e o que não é
+
+| Grandeza | $\Delta t$ = 1 µs | $\Delta t$ = 0,2 µs | Robusta? |
+|---|---|---|---|
+| Fração acima de 4,6 pu, sem mitigação | 8/150 (5,3 %) | 8/150 (5,3 %) | **sim** |
+| *Quais* realizações escalam | conjunto A | conjunto B | **não** — 6 em comum, 2 exclusivas de cada |
+| Pico máximo com para-raios | 3,45 pu | 3,45 pu | **sim** |
+| Energia máxima no para-raios | 57,2 J | 57,3 J | **sim** |
+| Realizações acima de 4,6 pu com para-raios | 0/150 | 0/150 | **sim** |
+| Fração que atravessa o envelope IEC | 8/150 | 8/150 | **sim** |
+| Atraso da travessia após a separação (p50) | 0,485 ms | 0,489 ms | **sim** |
+| Mediana do pico sem mitigação | 1,75 pu | 2,12 pu | **não** — ver §7.1 |
+| Reignições máximas numa realização | 128 | 191 | **não** |
+
+A leitura é limpa: **as estatísticas de população convergem; as realizações individuais e as
+contagens de reignição, não.** É a distinção que o modelo de dano precisa respeitar — a fração de
+manobras severas é um número utilizável, o desfecho de uma manobra específica não é.
+
+Todos os resultados de mitigação — o teto de 3,45 pu com para-raios, a energia de 57 J, a fração
+de 5,3 % que atravessa o envelope normativo e o atraso de meio milissegundo — sobrevivem ao
+refinamento. São, portanto, os resultados citáveis deste estudo.
+
+## 8. O que continua aberto
 
 * **A curva do para-raios é uma reconstrução** de dois pontos publicados, escalada de 11 para
   4,16 kV por regra de seleção. Um para-raios real tem curva de catálogo. O que os resultados
@@ -266,9 +312,11 @@ reportada como faixa.
   calculado é cota inferior [`emt_nonlinear_no_dynamic_arrester_model`].
 * **Não há classe de descarga**: a energia é medida (57,2 J no pior caso) mas não confrontada
   automaticamente com a capacidade do para-raios [`emt_arrester_no_energy_rating`].
-* **A varredura de 150 realizações foi feita a $\Delta t = 1$ µs** e sua cauda, portanto, não
-  está convergida (§6.3). Refazê-la a 0,2 µs custa cinco vezes mais e é o próximo passo natural
-  se a fração de realizações em escalada for usada como número, e não como ordem de grandeza.
+* **A varredura de 900 realizações do documento 08 foi feita a $\Delta t = 1$ µs** e seus
+  números de mediana e de contagem de reignições não estão convergidos (§7). O cenário da
+  literatura foi refeito a 0,2 µs; os cenários `medido` e `caso_de_referencia` e a configuração
+  com amortecedor **não** — suas medianas devem subir na mesma proporção, mas isso não foi
+  medido.
 * **A disrupção representada é apenas fase-terra no terminal.** Não há disrupção entre espiras —
   interna à bobina, não aparece como ramo do circuito — nem entre fases, embora Vollet reporte
   sobretensões fase-fase de até o dobro das fase-terra. Um resultado sem disrupção fase-terra não

@@ -80,6 +80,11 @@ reportam 1,85 a 2,60 pu "sem *chopping*/reignição" [LITERATURA: IPST 2019, p. 
 grandeza confere. Estes 95 % das realizações são a parte utilizável do motor para alimentar o
 modelo de dano.
 
+> **Valor convergido.** Os números desta tabela vêm de $\Delta t = 1$ µs, que erra o corpo da
+> distribuição em 21 % (`09_…md`, §7.1). Refeito a 0,2 µs, o cenário `literatura` sem mitigação dá
+> mediana de **2,12 pu** — mais perto do centro da faixa de Xemard, não da borda. A leitura
+> qualitativa não muda; o número, sim.
+
 ### 2.2 O amortecedor suprime a escalada, e cobra por isso
 
 O número máximo de reignições por fase cai de 39/79/29 (sem) para 1/0/0 (com), e nenhuma

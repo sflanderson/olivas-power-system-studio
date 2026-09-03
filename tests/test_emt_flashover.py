@@ -475,9 +475,50 @@ class TestConvergenciaEmPassoDaCauda:
         assert chave in KNOWN_LIMITATIONS
         texto = KNOWN_LIMITATIONS[chave]
         assert "0,2 µs" in texto
-        assert "POPULAÇÃO" in texto
+        assert "estatística de população" in texto
+        # A medição que sustenta a afirmação, e não só a afirmação.
+        assert "8 de 150" in texto
 
     def test_a_limitacao_do_pico_grampeado_esta_declarada(self):
         chave = "emt_flashover_clamped_waveform_is_not_a_result"
         assert chave in KNOWN_LIMITATIONS
         assert "CONTAGEM" in KNOWN_LIMITATIONS[chave]
+
+
+class TestPassoAdequado:
+    """Qual passo o caso exige, medido e não estipulado.
+
+    Vinte realizações sem escalada em três passos deram desvio relativo
+    mediano de 20,89 % entre 1,0 e 0,2 µs, e de 2,70 % entre 0,2 e
+    0,05 µs [CÁLCULO PRÓPRIO; ver
+    ``09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md``, §7.1]. Logo 0,2 µs é o
+    passo adequado e 1 µs não é.
+
+    O teste executa apenas UMA realização, para custo aceitável na suíte;
+    o que ele fixa é a direção e a ordem de grandeza do efeito.
+    """
+
+    T_SEP = 0.014686548756377423
+
+    def test_um_microssegundo_subestima_o_pico(self):
+        from app.simulation.emt.cases.atp_reference import AtpReferenceCase
+        from app.simulation.emt.vcb_scenarios import VcbSample
+
+        # Realização SEM escalada: o efeito medido é sobre o corpo da
+        # distribuição, não sobre a cauda.
+        amostras = tuple(
+            VcbSample("literatura", 5.0, 300.0, 12.0, 0.0, self.T_SEP, None)
+            for _ in range(3)
+        )
+        picos = []
+        for dt in (1.0e-6, 2.0e-7):
+            modelo = AtpReferenceCase(
+                with_snubber=False, vcb_samples=amostras, dt_s=dt
+            ).build()
+            modelo.run()
+            picos.append(
+                max(modelo.motor_voltage_summary().values()) * 1.0e3 / V_BASE_V
+            )
+        assert picos[0] < 4.6 and picos[1] < 4.6, "a realização não deve escalar"
+        assert picos[1] > picos[0], "refinar o passo eleva o pico"
+        assert (picos[1] - picos[0]) / picos[0] > 0.05

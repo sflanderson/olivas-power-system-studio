@@ -456,12 +456,17 @@ def sample_vcb_parameters(
         raise ValueError(
             f"separation_window_s deve ser (início >= 0, fim >= início) finito, obtido {(t0, t1)!r}"
         )
+    # A ORDEM dos sorteios é parte do contrato: mudá-la muda a realização
+    # produzida por uma mesma semente e invalida os conjuntos de dados já
+    # publicados. É corte, extinção, RRDS, separação.
+    corte = _uniform(rng, ranges.chopping_A)
     d, c = _extincao(rng, ranges)
+    rrds = _uniform(rng, ranges.rrds_kV_per_ms)
     return VcbSample(
         scenario_name=ranges.name,
-        chopping_current_A=_uniform(rng, ranges.chopping_A),
+        chopping_current_A=corte,
         didt_capability_A_per_us=d,
-        rrds_a_kV_per_ms=_uniform(rng, ranges.rrds_kV_per_ms),
+        rrds_a_kV_per_ms=rrds,
         rrds_b_kV_per_ms2=float(ranges.rrds_parabolic_kV_per_ms2 or 0.0),
         separation_time_s=t0 if t1 <= t0 else float(rng.uniform(t0, t1)),
         didt_slope_A_per_us2=c,
@@ -689,12 +694,15 @@ def sample_vcb_parameters_by_arc_time(
     t_sep = zeros.separation_for_arc_time(
         tau, earliest_separation_s=earliest_separation_s
     )
+    # Mesma ordem do amostrador por janela — ver a nota lá.
+    corte = _uniform(rng, ranges.chopping_A)
     d, c = _extincao(rng, ranges)
+    rrds = _uniform(rng, ranges.rrds_kV_per_ms)
     return VcbSample(
         scenario_name=ranges.name,
-        chopping_current_A=_uniform(rng, ranges.chopping_A),
+        chopping_current_A=corte,
         didt_capability_A_per_us=d,
-        rrds_a_kV_per_ms=_uniform(rng, ranges.rrds_kV_per_ms),
+        rrds_a_kV_per_ms=rrds,
         rrds_b_kV_per_ms2=float(ranges.rrds_parabolic_kV_per_ms2 or 0.0),
         separation_time_s=t_sep,
         arc_time_s=tau,

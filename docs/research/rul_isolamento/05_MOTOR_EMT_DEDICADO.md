@@ -724,7 +724,7 @@ Nenhum módulo fora de `app/simulation/emt/` importa o pacote [CÁLCULO PRÓPRIO
 
 | Chave | Conteúdo essencial |
 |---|---|
-| `emt_linear_components_only` | Não há elemento não linear, saturação, para-raios nem ponto de operação não linear |
+| `emt_linear_components_only` | Os ramos ESTAMPADOS são lineares: não há saturação, histerese nem resistência de arco dependente da corrente. **Superada em parte**: elementos não lineares entram por compensação (`nonlinear.py`) e o para-raios está implementado (`arrester.py`) — ver `09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md` |
 | `emt_dense_lu_no_sparsity` | Matriz densa; sem esparsidade — decisão justificada por medição (§2.6), a rever se $n$ crescer |
 | `emt_switching_quantized_to_step` | Instante efetivo de manobra quantizado em $\Delta t$; efeito medido em [LISTA: 02, Tabela 4] |
 | `emt_cda_only_on_topology_change` | CDA disparado por mudança de topologia (e por $t=0$, conforme o modo de partida) |
@@ -747,7 +747,7 @@ Nenhum módulo fora de `app/simulation/emt/` importa o pacote [CÁLCULO PRÓPRIO
 3. **Obter os dados de rede omitidos por A** e as tabelas de `CABLE CONSTANTS` do caso ATP, únicos caminhos para fechar §9.
 4. **Retirar o motor da condição de *backend* órfão** (§11.4): `Feature`, ação de menu, laudo, i18n, `CHANGELOG`.
 5. **Condições iniciais da linha em modo `zero` com histórico pré-carregado**, para casos em que a janela de acomodação de $\tau$ seja inviável.
-6. **Não linearidades** (saturação de transformador, para-raios) por compensação, na linha de [FONTE: Dommel 1971].
+6. ~~**Não linearidades** (saturação de transformador, para-raios) por compensação, na linha de [FONTE: Dommel 1971].~~ **Feito para o para-raios** (`app/simulation/emt/nonlinear.py`, `arrester.py`), com a álgebra verificada contra solução analítica; a saturação de transformador continua pendente e usa o mesmo mecanismo.
 7. **Traçado de assíntotas de Bode** como rotina de ajuste alternativa, caso se queira reproduzir literalmente o procedimento de 1982.
 8. **Migração do laço interno para C++**, apenas quando as três condições da §10.4 forem satisfeitas.
 

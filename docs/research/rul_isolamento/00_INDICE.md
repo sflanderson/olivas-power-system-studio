@@ -256,7 +256,7 @@ docs/research/rul_isolamento/
     ├── pesquisa/            9 arquivos — 3 pesquisas dirigidas + 6 pesquisas web
     ├── repo/                5 arquivos — mapas do código
     ├── cruzamento/          2 arquivos — A × B × literatura × repositório
-    ├── dados/               4 arquivos — resultados brutos das varreduras (JSON)
+    ├── dados/               5 arquivos — resultados brutos das varreduras (JSON)
     └── verdicts/            2 arquivos — veredictos da verificação adversarial (JSON)
 ```
 
@@ -291,8 +291,8 @@ publicadas e com os critérios de validade internos do motor.
 |---|---|---|
 | `06_CASO_BASE_ATP_ESPECIFICACAO.md` | Especificação do caso base extraída do `.atp`: topologia, cartões, parâmetros do disjuntor e do amortecedor, com a listagem do ATP como fonte da solução de regime | 94 linhas |
 | `07_AUDITORIA_DO_CASO_ATP.md` | Ancoragem do regime permanente por equivalente de Thévenin; decodificação da matriz do transformador; defeito corrigido no motor dedicado; **dois defeitos no `MODEL` do arquivo** que tornam a escalada impossível; confronto com a Tabela III; achados da listagem; cinco correções recomendadas | 193 linhas |
-| `08_VARREDURA_ESTATISTICA_VCB.md` | Varredura Monte Carlo com o **tempo de arco** como variável de controle e o disjuntor tratado como **tripolar**; três cenários (literatura, medido, caso de referência) com e sem amortecedor, 900 realizações; supressão da escalada pelo amortecedor e seu custo em regime; **delimitação do domínio de validade da cauda de escalada**, com o mecanismo diagnosticado e o caminho de correção | 262 linhas |
-| `09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md` | Método de **compensação** de Dommel 1971 verificado contra soluções analíticas; **para-raios ZnO** com a curva publicada por Vollet, escalada para 4,16 kV e confrontada com o envelope da IEC 60034-15; a cauda de escalada volta à faixa publicada (77,5 → 3,45 pu; 128 → 6 reignições); **critério de aceitação de Wong** atendido quanto à forma — dependência com a RRDS passa a ter máximo interior —, com a localização discutida; reconciliação de unidades da lei de extinção; **disrupção da isolação** no envelope da IEC 60034-15 como evento terminal, com as duas ressalvas de convergência medidas | 291 linhas |
+| `08_VARREDURA_ESTATISTICA_VCB.md` | Varredura Monte Carlo com o **tempo de arco** como variável de controle e o disjuntor tratado como **tripolar**; três cenários (literatura, medido, caso de referência) com e sem amortecedor, 900 realizações; supressão da escalada pelo amortecedor e seu custo em regime; **delimitação do domínio de validade da cauda de escalada**, com o mecanismo diagnosticado e o caminho de correção | 267 linhas |
+| `09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md` | Método de **compensação** de Dommel 1971 verificado contra soluções analíticas; **para-raios ZnO** com a curva publicada por Vollet, escalada para 4,16 kV e confrontada com o envelope da IEC 60034-15; a cauda de escalada volta à faixa publicada (77,5 → 3,45 pu; 128 → 6 reignições); **critério de aceitação de Wong** atendido quanto à forma — dependência com a RRDS passa a ter máximo interior —, com a localização discutida; reconciliação de unidades da lei de extinção; **disrupção da isolação** no envelope da IEC 60034-15 como evento terminal, com as duas ressalvas de convergência medidas; **varredura fina a 0,2 µs** fixando qual passo o caso exige e separando o que converge do que não converge | 339 linhas |
 
 ### 3.3 `anexos/fichamentos/` — literatura de apoio (13)
 

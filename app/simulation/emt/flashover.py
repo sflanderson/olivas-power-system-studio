@@ -518,10 +518,13 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "marginais. Medido: das oito realizações que escalam a "
         "Δt = 1 µs, DUAS colapsam para uma única reignição e 2,3 pu a "
         "Δt = 0,2 µs, enquanto outras duas escalam nos dois passos "
-        "[CÁLCULO PRÓPRIO]. A estatística de POPULAÇÃO (4 a 5 % das "
-        "realizações escalam) é mais robusta que qualquer realização "
-        "individual, e a cauda deve ser varrida com Δt <= 0,2 µs ou "
-        "reportada como faixa."
+        "[CÁLCULO PRÓPRIO]. MEDIDO em varredura completa: a FRAÇÃO é "
+        "estável — 8 de 150 nos dois passos —, mas o CONJUNTO muda: seis "
+        "realizações em comum, duas exclusivas de cada passo. A "
+        "estatística de população é utilizável; o desfecho de uma "
+        "realização específica, não. Passo adequado para este caso: "
+        "0,2 µs, que fica a 2,7 % de 0,05 µs, contra 21 % do passo de "
+        "1 µs."
     ),
     "emt_flashover_phase_to_ground_only": (
         "Só se representa a disrupção FASE-TERRA no terminal. Não há "

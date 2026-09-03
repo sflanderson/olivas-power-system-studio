@@ -51,6 +51,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -66,6 +67,7 @@ from app.simulation.emt.cases.atp_reference import (  # noqa: E402
     AtpReferenceCase,
     load_reference,
 )
+from app.simulation.emt.flashover import iec_60034_15_levels  # noqa: E402
 from app.simulation.emt.vcb_scenarios import (  # noqa: E402
     FIELD_PEAK_CEILING_PU,
     LITERATURE_WORST_ARC_TIME_S,
@@ -95,19 +97,57 @@ def zeros_do_caso() -> tuple[PoleCurrentZeros, ...]:
     )
 
 
-def _executa(argumento: tuple[str, bool, int, tuple]) -> dict:
+#: Mitigações disponíveis como eixo da varredura.
+#:
+#: ``"nenhuma"`` e ``"amortecedor"`` são o par histórico — a varredura
+#: publicada de 900 realizações usou exatamente esses dois e a linha de
+#: comando padrão os reproduz. ``"para_raios"`` instala o MOA no terminal
+#: do motor; ``"disrupcao"`` instala o limiar da IEC 60034-15 com registro
+#: do evento, sem mitigar nada — serve para CONTAR travessias, não para
+#: evitá-las.
+MITIGACOES: tuple[str, ...] = ("nenhuma", "amortecedor", "para_raios", "disrupcao")
+
+
+def _configuracao(mitigacao: str) -> dict:
+    """Argumentos de ``AtpReferenceCase`` para uma mitigação."""
+    m = str(mitigacao)
+    if m not in MITIGACOES:
+        raise ValueError(f"mitigação desconhecida {mitigacao!r}; use {MITIGACOES}")
+    if m == "amortecedor":
+        return {"with_snubber": True}
+    if m == "para_raios":
+        return {"with_snubber": False, "motor_arrester_system_voltage_V": 4160.0}
+    if m == "disrupcao":
+        sli, _sfi = iec_60034_15_levels(4160.0)
+        return {"with_snubber": False, "motor_flashover_level_V": sli}
+    return {"with_snubber": False}
+
+
+def _executa(argumento: tuple[str, str, int, tuple, float]) -> dict:
     """Uma realização. Isolada em função de topo por causa do pool."""
-    nome, com_snubber, indice, amostras = argumento
+    nome, mitigacao, indice, amostras, dt_s = argumento
     logging.disable(logging.WARNING)
     modelo = AtpReferenceCase(
-        with_snubber=bool(com_snubber), vcb_samples=amostras
+        vcb_samples=amostras, dt_s=float(dt_s), **_configuracao(mitigacao)
     ).build()
     modelo.run()
     motor = modelo.motor_voltage_summary()
     trv = modelo.trv_summary()
+    extra: dict = {}
+    if modelo.arresters:
+        extra["energia_moa_J"] = max(a.energy_J for a in modelo.arresters)
+        extra["moa_extrapolado"] = any(a.extrapolated for a in modelo.arresters)
+    if modelo.flashovers:
+        eventos = [f.controller.result for f in modelo.flashovers]
+        extra["disrupcoes"] = sum(r.count for r in eventos)
+        instantes = [t for r in eventos for t in r.times_s]
+        extra["primeira_disrupcao_s"] = min(instantes) if instantes else None
     return {
+        **extra,
         "cenario": nome,
-        "com_snubber": bool(com_snubber),
+        "mitigacao": str(mitigacao),
+        "com_snubber": str(mitigacao) == "amortecedor",
+        "dt_s": float(dt_s),
         "indice": int(indice),
         "separacao_s": float(amostras[0].separation_time_s),
         "tempo_de_arco_us": [float(a.arc_time_s) * 1.0e6 for a in amostras],
@@ -126,9 +166,21 @@ def _executa(argumento: tuple[str, bool, int, tuple]) -> dict:
 
 def _resumo(linhas: list[dict]) -> dict:
     """Estatística descritiva de um grupo de realizações."""
+    if not linhas:
+        return {"n": 0}
     pico_pu = np.array([max(l["motor_pu"].values()) for l in linhas])
     reign = np.array([sum(l["reignicoes"].values()) for l in linhas])
+    disr = [l["disrupcoes"] for l in linhas if "disrupcoes" in l]
+    extra = (
+        {
+            "fracao_com_disrupcao": float(np.mean(np.asarray(disr) > 0)),
+            "disrupcoes_max": int(max(disr)),
+        }
+        if disr
+        else {}
+    )
     return {
+        **extra,
         "n": int(len(linhas)),
         "pico_motor_pu": {
             "min": float(pico_pu.min()),
@@ -157,6 +209,30 @@ def main(argv: list[str] | None = None) -> int:
         "--saida", type=Path, default=Path("varredura_vcb.json"), help="JSON de saída"
     )
     parser.add_argument(
+        "--dt",
+        type=float,
+        default=1.0e-6,
+        help=(
+            "passo de integração [s]. A cauda de escalada NÃO está "
+            "convergida em 1 µs: realizações marginais mudam de desfecho "
+            "no refinamento — use 2e-7 para resultado quantitativo da "
+            "cauda (custo ~5x)"
+        ),
+    )
+    parser.add_argument(
+        "--cenarios",
+        default=",".join(CENARIOS),
+        help=f"cenários separados por vírgula; disponíveis: {','.join(CENARIOS)}",
+    )
+    parser.add_argument(
+        "--mitigacoes",
+        default="nenhuma,amortecedor",
+        help=(
+            "mitigações separadas por vírgula; disponíveis: "
+            f"{','.join(MITIGACOES)}. O padrão reproduz a varredura publicada"
+        ),
+    )
+    parser.add_argument(
         "--processos",
         type=int,
         default=max(1, (os.cpu_count() or 1)),
@@ -165,23 +241,31 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.n <= 0:
         parser.error("--n deve ser > 0")
+    if not (math.isfinite(args.dt) and args.dt > 0.0):
+        parser.error("--dt deve ser finito e > 0")
+    cenarios = tuple(x.strip() for x in str(args.cenarios).split(",") if x.strip())
+    if not cenarios or any(c not in CENARIOS for c in cenarios):
+        parser.error(f"--cenarios deve ser subconjunto de {CENARIOS}")
+    mitigacoes = tuple(x.strip() for x in str(args.mitigacoes).split(",") if x.strip())
+    if not mitigacoes or any(m not in MITIGACOES for m in mitigacoes):
+        parser.error(f"--mitigacoes deve ser subconjunto de {MITIGACOES}")
 
     zeros = zeros_do_caso()
-    tarefas: list[tuple[str, bool, int, tuple]] = []
+    tarefas: list[tuple[str, str, int, tuple, float]] = []
     amostragem: dict[str, list] = {}
-    for k, nome in enumerate(CENARIOS):
+    for k, nome in enumerate(cenarios):
         triplas = sweep_three_pole_samples(
             scenario(nome),
             n=args.n,
             zeros_abc=zeros,
             arc_time_window_s=LITERATURE_WORST_ARC_TIME_S,
             earliest_separation_s=PISO_SEPARACAO_S,
-            seed=args.seed + k,
+            seed=args.seed + CENARIOS.index(nome),
         )
         amostragem[nome] = [[asdict(a) for a in t] for t in triplas]
-        for com_snubber in (False, True):
+        for mitigacao in mitigacoes:
             for i, t in enumerate(triplas):
-                tarefas.append((nome, com_snubber, i, t))
+                tarefas.append((nome, mitigacao, i, t, float(args.dt)))
 
     print(f"{len(tarefas)} realizações em {args.processos} processos", flush=True)
     linhas: list[dict] = []
@@ -192,11 +276,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {j}/{len(tarefas)}", flush=True)
 
     resumos = {
-        f"{nome}|{'com' if s else 'sem'}_snubber": _resumo(
-            [l for l in linhas if l["cenario"] == nome and l["com_snubber"] is s]
+        f"{nome}|{m}": _resumo(
+            [l for l in linhas if l["cenario"] == nome and l["mitigacao"] == m]
         )
-        for nome in CENARIOS
-        for s in (False, True)
+        for nome in cenarios
+        for m in mitigacoes
     }
     args.saida.write_text(
         json.dumps(
@@ -204,6 +288,9 @@ def main(argv: list[str] | None = None) -> int:
                 "configuracao": {
                     "n_por_cenario": int(args.n),
                     "seed": int(args.seed),
+                    "dt_s": float(args.dt),
+                    "cenarios": list(cenarios),
+                    "mitigacoes": list(mitigacoes),
                     "piso_separacao_s": PISO_SEPARACAO_S,
                     "janela_tempo_de_arco_s": list(LITERATURE_WORST_ARC_TIME_S),
                     "v_base_fase_terra_V": float(V_BASE_FASE_TERRA_V),

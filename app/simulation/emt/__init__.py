@@ -416,12 +416,16 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "usar Δt compatível com a resolução angular pretendida."
     ),
     "emt_linear_components_only": (
-        "Todos os ramos são LINEARES e invariantes no tempo. Não há saturação "
-        "magnética, histerese, perdas no ferro, para-raios de óxido metálico "
-        "nem resistência de arco dependente da corrente. O transformador é "
+        "Os ramos ESTAMPADOS na matriz são lineares e invariantes no tempo. "
+        "Não há saturação magnética, histerese, perdas no ferro nem "
+        "resistência de arco dependente da corrente. O transformador é "
         "representado apenas pela impedância de dispersão (CoupledRL), sem "
         "capacitância entre enrolamentos — que é o caminho dominante de "
-        "transferência de surto de frente rápida."
+        "transferência de surto de frente rápida. RESSALVA: elementos não "
+        "lineares existem FORA da matriz, por compensação "
+        "(app.simulation.emt.nonlinear, Dommel 1971 §V), e o para-raios de "
+        "óxido metálico está implementado sobre esse mecanismo "
+        "(app.simulation.emt.arrester); a saturação de transformador, não."
     ),
     "emt_dense_lu_no_sparsity": (
         "A matriz MNA é DENSA e a fatoração LU é de Doolittle com pivotamento "
