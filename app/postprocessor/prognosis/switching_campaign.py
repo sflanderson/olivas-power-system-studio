@@ -318,12 +318,18 @@ class SwitchingCampaign:
         acc = accumulator or CombinedDamageAccumulator(
             params=params or DamageModelParams()
         )
+        # ``None`` e perfil VAZIO são coisas diferentes: o primeiro é
+        # ausência de medição e impede integrar; o segundo é medição que
+        # não encontrou excursão acima do limiar de detecção — dano nulo,
+        # e uma manobra que ocorreu.
         sem_perfil = [o.index for o in self.aging if o.profile is None]
         if sem_perfil:
             raise ValueError(
                 "manobras de envelhecimento sem perfil de estresse nos "
                 f"índices {sem_perfil[:5]}{'…' if len(sem_perfil) > 5 else ''}: "
-                "o dano não pode ser integrado sem a forma de onda"
+                "o dano não pode ser integrado sem a forma de onda. Um perfil "
+                "VAZIO (medido, sem excursão acima do limiar) é aceito e "
+                "contribui dano nulo"
             )
         for o in self.aging:
             acc.add_profile(o.profile)  # type: ignore[arg-type]
@@ -339,6 +345,18 @@ class SwitchingCampaign:
         ignora a dependência do dano com o estado, que o próprio
         acumulador modela quando ``state_dependent_threshold`` está ativo.
 
+        A contagem de manobras vem da CAMPANHA, e **não** de
+        ``accumulator.n_operations``. As duas medem coisas diferentes e
+        confundi-las erra o denominador nos dois sentidos:
+
+        * ``n_operations`` conta GRUPOS de reignição identificados dentro
+          do perfil. Um perfil que reúne as três fases de uma manobra
+          declara até três grupos — logo SUPERESTIMA o número de manobras;
+        * uma manobra tão branda que nenhuma excursão ultrapassa o limiar
+          de DETECÇÃO produz perfil vazio e nenhum grupo — logo é
+          SUBESTIMADA, embora tenha ocorrido e tenha de entrar no
+          denominador.
+
         Returns
         -------
         float
@@ -347,10 +365,25 @@ class SwitchingCampaign:
         Raises
         ------
         ValueError
-            Nenhuma manobra de envelhecimento contabilizada.
+            Nenhuma manobra de envelhecimento na campanha, ou acumulador
+            que não foi alimentado.
         """
-        n = accumulator.n_operations
+        n = len(self.aging)
         if n <= 0:
+            raise ValueError(
+                "a campanha não tem manobra de envelhecimento: não há dano a "
+                "extrapolar"
+            )
+        # Distinguir "acumulador não alimentado" de "alimentado e sem
+        # dano": os dois dão n_operations = 0 e D = 0, e só a campanha
+        # sabe qual é qual. Se ela tem excursões e o acumulador não viu
+        # nenhuma, ele não foi alimentado — erro do chamador, e devolver
+        # "vida infinita" para ele seria perigoso. Se ela não tem excursão
+        # nenhuma, o dano nulo é o resultado correto.
+        tem_excursao = any(
+            o.profile is not None and o.profile.events for o in self.aging
+        )
+        if tem_excursao and accumulator.n_operations == 0 and accumulator.D_total <= 0.0:
             raise ValueError(
                 "o acumulador não contabilizou manobra nenhuma; chame "
                 "accumulate() antes"

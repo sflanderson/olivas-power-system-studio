@@ -724,3 +724,74 @@ class TestRobustezAoExpoente:
     def test_lista_de_expoentes_vazia_levanta(self):
         with pytest.raises(ValueError, match="exponents"):
             exponent_robustness(self._par(), exponents=())
+
+
+# ---------------------------------------------------------------------------
+# 9. Perfil vazio e a contagem correta de manobras
+# ---------------------------------------------------------------------------
+
+
+class TestPerfilVazioEDenominador:
+    """Duas distinções que a campanha de 150 manobras revelou por falha.
+
+    A primeira: ``None`` e perfil VAZIO são coisas diferentes. ``None`` é
+    ausência de medição e impede integrar; vazio é medição que não
+    encontrou excursão acima do limiar de detecção — dano nulo, e uma
+    manobra que ocorreu.
+
+    A segunda: ``accumulator.n_operations`` conta GRUPOS de reignição
+    dentro do perfil, não manobras da campanha. Um perfil que reúne as
+    três fases declara até três grupos. O denominador correto é
+    ``len(campanha.aging)``.
+    """
+
+    def test_perfil_vazio_e_aceito_e_contribui_dano_nulo(self):
+        c = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV)
+        c.add(ManeuverOutcome(index=0, peak_pu=1.2, profile=StressProfile(events=[])))
+        acc = c.accumulate(params=DamageModelParams())
+        assert acc.D_total == 0.0
+        assert c.maneuvers_to_damage_limit(acc) == math.inf
+
+    def test_perfil_vazio_entra_no_denominador(self):
+        """A manobra branda ocorreu: ignorá-la superestimaria a taxa de dano."""
+        com_vazio = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV)
+        com_vazio.add(ManeuverOutcome(index=0, peak_pu=3.0, profile=_perfil(12.0)))
+        for i in (1, 2, 3):
+            com_vazio.add(
+                ManeuverOutcome(
+                    index=i, peak_pu=1.2, profile=StressProfile(events=[])
+                )
+            )
+        so_a_severa = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV)
+        so_a_severa.add(ManeuverOutcome(index=0, peak_pu=3.0, profile=_perfil(12.0)))
+
+        n_com = com_vazio.maneuvers_to_damage_limit(com_vazio.accumulate())
+        n_so = so_a_severa.maneuvers_to_damage_limit(so_a_severa.accumulate())
+        # Mesmo dano, quatro manobras em vez de uma: a vida quadruplica.
+        assert n_com == pytest.approx(4.0 * n_so, rel=1e-9)
+
+    def test_none_continua_sendo_erro_e_a_mensagem_ensina(self):
+        c = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV)
+        c.add(ManeuverOutcome(index=0, peak_pu=2.0))
+        with pytest.raises(ValueError, match="VAZIO"):
+            c.accumulate()
+
+    def test_o_denominador_ignora_o_contador_do_acumulador(self):
+        """Um perfil de três grupos numa manobra não vira três manobras."""
+        tres_grupos = StressProfile(
+            events=[
+                StressEvent(
+                    V_pk_kV=12.0, T1_us=0.2, dvdt_kV_per_us=60.0, n_reignitions=1
+                )
+                for _ in range(3)
+            ]
+        )
+        c = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV)
+        c.add(ManeuverOutcome(index=0, peak_pu=3.0, profile=tres_grupos))
+        acc = c.accumulate()
+        assert acc.n_operations == 3, "o acumulador vê três grupos"
+        assert len(c.aging) == 1, "a campanha vê uma manobra"
+        # A vida usa a contagem da CAMPANHA.
+        assert c.maneuvers_to_damage_limit(acc) == pytest.approx(
+            1.0 / acc.D_total, rel=1e-12
+        )

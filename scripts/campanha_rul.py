@@ -147,11 +147,10 @@ def _reconstroi(linha: dict) -> ManeuverOutcome:
         for p in linha["perfis"]
         for k in range(p["n_eventos"])
     ]
-    perfil = (
-        StressProfile(events=eventos, label=f"manobra{linha['indice']}")
-        if eventos
-        else None
-    )
+    # Perfil VAZIO, e não ``None``: a manobra foi medida e não produziu
+    # excursão acima do limiar de detecção. ``None`` significaria ausência
+    # de medição, e impediria integrar o dano da campanha inteira.
+    perfil = StressProfile(events=eventos, label=f"manobra{linha['indice']}")
     return ManeuverOutcome(
         index=int(linha["indice"]),
         peak_pu=float(linha["pico_pu"]),
@@ -211,6 +210,37 @@ def main(argv: list[str] | None = None) -> int:
             if j % 10 == 0:
                 print(f"  {j}/{len(tarefas)}", flush=True)
 
+    def grava(resumos: dict) -> None:
+        """Grava o JSON. Chamado ANTES do resumo e de novo depois dele.
+
+        A simulação é a parte cara; o resumo é barato e pode falhar. Gravar
+        antes garante que uma falha de pós-processamento não descarte horas
+        de execução — foi o que aconteceu na primeira campanha de 150.
+        """
+        args.saida.write_text(
+            json.dumps(
+                {
+                    "configuracao": {
+                        "n": int(args.n),
+                        "seed": int(args.seed),
+                        "dt_s": float(args.dt),
+                        "envelope_V": float(envelope_V),
+                        "v_base_V": V_BASE_V,
+                        "limiar_deteccao_kV": DETECTION_THRESHOLD_KV,
+                        "impedancia_de_surto_ohm": SURGE_IMPEDANCE_OHM,
+                    },
+                    "resumo": resumos,
+                    "manobras": linhas,
+                },
+                indent=1,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+    grava({})
+    print(f"execuções gravadas em {args.saida}; resumindo", flush=True)
+
     resumos = {}
     for com in configs:
         rotulo = "com_para_raios" if com else "sem_mitigacao"
@@ -234,26 +264,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"  caminho dominante: {resumo['caminho_dominante']}")
 
-    args.saida.write_text(
-        json.dumps(
-            {
-                "configuracao": {
-                    "n": int(args.n),
-                    "seed": int(args.seed),
-                    "dt_s": float(args.dt),
-                    "envelope_V": float(envelope_V),
-                    "v_base_V": V_BASE_V,
-                    "limiar_deteccao_kV": DETECTION_THRESHOLD_KV,
-                    "impedancia_de_surto_ohm": SURGE_IMPEDANCE_OHM,
-                },
-                "resumo": resumos,
-                "manobras": linhas,
-            },
-            indent=1,
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
+    grava(resumos)
     print(f"\ngravado em {args.saida}")
     return 0
 
