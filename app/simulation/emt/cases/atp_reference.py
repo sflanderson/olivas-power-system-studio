@@ -1465,6 +1465,14 @@ class AtpReferenceCase:
     atp_model_compatibility: bool = False
     zero_crossing_order: str = ATP_ZERO_ORDER_LITERAL
     reference_path: Path | None = None
+    #: Realizações de parâmetros por polo, uma por fase, vindas de
+    #: :mod:`app.simulation.emt.vcb_scenarios`. ``None`` (padrão) usa os
+    #: valores do arquivo de referência. Um trio de amostras substitui
+    #: corrente de corte, recuperação dielétrica, capacidade de extinção
+    #: e instante de separação — é o caminho da varredura estatística,
+    #: em que os parâmetros do disjuntor entram como FAIXAS da literatura
+    #: e não como constantes de um caso.
+    vcb_samples: tuple | None = None
 
     def __post_init__(self) -> None:
         for label, value in (("dt_s", self.dt_s), ("t_end_s", self.t_end_s)):
@@ -1641,6 +1649,37 @@ class AtpReferenceCase:
 
         # -- polos do disjuntor ----------------------------------------------
         recovery = self.recovery()
+        if self.vcb_samples is not None:
+            amostras = tuple(self.vcb_samples)
+            if len(amostras) != len(PHASES):
+                raise ValueError(
+                    f"vcb_samples deve trazer {len(PHASES)} realizações, uma por fase, "
+                    f"obtidas {len(amostras)}"
+                )
+            # A convenção de extinção acompanha a AMOSTRA, não o arquivo:
+            # uma realização vinda das faixas da literatura traz consigo a
+            # convenção física (extingue DENTRO da capacidade de di/dt), e
+            # impor sobre ela a convenção invertida do arquivo misturaria
+            # duas físicas incompatíveis no mesmo resultado.
+            parametros = tuple(
+                (
+                    a.separation_time_s,
+                    a.chopping_current_A,
+                    a.recovery(),
+                    a.didt_capability_A_per_us,
+                    a.as_pole_kwargs()["didt_convention"],
+                )
+                for a in amostras
+            )
+        else:
+            parametros = tuple(
+                (t_sep, i_ch, recovery, didt, self.didt_convention)
+                for t_sep, i_ch, didt in zip(
+                    self.separation_times(),
+                    VCB_CHOPPING_CURRENT_A,
+                    VCB_DIDT_CAPABILITY_A_PER_US,
+                )
+            )
         poles: tuple = tuple(polo.controller for polo in literal_poles) if literal_poles else tuple(
             VacuumCircuitBreakerModel(
                 sw,
@@ -1648,19 +1687,13 @@ class AtpReferenceCase:
                 chopping_current_A=i_ch,
                 chopping_range_A=(i_ch, i_ch),
                 chopping_distribution="deterministic",
-                recovery=recovery,
+                recovery=rec,
                 didt_capability_A_per_us=didt,
-                didt_convention=self.didt_convention,
+                didt_convention=conv,
                 max_reignitions=int(self.max_reignitions),
                 name=f"vcb_{ph}",
             )
-            for ph, sw, t_sep, i_ch, didt in zip(
-                PHASES,
-                switches,
-                self.separation_times(),
-                VCB_CHOPPING_CURRENT_A,
-                VCB_DIDT_CAPABILITY_A_PER_US,
-            )
+            for ph, sw, (t_sep, i_ch, rec, didt, conv) in zip(PHASES, switches, parametros)
         )
 
         # -- ramo amortecedor opcional ---------------------------------------
