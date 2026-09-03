@@ -251,13 +251,14 @@ docs/research/rul_isolamento/
 ├── 08_VARREDURA_ESTATISTICA_VCB.md                    (varredura Monte Carlo do VCB)
 ├── 09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md           (compensação, MOA e aceitação)
 ├── 10_CAMPANHA_DOIS_CAMINHOS_DE_FIM_DE_VIDA.md        (envelhecimento × falha)
+├── 11_REDUCAO_DAS_LIMITACOES.md                       (acoplamento, robustez, estratificação)
 └── anexos/
     ├── fichamentos/        13 arquivos — literatura de apoio
     ├── fichamentos_AB/      2 arquivos — Documentos A e B do autor
     ├── pesquisa/            9 arquivos — 3 pesquisas dirigidas + 6 pesquisas web
     ├── repo/                5 arquivos — mapas do código
     ├── cruzamento/          2 arquivos — A × B × literatura × repositório
-    ├── dados/               6 arquivos — resultados brutos das varreduras (JSON)
+    ├── dados/               7 arquivos — resultados brutos das varreduras (JSON)
     └── verdicts/            2 arquivos — veredictos da verificação adversarial (JSON)
 ```
 
@@ -283,7 +284,7 @@ Todos os caminhos de documento citados adiante são **relativos a `docs/research
 | `05_MOTOR_EMT_DEDICADO.md` | 13 seções: por que um motor dedicado e próprio (F1–F3) e o `.atp` como fonte da verdade; MNA e modelos companheiros; CDA; partida em regime permanente; Bergeron e JMarti lado a lado, com o viés de $T_1$ medido; VCB dinâmico; *snubber* e a lacuna do nível de *breakover*; validação (fontes primárias + regressão dígito a dígito contra as Listas EEE873); *benchmark* aberto contra o Documento A; desempenho medido e critério objetivo de migração para C++; integração com o prognóstico e papel do `.atp`; 41 limitações catalogadas e trabalho futuro; referências | 818 linhas |
 
 
-Os cinco documentos acrescentados depois do fechamento das etapas — `06` a `10` — formam a
+Os seis documentos acrescentados depois do fechamento das etapas — `06` a `11` — formam a
 linha de **confrontação com a literatura**, e não com os Documentos A e B: eles substituem a
 validação contra a Tabela III de A, que seria circular, pela confrontação com as faixas
 publicadas e com os critérios de validade internos do motor.
@@ -295,6 +296,7 @@ publicadas e com os critérios de validade internos do motor.
 | `08_VARREDURA_ESTATISTICA_VCB.md` | Varredura Monte Carlo com o **tempo de arco** como variável de controle e o disjuntor tratado como **tripolar**; três cenários (literatura, medido, caso de referência) com e sem amortecedor, 900 realizações; supressão da escalada pelo amortecedor e seu custo em regime; **delimitação do domínio de validade da cauda de escalada**, com o mecanismo diagnosticado e o caminho de correção | 267 linhas |
 | `09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md` | Método de **compensação** de Dommel 1971 verificado contra soluções analíticas; **para-raios ZnO** com a curva publicada por Vollet, escalada para 4,16 kV e confrontada com o envelope da IEC 60034-15; a cauda de escalada volta à faixa publicada (77,5 → 3,45 pu; 128 → 6 reignições); **critério de aceitação de Wong** atendido quanto à forma — dependência com a RRDS passa a ter máximo interior —, com a localização discutida; reconciliação de unidades da lei de extinção; **disrupção da isolação** no envelope da IEC 60034-15 como evento terminal, com as duas ressalvas de convergência medidas; **varredura fina a 0,2 µs** fixando qual passo o caso exige e separando o que converge do que não converge | 339 linhas |
 | `10_CAMPANHA_DOIS_CAMINHOS_DE_FIM_DE_VIDA.md` | Fecha a cadeia manobra → estresse → estado → vida com formas de onda reais: taxa de travessia do envelope (**uma manobra em dezenove** sem mitigação, mais de 50 com para-raios), tratamento do caso de zero eventos pela regra de três, e o achado de que **o para-raios aumenta o dano acumulado porque converte falha em envelhecimento** — com a causa isolada por medição | 142 linhas |
+| `11_REDUCAO_DAS_LIMITACOES.md` | Fecha as três limitações do documento 10: **acoplamento** de $p$ com o dano, computável sem simular (inócuo sem mitigação por causa de uma lacuna de 19× na distribuição; corta 8 % da vida mitigada); **robustez ao expoente** não calibrado, que torna a DECISÃO livre de calibração porque a dispersão é 1 quando a travessia domina; **campanha completa** das 150 manobras, com os dois defeitos de contagem que ela revelou; **estratificação**, com ganho de variância de 6,8× e o refinamento da taxa para uma manobra em 24 | 179 linhas |
 
 ### 3.3 `anexos/fichamentos/` — literatura de apoio (13)
 

@@ -37,7 +37,7 @@ atravessa o envelope da IEC 60034-15 na instalação sem mitigação; com para-r
 
 ## 3. O que os dados contêm
 
-Seis conjuntos em `docs/research/rul_isolamento/anexos/dados/`, todos JSON, ~2,3 MB.
+Sete conjuntos em `docs/research/rul_isolamento/anexos/dados/`, todos JSON, ~2,9 MB.
 
 | Arquivo | Conteúdo | Para que serve na integração |
 |---|---|---|
@@ -46,7 +46,8 @@ Seis conjuntos em `docs/research/rul_isolamento/anexos/dados/`, todos JSON, ~2,3
 | `varredura_rrds_constante.json` | Grade de RRDS de 5 a 50 kV/ms, 25 realizações por ponto, com e sem para-raios, capacidade de extinção constante | Critério de aceitação de Wong (forma da dependência) |
 | `varredura_rrds_wong.json` | Mesma grade com a lei de extinção dependente do tempo | idem |
 | `varredura_rrds_wong_estendida.json` | Grade estendida a 200 kV/ms | Localiza o máximo interior da dependência |
-| `campanha_rul_n60.json` | 120 manobras com **formas de onda processadas**: por manobra e por fase, cada excursão com pico, T₁, dv/dt, energia e contagem de reignições | Demonstração ponta a ponta da cadeia |
+| `campanha_rul_n150.json` | **300 manobras com formas de onda processadas**: por manobra e por fase, cada excursão com pico, T₁, dv/dt, energia e contagem de reignições, nas duas configurações | **Conjunto de referência da cadeia completa** |
+| `campanha_rul_n60.json` | Idem, 120 manobras | Histórico; seus números de envelhecimento foram superados |
 
 Todos trazem um bloco `configuracao` com semente, passo, tensão de base, envelope adotado e
 limiar de detecção — o suficiente para reproduzir qualquer linha.
@@ -62,6 +63,9 @@ misturá-las no mesmo painel seria o principal risco do produto.
   de curva de vida. Sem mitigação: $p = 4{,}1\,\% \pm 1{,}3\,\%$, ou **uma manobra em 24**. Com
   para-raios: zero em 150, logo $p \le 2\,\%$ pela regra de três — **mais de 50 manobras**, e
   não "nunca".
+* **Fim de vida pelos dois caminhos.** Sem mitigação, 18,75 manobras (a travessia domina); com
+  para-raios, $1{,}44\cdot10^6$ (o envelhecimento domina) — fator de 76 000. A decisão é robusta
+  ao expoente não calibrado; o segundo número, não.
 * **Instante da travessia.** Mediana de 0,489 ms após a separação dos contatos. Consequência
   comercial direta: **não há janela de atuação nessa escala**, o que sustenta a recomendação de
   mitigação preventiva contra proteção reativa.
@@ -70,9 +74,9 @@ misturá-las no mesmo painel seria o principal risco do produto.
 
 ### 4.2 Arquitetura com incerteza propagada — exibir sempre com a faixa
 
-* **Manobras por envelhecimento.** Ordem de $10^7$, mas os parâmetros da curva de vida **não
-  estão calibrados** para mica-epóxi pré-formada de MT. Varrendo o expoente na faixa da
-  literatura (3,8 a 11,7), a vida varia por fator de **4,15·10³**. Nunca exiba esse número sem a
+* **Manobras por envelhecimento.** Ordem de $10^6$ a $10^7$, mas os parâmetros da curva de vida
+  **não estão calibrados** para mica-epóxi pré-formada de MT. Varrendo o expoente na faixa da
+  literatura (3,8 a 11,7), a vida varia por fator de **2,9·10³**. Nunca exiba esse número sem a
   faixa.
 * **Asset Health Index.** Herda a mesma incerteza.
 

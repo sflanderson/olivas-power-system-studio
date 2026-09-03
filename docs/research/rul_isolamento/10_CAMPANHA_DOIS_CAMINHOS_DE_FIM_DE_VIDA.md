@@ -53,6 +53,10 @@ nenhuma não demonstra impossibilidade; demonstra um limite superior.
 
 ### 2.2 A campanha de 60 manobras dá 1/60, e isso não contradiz
 
+> **Superado.** A campanha foi refeita para as 150 manobras nas duas configurações, e a taxa
+> passou a coincidir exatamente com a da varredura: 8/150. Ver `11_REDUCAO_DAS_LIMITACOES.md`,
+> §3. A análise abaixo permanece como o raciocínio que identificou a causa.
+
 A campanha ponta a ponta rodou as 60 primeiras realizações da mesma sequência e encontrou **uma**
 travessia — $p = 1{,}7\,\%$, com intervalo de 95 % de 0 a 4,9 %, que **contém** os 5,3 % do
 conjunto completo. A razão é a posição das travessias na sequência: elas ocorrem nos índices
@@ -65,6 +69,11 @@ realização a qualquer grandeza física. **A estimativa a usar é a de 150 real
 amostra pequena e está reportada aqui apenas porque é a que acompanha as formas de onda.
 
 ## 3. O achado: o para-raios AUMENTA o dano acumulado
+
+> **Números superados.** Os valores de dano desta seção vêm da campanha de 60 manobras e de um
+> denominador que contava GRUPOS de reignição em vez de manobras — dois defeitos corrigidos
+> depois. O **achado qualitativo se confirma** sobre as 150 manobras, e com oito realizações em
+> vez de uma; os números corretos estão em `11_REDUCAO_DAS_LIMITACOES.md`, §3.2.
 
 Campanha de 60 manobras com formas de onda, com e sem para-raios:
 
@@ -120,17 +129,16 @@ travessia da posição de caminho dominante.
 
 ## 5. O que continua aberto
 
-* **Os parâmetros da curva de vida continuam não calibrados.** O número de manobras por
-  envelhecimento ($10^7$ na ordem de grandeza) é arquitetura com incerteza propagada, não
-  previsão. O número **utilizável** deste estudo é o do caminho terminal.
-* **A dependência de $p$ com o dano acumulado não é modelada.** Uma isolação envelhecida
-  atravessa o envelope com probabilidade maior, porque sua suportabilidade caiu. O resultado é
-  **cota superior** do número de manobras até o fim
-  [`rul_campaign_terminal_and_aging_are_not_additive`].
+* **Os parâmetros da curva de vida continuam não calibrados** para o número absoluto; a
+  **decisão**, porém, não depende deles (`11_REDUCAO_DAS_LIMITACOES.md`, §2). O número
+  utilizável deste estudo continua sendo o do caminho terminal.
+* ~~**A dependência de $p$ com o dano acumulado não é modelada.**~~ **Fechado** — modelada e
+  medida: inócua sem mitigação, corta 8 % da vida mitigada
+  (`11_REDUCAO_DAS_LIMITACOES.md`, §1).
 * **A independência entre manobras é premissa.** Uma sequência de partidas abortadas — a condição
   que o CDV da IEC 60034-15 nomeia para o nível reforçado — a viola.
-* **A campanha com formas de onda cobriu 60 manobras, não 150.** A taxa citável vem da varredura
-  de 150; a campanha existe para fechar a cadeia, não para estimar a taxa.
+* ~~**A campanha com formas de onda cobriu 60 manobras, não 150.**~~ **Fechado** —
+  `11_REDUCAO_DAS_LIMITACOES.md`, §3.
 
 ## Referências
 
