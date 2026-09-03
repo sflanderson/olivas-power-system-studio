@@ -1,0 +1,53 @@
+{
+  "_origem": "listagem de saida do ATP, execucao de 03-Sep-26 08:33:19, caso com ramo amortecedor, Tmax=0.04 s, dT=1e-6 s",
+  "_convencao": "tensoes e correntes de PICO; angulos em graus; referencia cosseno",
+  "_avisos_da_propria_listagem": [
+    "Nonlinear resistances, time-varying resistances, and type-94 MODELS components are ignored during the phasor solution",
+    "Floating subnetwork found -- eliminacao das linhas X0002A e X0002B produziu diagonal quase nula; nos curto-circuitados a terra durante a manobra",
+    "Suspended simulation; plot data space exhausted (duas ocorrencias)"
+  ],
+  "frequencia_Hz": 60.0,
+  "fontes": {
+    "X0030A": {"V": 11718.4337, "ang": 0.0},
+    "X0030B": {"V": 11718.4337, "ang": 120.0},
+    "X0030C": {"V": 11718.4337, "ang": -120.0}
+  },
+  "tensoes_nodais": {
+    "X0028A": {"V": 11718.265885455, "ang": 0.0015143},
+    "X0028B": {"V": 11718.259867476, "ang": 120.0014935},
+    "X0028C": {"V": 11718.266555772, "ang": -119.9985215},
+    "X0029A": {"V": 3386.445342208, "ang": 30.4988358},
+    "X0029B": {"V": 3462.4613943689, "ang": 149.9015055},
+    "X0029C": {"V": 3396.9745565223, "ang": -90.9659742},
+    "X0002A": {"V": 3333.2341627423, "ang": 30.4064869},
+    "X0002B": {"V": 3418.47874193, "ang": 150.1939450},
+    "X0002C": {"V": 3351.525875651, "ang": -90.3750486},
+    "01ATA": {"V": 3149.2816313431, "ang": 29.5520506},
+    "01ATB": {"V": 3196.7932279749, "ang": 150.1398934},
+    "01ATC": {"V": 3133.6916426995, "ang": -89.2501817},
+    "XX0003": {"V": 49.026256208539, "ang": 156.3343652}
+  },
+  "correntes_de_ramo": {
+    "X0001A->XX0027": {"I": 911.39739155224, "ang": -48.9037264},
+    "X0001B->XX0019": {"I": 924.99635785946, "ang": 71.6801783},
+    "X0001C->XX0011": {"I": 906.85197488873, "ang": -167.7171473},
+    "01ATA->TERRA": {"I": 911.51501563824, "ang": 131.0890199},
+    "01ATB->TERRA": {"I": 925.26657514177, "ang": -108.3231373},
+    "01ATC->TERRA": {"I": 907.00271397526, "ang": 12.2867875}
+  },
+  "valvulas_do_amortecedor": {
+    "tensao_de_disparo_V": 2404.0,
+    "corrente_de_manutencao_A": 1.0,
+    "tempo_de_desionizacao_s": 0.0,
+    "estado_em_regime": "aberta"
+  },
+  "extremos_da_janela_completa": {
+    "_nota": "valores da secao Extrema of output variables; instantes em segundos",
+    "01ATA": {"max": 33511.0542, "t_max": 2.8e-05, "min": -76802.475, "t_min": 8e-06},
+    "01ATB": {"max": 24550.7529, "t_max": 0.024761, "min": -15483.733, "t_min": 1.2e-05},
+    "01ATC": {"max": 66285.3065, "t_max": 8e-06, "min": -32555.698, "t_min": 2.8e-05},
+    "X0029A": {"max": 22911.2404, "t_max": 3.6e-05, "min": -29222.828, "t_min": 1.6e-05},
+    "X0029C": {"max": 32766.8429, "t_max": 1.7e-05, "min": -23161.501, "t_min": 3.6e-05}
+  },
+  "perda_total_da_rede_W": 997130.9256266
+}
