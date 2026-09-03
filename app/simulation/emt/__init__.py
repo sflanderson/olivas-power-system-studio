@@ -83,7 +83,9 @@ from __future__ import annotations
 
 from app.simulation.emt.circuit import (
     DEFAULT_FACTORIZATION_CACHE_SIZE,
+    INVERSE_CONDITION_LIMIT,
     PIVOT_TOLERANCE,
+    SOLVE_STRATEGIES,
     Circuit,
     Controller,
     SingularSystemError,
@@ -134,6 +136,8 @@ __all__ = [
     "lu_factor",
     "lu_solve",
     "PIVOT_TOLERANCE",
+    "INVERSE_CONDITION_LIMIT",
+    "SOLVE_STRATEGIES",
     "DEFAULT_FACTORIZATION_CACHE_SIZE",
     # componentes
     "Component",
@@ -179,12 +183,32 @@ __all__ = [
 
 KNOWN_LIMITATIONS: dict[str, str] = {
     "emt_no_steady_state_init": (
-        "NÃO há inicialização fasorial em regime permanente. Toda simulação "
-        "parte do repouso (correntes de indutor e tensões de capacitor nulas, "
-        "salvo condição inicial explícita). O caso deve incluir uma janela de "
+        "NÃO há inicialização fasorial em regime permanente nem rodada de "
+        "condições iniciais consistentes. Toda simulação parte do repouso "
+        "(correntes de indutor e tensões de capacitor nulas, salvo condição "
+        "inicial explícita nos componentes) e a primeira amostra registrada é "
+        "a de t = Δt, não a de t = 0. O caso deve incluir uma janela de "
         "acomodação de pelo menos 5 constantes de tempo ANTES do evento de "
         "manobra, sob pena de o transitório de energização contaminar o V_pk "
         "e o dv/dt medidos."
+    ),
+    "emt_cda_residual_in_stiff_networks": (
+        "Um único passo de CDA (o padrão do ATP, cda_full_steps=1) reduz o "
+        "artefato trapezoidal por um fator da ordem de (1 + R·Δt/2L)², mas não "
+        "o anula: em rede muito rígida após o evento — constante de tempo "
+        "residual muito menor que Δt, caso da interrupção contra resistência "
+        "de fuga elevada e SEM snubber — pode restar oscilação da ordem de "
+        "dezenas de vezes o valor de regime. [CÁLCULO PRÓPRIO: L = 1 mH, "
+        "R_p = 100 kΩ, Δt = 1 µs — resíduo de 36x o regime com 1 passo, 1,01x "
+        "com 2 passos.] Use cda_full_steps=2 nesses casos."
+    ),
+    "emt_cda_half_step_not_recorded": (
+        "Por padrão as sondas registram apenas os instantes de passo COMPLETO; "
+        "as amostras internas dos meios-passos do CDA são descartadas para "
+        "manter a base de tempo uniforme. Como o maior valor instantâneo logo "
+        "após uma interrupção pode cair DENTRO do par de meios-passos, o V_pk "
+        "registrado pode subestimar o valor calculado pelo próprio solver. "
+        "Ative Solver(record_half_steps=True) quando o pico importar."
     ),
     "emt_constant_parameter_line": (
         "A linha/cabo é de PARÂMETROS CONSTANTES (Bergeron). Não há modelo "
