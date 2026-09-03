@@ -228,6 +228,25 @@ class TestCorrectionFactors:
         )
         assert any("FC_total" in w for w in r.warnings)
 
+    def test_grouping_factor_is_banded_not_interpolated(self):
+        """Tabela 42 NBR 5410 é uma função em degraus (faixas 9-11,
+        12-15, 16-19, ≥20 com fator ÚNICO cada) — confirmado contra a
+        reprodução oficial da Prysmian (Guia BT, Tabela 13, conforme
+        Tabela 42 da NBR 5410:2004). Regressão: uma versão anterior
+        interpolava linearmente entre os extremos de cada faixa,
+        produzindo fatores (ex. 0.48 para 10 circuitos) que não
+        existem na norma."""
+        from app.postprocessor.cable_sizing import _fc_grouping
+        # Mesma faixa → mesmo fator (sem interpolação)
+        assert _fc_grouping(9) == _fc_grouping(10) == _fc_grouping(11) == 0.50
+        assert _fc_grouping(12) == _fc_grouping(15) == 0.45
+        assert _fc_grouping(16) == _fc_grouping(19) == 0.41
+        assert _fc_grouping(20) == _fc_grouping(30) == 0.38
+        # Faixas adjacentes 1-8: valor próprio, conferido linha a linha
+        assert [_fc_grouping(n) for n in range(1, 9)] == [
+            1.00, 0.80, 0.70, 0.65, 0.60, 0.57, 0.54, 0.52,
+        ]
+
 
 # ---------------------------------------------------------------------------
 # Thermal stress (SC current)

@@ -245,30 +245,37 @@ def _fc_temperature(
     return 1.0
 
 
-# Tabela 42 NBR 5410 — FC para agrupamento (eletroduto)
+# Tabela 42 NBR 5410 — FC para agrupamento em feixe (eletroduto/leito),
+# métodos de referência A a F. A norma tabela FAIXAS de circuitos com
+# valor único por faixa (função em degraus, não interpolação contínua)
+# — confirmado contra a reprodução oficial da Prysmian (Guia de
+# Dimensionamento de Cabos para Baixa Tensão, Tabela 13, linha 1
+# "Em feixe...", conforme tabela 42 da NBR 5410:2004): 9-11→0.50,
+# 12-15→0.45, 16-19→0.41, ≥20→0.38. As chaves abaixo marcam o INÍCIO
+# de cada faixa; _fc_grouping busca a faixa correta, sem interpolar.
 _FC_GROUPING = {
     1: 1.00, 2: 0.80, 3: 0.70, 4: 0.65, 5: 0.60,
-    6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50, 10: 0.48,
-    12: 0.45, 14: 0.43, 16: 0.41, 18: 0.39, 20: 0.38,
+    6: 0.57, 7: 0.54, 8: 0.52, 9: 0.50,
+    12: 0.45, 16: 0.41, 20: 0.38,
 }
 
 
 def _fc_grouping(n_circuits: int) -> float:
-    """Fator de correção por agrupamento (default 0.80 se >20)."""
+    """Fator de correção por agrupamento em feixe (Tabela 42 NBR 5410).
+
+    Função em degraus: cada faixa de número de circuitos (1,2,...,8,
+    9-11,12-15,16-19,≥20) tem um único fator, sem interpolação entre
+    faixas — não fazer interpolação linear introduziria valores que
+    não existem na norma.
+    """
     if n_circuits <= 0:
         return 1.0
     if n_circuits >= 20:
         return _FC_GROUPING[20]
-    if n_circuits in _FC_GROUPING:
-        return _FC_GROUPING[n_circuits]
-    # Aproximação para valores intermediários
-    keys = sorted(_FC_GROUPING.keys())
-    for i, k in enumerate(keys[:-1]):
-        if k <= n_circuits <= keys[i + 1]:
-            t = (n_circuits - k) / (keys[i + 1] - k)
-            return _FC_GROUPING[k] + t * (
-                _FC_GROUPING[keys[i + 1]] - _FC_GROUPING[k]
-            )
+    # Chaves em ordem decrescente: primeira <= n_circuits define a faixa.
+    for k in sorted(_FC_GROUPING, reverse=True):
+        if n_circuits >= k:
+            return _FC_GROUPING[k]
     return 1.0
 
 

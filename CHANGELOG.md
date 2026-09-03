@@ -6,6 +6,12 @@ Todas as mudanças notáveis deste projeto. O formato segue [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+- `app/postprocessor/cable_sizing.py`: `_fc_grouping` (fator de correção por agrupamento, Tabela 42 NBR 5410) interpolava linearmente entre faixas da norma, produzindo valores inexistentes (ex. 0.48 para 10 circuitos, quando a norma define um único fator 0.50 para toda a faixa 9-11). A Tabela 42 é uma função em degraus, não contínua — confirmado contra a reprodução oficial da Prysmian (Guia de Dimensionamento de Cabos para Baixa Tensão, Tabela 13, "conforme tabela 42 da NBR 5410:2004"). Corrigido para busca por faixa sem interpolação; as tabelas de correção por temperatura (`_FC_TEMP_PVC`/`_FC_TEMP_XLPE`, Tabela 40) foram conferidas na mesma fonte e batem exatamente — não alteradas.
+
+### Documented (sem alteração de código)
+- `app/postprocessor/cable_sizing.py` cobre apenas os métodos de instalação A1/B1 (não-subterrâneos); a Prysmian também publica as tabelas de correção para linhas subterrâneas (temperatura do solo a 20 °C de referência, Tabela 11 "Solo") e resistividade térmica do solo (Tabela 12, NBR Tabela 41) — não incorporadas por não haver ainda suporte ao método D (subterrâneo direto), já sinalizado no código como trabalho futuro (`v0.95.x`). Evitado implementar correção sem a base de ampacidade subterrânea correspondente.
+
 ### Added — Catálogo de engenharia com dados de fabricantes (FASES 1-5)
 
 Digitalização de manuais/datasheets oficiais (ABB, Schneider, WEG, Eaton, Siemens, SEL, GE, Bussmann, SIBA, Prysmian, Nexans, Induscabos), com proveniência por entrada. Todas as mudanças são aditivas.
