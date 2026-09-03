@@ -1157,26 +1157,41 @@ _TRIP_UNITS: list[TripUnitModel] = [
         S_delay_tsd=_dial((0.05, 0.1, 0.2, 0.3, 0.4), unit="s"),
         S_i2t_selectable=True,
         I_pickup_Ii=_dial((2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0), off=True),
-        G_pickup_Ig=_dial((0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0), off=True),
-        G_delay_tg=_dial((0.05, 0.1, 0.2, 0.3, 0.4), unit="s"),
+        G_pickup_Ig=_sr(0.2, 1.0, unit="xIn", off=True),
+        G_delay_tg=_sr(0.05, 3.0, unit="s"),
         G_i2t_selectable=True,
         rated_voltage_V=690.0,
         notes=(
             "tsd impresso no catálogo como '(0,05-0,1-0,2-0,3-0,4) x Ir' e tg "
             "sem unidade — erro tipográfico da fonte; a única unidade "
-            "fisicamente coerente para retardo é segundos. I2t ON: "
-            "{0.1,0.2,0.3,0.4} s (tsd e tg). Tempo de abertura mínimo/máximo "
+            "fisicamente coerente para retardo é segundos. Verificação "
+            "adversarial (Rev. 23) confirmou que Ig e tg são FAIXAS "
+            "CONTÍNUAS nesta tabela detalhada (Ig: 0,2~1,0×In, ajuste de 1 A "
+            "absoluto; tg: 0,05~3,0 s, mesma faixa independente de I2t "
+            "on/off) — DIFERENTE do Tipo A, que mantém listas discretas de "
+            "8 posições para ambos mesmo na tabela avançada (ver "
+            "WEG-ABW-OCR-TIPO-A). tsd (S): I2t ON {0.1,0.2,0.3,0.4} s, I2t "
+            "OFF {0.05,0.1,0.2,0.3,0.4} s; tempo de abertura mínimo/máximo "
             "(I2t OFF, ms): 20/80 (posição 1), 80/140, 160/240, 260/340, "
-            "360/440 (mesma tabela para tsd e tg). tr também tabelado a "
-            "1.5×Ir {12.5,25,50,100,200,300,400,500} s e a 7.2×Ir "
+            "360/440 — valores confirmados na tabela da unidade Tipo P na "
+            "seção ABWC do mesmo catálogo (não repetidos na tabela "
+            "detalhada ABW aqui citada como source_doc, mas mesma unidade "
+            "de proteção); não se aplica a tg (faixa contínua, sem tabela "
+            "de bandas). tr também tabelado a 1.5×Ir "
+            "{12.5,25,50,100,200,300,400,500} s e a 7.2×Ir "
             "{0.34,0.69,1.38,2.7,5.5,8.3,11,13.8} s (mesmas 8 posições do "
-            "dial, precisão ±15%). Tipo A (AZ1/AH1/AC1/AF1...) usa ajuste "
-            "de L em dois estágios (Iu×Ir) — ver WEG-ABW-OCR-TIPO-A; S/I/G "
-            "idênticos entre Tipo A e Tipo P. Fuga à terra (I∆n, opcional, "
-            "requer TC externo): 0.5/1/2/3/5/10/20/30 A ou OFF, tempo de "
-            "alarme 140/230/350/800/950 ms — não modelada (função "
-            "independente de G, sem campo dedicado no dataclass). "
-            "Interlock Ir<Isd<Ii não explicitado no manual."
+            "dial); tolerância = maior valor entre ±10% (Ir<6×In), ±20% "
+            "(Ir≥6×In) ou ±40 ms — não ±15% fixo (esse valor é da tabela "
+            "simplificada ABWC, não da tabela detalhada ABW). Tipo A "
+            "(AZ1/AH1/AC1/AF1...) usa ajuste de L em dois estágios (Iu×Ir) "
+            "— ver WEG-ABW-OCR-TIPO-A; S e I são idênticos entre Tipo A e "
+            "Tipo P, G NÃO é (ver acima). Fuga à terra (I∆n, opcional, "
+            "requer TC externo): faixa contínua 0,1~30 A (não lista "
+            "discreta — essa pertence ao Tipo A); abertura e alarme usam o "
+            "MESMO ajuste (diferente do Tipo A, que tem tabelas separadas): "
+            "Proteção L: 0,1~3,0 s / Proteção S: (0,1~3,0 s)@30 A — não "
+            "modelada (função independente de G, sem campo dedicado no "
+            "dataclass). Interlock Ir<Isd<Ii não explicitado no manual."
         ),
     ),
     # WEG — ABW-OCR Tipo A (ACB, medição de corrente apenas: AZ1/AH1/
@@ -1212,12 +1227,29 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "0.93,0.95,0.98,1.0} (9 posições — a corrente de ajuste final é "
             "Iu×Ir_fino, não modelável em L_pickup_Ir sem um segundo campo; "
             "acima representa apenas o estágio grosso Iu; o produto "
-            "Iu×Ir_fino cobre efetivamente ~0.40-1.0×In). tr@6×Ir idêntico "
-            "ao Tipo P; também tabelado a 1.5×Ir e 7.2×Ir (mesmos valores "
-            "do Tipo P), precisão ±15%. S/I/G IDÊNTICOS ao Tipo P (mesma "
-            "fonte, mesma revisão) — ver WEG-ABW-OCR-TIPO-P para as notas "
-            "de tempo de abertura min/máx e a função opcional de fuga à "
-            "terra I∆n, ambas aplicáveis aqui também."
+            "Iu×Ir_fino cobre efetivamente ~0.40-1.0×In; um trecho isolado "
+            "do catálogo — legenda de teclas da seção introdutória ABWC "
+            "tipo A — lista uma 10ª posição espúria 0,89 entre 0,88 e 0,9, "
+            "não confirmada nas 3 outras ocorrências da mesma tabela, "
+            "tratada como erro de diagramação da fonte e não incluída "
+            "acima). tr@6×Ir idêntico ao Tipo P; também tabelado a 1.5×Ir e "
+            "7.2×Ir (mesmos valores do Tipo P); tolerância = maior valor "
+            "entre ±10% (Ir<6×In), ±20% (Ir≥6×In) ou ±40 ms (tabela "
+            "detalhada) — o catálogo também traz ±15% fixo numa tabela "
+            "simplificada anterior (ABWC), idêntico entre Tipo A e Tipo P "
+            "em ambos os casos. S e I são IDÊNTICOS ao Tipo P (mesma fonte, "
+            "mesma revisão) — ver WEG-ABW-OCR-TIPO-P para as notas de "
+            "tempo de abertura min/máx de tsd (valores confirmados também "
+            "aqui, seção Tipo A). G (Ig, tg) NÃO é idêntico ao Tipo P: aqui "
+            "permanece discreto (8 posições) mesmo na tabela avançada, "
+            "enquanto o Tipo P passa a usar faixa contínua nessa mesma "
+            "tabela — ver WEG-ABW-OCR-TIPO-P. Fuga à terra (I∆n, opcional, "
+            "requer TC externo): 0,5/1/2/3/5/10/20/30 A ou OFF; tempo de "
+            "abertura 140/230/350/800 ms, tempo de alarme "
+            "140/230/350/800/950 ms (tabelas distintas entre abertura e "
+            "alarme — diferente do Tipo P, que usa o mesmo ajuste para "
+            "ambos) — não modelada (função independente de G, sem campo "
+            "dedicado no dataclass)."
         ),
     ),
     # WEG — ACW ETS (MCCB — NÃO disjuntor aberto), disparador eletrônico

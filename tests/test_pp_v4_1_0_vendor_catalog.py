@@ -230,7 +230,9 @@ class TestTripUnits:
 
     def test_weg_abw_tipo_a_two_stage_L_adjustment(self):
         """Tipo A usa ajuste em dois estágios (Iu grosso × Ir fino),
-        diferente do Tipo P (Ir direto); S/I/G idênticos entre os dois."""
+        diferente do Tipo P (Ir direto); S/I idênticos entre os dois, mas
+        G NÃO é (Tipo P usa faixa contínua na tabela avançada do catálogo,
+        Tipo A permanece discreto — achado da verificação adversarial)."""
         tipo_a = library.get_trip_unit("WEG-ABW-OCR-TIPO-A")
         tipo_p = library.get_trip_unit("WEG-ABW-OCR-TIPO-P")
         assert tipo_a is not None
@@ -238,7 +240,11 @@ class TestTripUnits:
         assert tipo_a.L_pickup_Ir.min != tipo_p.L_pickup_Ir.min  # 0.5 vs 0.4
         assert tipo_a.S_pickup_Isd.discrete == tipo_p.S_pickup_Isd.discrete
         assert tipo_a.I_pickup_Ii.discrete == tipo_p.I_pickup_Ii.discrete
-        assert tipo_a.G_pickup_Ig.discrete == tipo_p.G_pickup_Ig.discrete
+        assert tipo_a.G_pickup_Ig.is_discrete
+        assert not tipo_p.G_pickup_Ig.is_discrete    # faixa contínua (verificação)
+        assert tipo_p.G_pickup_Ig.min == 0.2 and tipo_p.G_pickup_Ig.max == 1.0
+        assert not tipo_p.G_delay_tg.is_discrete
+        assert tipo_p.G_delay_tg.min == 0.05 and tipo_p.G_delay_tg.max == 3.0
         assert "0.89" not in tipo_a.notes   # valor espúrio da digitalização antiga
 
     def test_all_have_source_doc(self):
