@@ -69,6 +69,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from app.core.logging_config import get_logger
+
+log = get_logger(__name__)
+
 # ---------------------------------------------------------------------------
 # Faixas de classificação (semáforo)
 # ---------------------------------------------------------------------------
@@ -177,6 +181,12 @@ class HealthIndexThresholds:
     # CONFIGURÁVEL — NÃO CALIBRADO. γ = 2 como "margem sadia" é
     # convenção do módulo, não critério normativo.
     gamma_healthy: float = 2.0
+    # Múltiplo de pi_min que pontua 100 no escore de PI. A ABNT NBR
+    # 17094-3:2018, 6.8.3 fixa apenas o MÍNIMO (1,5 / 2,0); não há valor
+    # normativo de "PI bom". CONFIGURÁVEL — NÃO CALIBRADO, convenção do
+    # módulo (era constante embutida antes desta revisão, contradizendo a
+    # própria declaração de "configurável").
+    pi_good_multiplier: float = 2.0
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.pi_min) or self.pi_min <= 0.0:
@@ -216,6 +226,13 @@ class HealthIndexThresholds:
             raise ValueError(
                 f"gamma_healthy ({self.gamma_healthy}) deve ser > "
                 f"gamma_end_of_life ({self.gamma_end_of_life})"
+            )
+        if not math.isfinite(self.pi_good_multiplier) or (
+            self.pi_good_multiplier <= 1.0
+        ):
+            raise ValueError(
+                f"pi_good_multiplier deve ser > 1 (o PI 'bom' tem de exceder "
+                f"o mínimo normativo), obtido {self.pi_good_multiplier}"
             )
 
 
@@ -276,8 +293,9 @@ class AssetHealthIndex:
     weights, thresholds:
         Pesos e limiares (ver as classes correspondentes).
     bands:
-        Faixas de classificação; padrão :data:`DEFAULT_BANDS`
-        (não normativas).
+        Faixas de classificação ``(limite_inferior, rótulo, semáforo)`` em
+        ordem estritamente **decrescente** de limite inferior (validada);
+        padrão :data:`DEFAULT_BANDS` (não normativas).
     asset_id:
         Identificação do ativo, para rastreabilidade no laudo.
 
@@ -346,14 +364,33 @@ class AssetHealthIndex:
             )
         if not self.bands:
             raise ValueError("bands não pode ser vazio")
+        previous: float | None = None
         for band in self.bands:
             if len(band) != 3:
                 raise ValueError(
                     f"cada faixa deve ser (limite, rótulo, semáforo), "
                     f"obtido {band!r}"
                 )
-            if not math.isfinite(float(band[0])):
+            try:
+                lower = float(band[0])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"limite de faixa deve ser numérico em {band!r}"
+                ) from exc
+            if not math.isfinite(lower):
                 raise ValueError(f"limite de faixa não finito em {band!r}")
+            # :meth:`_band` devolve a PRIMEIRA faixa cujo limite inferior é
+            # atingido; sem ordenação estritamente decrescente a
+            # classificação sai silenciosamente errada (um AHI 100 cairia
+            # na faixa "CRITICO" se ela viesse primeiro). A ordenação é,
+            # portanto, invariante de correção — não convenção de estilo.
+            if previous is not None and lower >= previous:
+                raise ValueError(
+                    f"bands deve estar em ordem estritamente DECRESCENTE de "
+                    f"limite inferior: {lower} não é < {previous} em "
+                    f"{band!r}"
+                )
+            previous = lower
 
     # -- escores por componente --------------------------------------------
 
@@ -380,8 +417,9 @@ class AssetHealthIndex:
 
         IR: 0 pontos em ``ir_min_Mohm``, 100 em ``ir_good_Mohm``
         [NORMA: ABNT NBR 17094-3:2018, 6.8.2, Tab. 2].
-        PI: 0 pontos em ``pi_min``, 100 em ``2 × pi_min``
-        [NORMA: idem, 6.8.3]. O fator 2× é CONFIGURÁVEL e não normativo.
+        PI: 0 pontos em ``pi_min``, 100 em
+        ``pi_good_multiplier × pi_min`` [NORMA: idem, 6.8.3 — fixa só o
+        mínimo]. O multiplicador é CONFIGURÁVEL e não normativo.
         """
         th = self.thresholds
         scores: list[float] = []
@@ -390,7 +428,11 @@ class AssetHealthIndex:
                 _log_score(self.ir_Mohm, th.ir_min_Mohm, th.ir_good_Mohm)
             )
         if self.pi is not None:
-            scores.append(_linear_score(self.pi, th.pi_min, 2.0 * th.pi_min))
+            scores.append(
+                _linear_score(
+                    self.pi, th.pi_min, th.pi_good_multiplier * th.pi_min
+                )
+            )
         if not scores:
             return None
         return min(scores)
@@ -407,6 +449,17 @@ class AssetHealthIndex:
         if self.pd_qm_mV is None:
             return None
         th = self.thresholds
+        # Piso numérico: a escala é logarítmica e Q_m = 0 (leitura nula ou
+        # instrumento saturado em zero) não tem log. O piso é arbitrário e
+        # o clamp é registrado — abaixo de pd_qm_good_mV o escore já está
+        # saturado em 100, de modo que o piso não altera a pontuação.
+        if self.pd_qm_mV < 1.0e-6:
+            log.warning(
+                "AssetHealthIndex: Q_m = %.6g mV abaixo do piso numerico de "
+                "1e-6 mV da escala logaritmica; escore de DP saturado em 100. "
+                "Verifique se ha medicao de DP valida para este ativo.",
+                self.pd_qm_mV,
+            )
         value = max(self.pd_qm_mV, 1.0e-6)  # log exige > 0
         return _log_score(value, th.pd_qm_alarm_mV, th.pd_qm_good_mV)
 

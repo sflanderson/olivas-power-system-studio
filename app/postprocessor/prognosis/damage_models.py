@@ -82,11 +82,14 @@ import math
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Sequence
 
+from app.core.logging_config import get_logger
 from app.postprocessor.prognosis.stress_profile import (
     ABSOLUTE_ZERO_C,
     StressEvent,
     StressProfile,
 )
+
+log = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Faixas de literatura (para validação e para o laudo)
@@ -103,6 +106,26 @@ HIC_LITERATURE_RANGE_C: tuple[float, float] = (8.0, 15.0)
 #: Limite superior de expoente aceito nos argumentos de exp()/2**, para
 #: evitar overflow. Puramente numérico.
 _MAX_EXPONENT: float = 700.0
+
+
+def _saturate_exponent(expo: float, where: str) -> float:
+    """Satura o expoente em +/- :data:`_MAX_EXPONENT` e LOGA o clamp.
+
+    Convenção do repositório: "fallbacks aplicados, limitações tocadas"
+    são registrados em nível WARNING [REPO: app/core/logging_config.py:33-37;
+    checklist de convencoes_auditoria_gui_docs.md, item 4.1.6].
+    """
+    if expo > _MAX_EXPONENT or expo < -_MAX_EXPONENT:
+        log.warning(
+            "%s: expoente %.6g saturado em +/-%.0f para evitar overflow "
+            "numerico; o resultado NAO e o do modelo analitico e nao deve "
+            "ser citado como valor de projeto.",
+            where,
+            expo,
+            _MAX_EXPONENT,
+        )
+        return max(-_MAX_EXPONENT, min(_MAX_EXPONENT, expo))
+    return expo
 
 
 def _kelvin(theta_C: float) -> float:
@@ -286,8 +309,7 @@ def arrhenius_life(
     T = _kelvin(theta_C)
     T0 = _kelvin(theta0_C)
     c_T = 1.0 / T0 - 1.0 / T  # convenção de sinal da Etapa 1 §5.4, D5
-    expo = -B_K * c_T
-    expo = max(-_MAX_EXPONENT, min(_MAX_EXPONENT, expo))
+    expo = _saturate_exponent(-B_K * c_T, "arrhenius_life (D6)")
     return L0_h * math.exp(expo)
 
 
@@ -316,8 +338,7 @@ def montsinger_life(
         raise ValueError(f"HIC deve ser > 0 [°C], obtido {HIC}")
     _kelvin(theta_C)
     _kelvin(theta0_C)
-    expo = (theta0_C - theta_C) / HIC
-    expo = max(-_MAX_EXPONENT, min(_MAX_EXPONENT, expo))
+    expo = _saturate_exponent((theta0_C - theta_C) / HIC, "montsinger_life (D6)")
     return L0_h * (2.0 ** expo)
 
 
@@ -360,8 +381,7 @@ def simoni_life(
     T = _kelvin(theta_C)
     T0 = _kelvin(theta0_C)
     c_T = 1.0 / T0 - 1.0 / T
-    expo = -B_K * c_T
-    expo = max(-_MAX_EXPONENT, min(_MAX_EXPONENT, expo))
+    expo = _saturate_exponent(-B_K * c_T, "simoni_life (D5)")
     return t0_h * (V / V0) ** (-n) * math.exp(expo)
 
 
@@ -606,8 +626,10 @@ def supportable_events(
         return math.inf
 
     front = front_time_correction(event.T1_us, params.t_f0_us, params.m_front)
-    thermal_expo = (params.theta0_C - event.theta_C) / params.HIC_C
-    thermal_expo = max(-_MAX_EXPONENT, min(_MAX_EXPONENT, thermal_expo))
+    thermal_expo = _saturate_exponent(
+        (params.theta0_C - event.theta_C) / params.HIC_C,
+        "supportable_events (D7, fator termico)",
+    )
     thermal = 2.0 ** thermal_expo
 
     return params.N0_events * ratio ** (-params.n_voltage) * front * thermal
@@ -625,6 +647,16 @@ def event_damage(
     """``1/N_j`` — dano incremental de uma reignição (eq. 5.2).
 
     Vale exatamente 0,0 quando ``a V_pk <= V_th``.
+
+    Saturação declarada [CÁLCULO PRÓPRIO — proteção numérica]: quando o
+    produto ``ratio^-n · (t_f/t_f0)^m · 2^((θ_0-θ_j)/HIC)`` sofre
+    *underflow* para 0,0 em ponto flutuante (estresse muitas ordens de
+    grandeza acima da referência, ou θ_j muito acima de θ_0), ``N_j`` é
+    0,0 e ``1/N_j`` não é representável. O incremento é então saturado em
+    **1,0**, que é a falha convencionada ``D = 1`` da regra de Miner
+    (Etapa 1 §5.4, D4) — um único evento consome todo o orçamento de
+    vida. O clamp é registrado em WARNING; o valor NÃO é resultado do
+    modelo analítico e não deve ser citado como número de projeto.
     """
     N_j = supportable_events(
         event,
@@ -636,6 +668,18 @@ def event_damage(
     )
     if math.isinf(N_j):
         return 0.0
+    if N_j <= 0.0:
+        log.warning(
+            "event_damage (D7): N_j sofreu underflow para %.6g com "
+            "V_pk = %.6g kV, T1 = %.6g us e theta = %.6g C; incremento "
+            "saturado em 1,0 (falha convencionada D = 1, D4). Reveja n, "
+            "V_ref e HIC: o evento esta fora da faixa numerica do modelo.",
+            N_j,
+            event.abs_V_pk_kV,
+            event.T1_us,
+            event.theta_C,
+        )
+        return 1.0
     return 1.0 / N_j
 
 
@@ -667,6 +711,14 @@ def psi_linear(D: float, *, psi_min: float = 0.5) -> float:
         raise ValueError(f"D deve ser >= 0, obtido {D}")
     if not math.isfinite(psi_min) or not (0.0 < psi_min <= 1.0):
         raise ValueError(f"psi_min deve estar em (0, 1], obtido {psi_min}")
+    if D > 1.0:
+        log.warning(
+            "psi_linear: D = %.6g > 1 (falha ja atingida, D4); psi saturado "
+            "no valor de D = 1 (%.6g). A extrapolacao de suportabilidade "
+            "residual alem da falha convencionada nao esta definida.",
+            D,
+            psi_min,
+        )
     d = min(1.0, D)
     return 1.0 - (1.0 - psi_min) * d
 

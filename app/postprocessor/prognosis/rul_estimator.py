@@ -37,7 +37,14 @@ Duas rotas independentes para a vida útil remanescente (RUL):
             [0,          0,                1]]
        H = [1, 0, 0]
 
-   [INFERÊNCIA — reconstrução do módulo, declarada como tal.]
+   [INFERÊNCIA — reconstrução do módulo, declarada como tal.] O jacobiano
+   é verificado por diferenças centradas no arquivo de testes.
+
+   A eq. (6) é implementada na **forma de Joseph**,
+   ``P = (I - K H) M (I - K H)^T + K R K^T``, algebricamente idêntica a
+   ``(I - K H) M`` para o ganho ótimo (4) mas simétrica e semidefinida
+   positiva por construção; a forma curta perde a simetria por
+   arredondamento ao longo de séries longas [INFERÊNCIA numérica].
 
 2. **Determinístico** — :func:`rul_from_damage`, ``RUL = (1 - D)/dD/dt``,
    coerente com o acumulador (5.1)-(5.2) e com D7 (Etapa 1 §5.4).
@@ -76,6 +83,10 @@ from statistics import NormalDist
 from typing import Sequence
 
 import numpy as np
+
+from app.core.logging_config import get_logger
+
+log = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Defaults NÃO CALIBRADOS
@@ -286,7 +297,22 @@ class EkfRulEstimator:
 
     @staticmethod
     def _safe_exp(value: float) -> float:
-        return math.exp(max(-_MAX_EXPONENT, min(_MAX_EXPONENT, value)))
+        """``exp`` com expoente saturado em +/- :data:`_MAX_EXPONENT`.
+
+        O clamp é registrado em WARNING [REPO: app/core/logging_config.py:33-37]:
+        acima dele a trajetória exponencial deixa de ser representável e o
+        valor retornado NÃO é o do modelo (7).
+        """
+        if value > _MAX_EXPONENT or value < -_MAX_EXPONENT:
+            log.warning(
+                "EkfRulEstimator: expoente beta*t = %.6g saturado em "
+                "+/-%.0f; a tendencia exponencial saiu da faixa numerica e "
+                "o indicador projetado nao e o do modelo (7).",
+                value,
+                _MAX_EXPONENT,
+            )
+            value = max(-_MAX_EXPONENT, min(_MAX_EXPONENT, value))
+        return math.exp(value)
 
     def predict_indicator(self, t: float) -> float:
         """``I(t) = α e^{β (t - t0)}`` com o estado corrente (eq. 7)."""
@@ -348,9 +374,19 @@ class EkfRulEstimator:
         innovation = z - float((self._H @ x_pred)[0])
         self._x = x_pred + (K * innovation).reshape(self.N_STATES)
 
-        # (6) P = (I - K H) M
+        # (6) P = (I - K H) M — implementada na FORMA DE JOSEPH,
+        #     P = (I - K H) M (I - K H)^T + K R K^T,
+        # algebricamente idêntica a (6) para o ganho ótimo (4), porém
+        # simétrica e semidefinida positiva por construção mesmo com erro
+        # de arredondamento; a forma curta (I - K H) M perde a simetria e
+        # pode gerar P indefinida ao longo de séries longas
+        # [LITERATURA: forma clássica de Joseph, estabilização numérica do
+        # filtro de Kalman]. A simetrização final elimina o resíduo de
+        # ordem do épsilon de máquina.
         eye = np.eye(self.N_STATES)
-        self._P = (eye - K @ self._H) @ M
+        A = eye - K @ self._H
+        P = A @ M @ A.T + (K * self._R) @ K.T
+        self._P = 0.5 * (P + P.T)
 
         self._t = float(t)
         self._n_updates += 1
@@ -404,10 +440,10 @@ class EkfRulEstimator:
         Raises
         ------
         ValueError
-            ``threshold`` não positivo quando ``α > 0`` (ou de sinal
-            incompatível), ``β = 0``, ou tendência que **nunca** cruza o
-            limiar (por exemplo indicador crescente com limiar abaixo do
-            valor atual); ``confidence`` fora de (0, 1).
+            ``threshold`` de sinal incompatível com ``α``; ``β = 0``;
+            ``α = 0`` no estado filtrado; limiar já cruzado no passado;
+            tendência que se **afasta** do limiar e nunca o alcança;
+            ``confidence`` fora de (0, 1).
         """
         if not math.isfinite(threshold):
             raise ValueError(f"threshold deve ser finito, obtido {threshold}")
@@ -421,6 +457,16 @@ class EkfRulEstimator:
             raise ValueError(
                 "β = 0: a tendência é constante e nunca cruza o limiar"
             )
+        if alpha == 0.0:
+            # α é ESTADO filtrado: o EKF pode conduzi-lo a zero com séries
+            # ruidosas ou com R muito pequeno. Sem esta guarda, threshold/α
+            # e ∂T/∂α = -1/(αβ) levantariam ZeroDivisionError, quebrando o
+            # contrato de erro do módulo (só ValueError).
+            raise ValueError(
+                "α = 0 no estado filtrado: o modelo α e^{β t} é "
+                "identicamente nulo e o limiar nunca é cruzado. Reveja a "
+                "inicialização (alpha0) e as covariâncias Q/R."
+            )
         ratio = threshold / alpha
         if ratio <= 0.0:
             raise ValueError(
@@ -430,6 +476,20 @@ class EkfRulEstimator:
         t_fail = math.log(ratio) / beta + self.t0
         rul = t_fail - self._t
         if rul < 0.0:
+            # A trajetória α e^{β(t-t0)} é monótona: RUL < 0 significa
+            # SEMPRE que o modelo atingiu o limiar em t_fail < t_now — não
+            # existe caso "nunca alcança" uma vez que threshold/α > 0 e
+            # β != 0. Distingue-se, porém, o cruzamento ANTERIOR à janela
+            # de observação (t_fail < t0), que é extrapolação para fora dos
+            # dados assimilados e não deve ir a laudo como constatação.
+            if t_fail < self.t0:
+                raise ValueError(
+                    f"o limiar seria cruzado em t = {t_fail:.6g}, ANTES da "
+                    f"origem da janela de observação (t0 = {self.t0:.6g}): "
+                    f"a tendência ajustada afasta-se do limiar dentro dos "
+                    f"dados assimilados e o cruzamento é extrapolação para "
+                    f"fora deles. RUL não definida."
+                )
             raise ValueError(
                 f"o limiar já foi cruzado em t = {t_fail:.6g} "
                 f"(instante atual {self._t:.6g}): RUL negativa"

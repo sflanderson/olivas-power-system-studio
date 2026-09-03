@@ -2,7 +2,7 @@
 
 **Objetivo.** Documentar a arquitetura do MVP de prognóstico de vida útil remanescente (RUL) do isolamento estatórico de motores de indução de média tensão (2,3 a 13,8 kV) no Olivas Power System Studio, registrando **o que já foi implementado nesta sessão** (pacote `app/postprocessor/prognosis/`, 4 módulos mais a fachada, 3 052 linhas de código, 142 testes verdes) com rastreabilidade `arquivo:linha`, e **o que falta** para fechar uma release conforme os oito critérios de aceite do projeto.
 
-**Diagnóstico.** O núcleo computacional existe e é puro (sem I/O, sem GUI, sem estado global) [REPO: `app/postprocessor/prognosis/__init__.py:8-11`]. Ele **não** está integrado a nenhuma das seis convenções obrigatórias do repositório: não há `Feature` comercial, não há ação de menu (violação em aberto da 7ª garantia), não há chaves em `STANDARDS_CATALOG`/`KNOWN_LIMITATIONS` globais, não há laudo HTML/PDF, não há strings i18n, não há entrada em `CHANGELOG.md`/`version.py`. Além disso, o repositório **não** possui, hoje, cadeia automática ATP → PL4 → perfil de estresse: o `AtpRunner` posiciona arquivos mas nenhum consumidor lê o PL4 a partir de `RunResult.run_dir` [REPO: `docs/research/rul_isolamento/anexos/repo/trt_transitorios_simulacao.md:29`, verificado contra `app/simulation/runner.py:285,338-372`]. Duas premissas do enunciado da tarefa são **corrigidas** aqui: (i) não existe motor de física em C++ neste projeto — a árvore não contém um único arquivo `.cpp`/`.cc`/`.hpp` [CÁLCULO PRÓPRIO: `find . -name "*.cpp" -o -name "*.cc" -o -name "*.hpp"` → vazio]; (ii) o `RRRV` do repositório é uma taxa **média** até o pico, não a derivada instantânea que o vetor de estresse exige [REPO: `app/analysis/transient_metrics.py:131`].
+**Diagnóstico.** O núcleo computacional existe e é puro (sem I/O, sem GUI, sem estado global) [REPO: `app/postprocessor/prognosis/__init__.py:8-11`]. Ele **não** está integrado a nenhuma das seis convenções obrigatórias do repositório: não há `Feature` comercial, não há ação de menu (violação em aberto da 7ª garantia), não há chaves em `STANDARDS_CATALOG`/`KNOWN_LIMITATIONS` globais, não há laudo HTML/PDF, não há strings i18n, não há entrada em `CHANGELOG.md`/`version.py`. Além disso, o repositório **não** possui, hoje, cadeia automática ATP → PL4 → perfil de estresse: o `AtpRunner` posiciona arquivos mas nenhum consumidor lê o PL4 a partir de `RunResult.run_dir` [REPO: `docs/research/rul_isolamento/anexos/repo/trt_transitorios_simulacao.md:28`, verificado contra `app/simulation/runner.py:285,338-372`]. Duas premissas do enunciado da tarefa são **corrigidas** aqui: (i) não existe motor de física em C++ neste projeto — a árvore não contém um único arquivo `.cpp`/`.cc`/`.hpp` [CÁLCULO PRÓPRIO: `find . -name "*.cpp" -o -name "*.cc" -o -name "*.hpp"` → vazio]; (ii) o `RRRV` do repositório é uma taxa **média** até o pico, não a derivada instantânea que o vetor de estresse exige [REPO: `app/analysis/transient_metrics.py:131`].
 
 **Arquivos consultados.**
 
@@ -37,7 +37,7 @@
 
 ### 1.1 Vocabulário de camadas e ressalva de conformidade
 
-As seis camadas funcionais **DA → DM → SD → HA → PA → AG** (aquisição de dados, manipulação de dados, detecção de estado, avaliação de saúde, avaliação prognóstica, geração de recomendação) são a decomposição canônica de sistemas de monitoramento de condição [NORMA: ISO 13374-1:2003, blocos funcionais — **texto normativo NÃO acessado nesta sessão**; ver §8, item L-N1]. Elas são usadas aqui como **vocabulário de organização da arquitetura**, e nenhuma alegação de conformidade formal é feita. A exigência de nível de confiança explícito na saída prognóstica, essa sim, foi verificada e está citada no código [NORMA: ISO 13381-1:2015, 3.3 e 3.9, citada em `app/postprocessor/prognosis/__init__.py:55-56` e em `rul_estimator.py:397-399`].
+As seis camadas funcionais **DA → DM → SD → HA → PA → AG** (aquisição de dados, manipulação de dados, detecção de estado, avaliação de saúde, avaliação prognóstica, geração de recomendação) são a decomposição canônica de sistemas de monitoramento de condição [NORMA: ISO 13374-1:2003, blocos funcionais — **texto normativo NÃO acessado nesta sessão**; ver §8, item L-N1]. Elas são usadas aqui como **vocabulário de organização da arquitetura**, e nenhuma alegação de conformidade formal é feita. A exigência de nível de confiança explícito na saída prognóstica, essa sim, foi verificada e está citada no código [NORMA: ISO 13381-1:2015, 3.3 e 3.9, citada em `app/postprocessor/prognosis/__init__.py:55-56` e em `rul_estimator.py:401`].
 
 ### 1.2 Onde entra o Python e onde entram os motores de física
 
@@ -109,10 +109,10 @@ O `.atp` é o **artefato canônico** da camada de transitórios: a arquitetura d
 
 | Camada | Componente real | Estado | Evidência |
 |---|---|---|---|
-| DA (transitório) | ATP/EMTP externo via `AtpRunner.run` | **Externo, existente**; sucesso = `returncode == 0` e ausência de `/ERROR/` no *stdout* | [REPO: `app/simulation/runner.py:127-318`, critério em `:263-265` conforme `anexos/repo/trt_transitorios_simulacao.md:14`] |
+| DA (transitório) | ATP/EMTP externo via `AtpRunner.run` | **Externo, existente**; sucesso = `returncode == 0` e ausência de `/ERROR/` no *stdout* | [REPO: `app/simulation/runner.py:127-318`, critério em `:263-265` conforme `anexos/repo/trt_transitorios_simulacao.md:22`] |
 | DA (campo) | Oscilografia, DP, RTD, IR/PI, tan δ | **Não implementado**; entradas do usuário | [REPO: `prognosis/__init__.py:200-219` — `rul_measurement_point`, `rul_thermal_state_not_derived`] |
-| DM (leitura) | `read_pl4` → `AtpResults` | **Existente**; sem metadado de unidade (V × kV) e com exceções silenciadas | [REPO: `app/simulation/results_reader.py:46-96`; `anexos/repo/trt_transitorios_simulacao.md:38,40`] |
-| DM (ponte PL4 → perfil) | adaptador `AtpResults` → `extract_stress_events` | **Falta**; nenhum consumidor lê PL4 a partir de `RunResult.run_dir` | [REPO: `anexos/repo/trt_transitorios_simulacao.md:14`] |
+| DM (leitura) | `read_pl4` → `AtpResults` | **Existente**; sem metadado de unidade (V × kV) e com exceções silenciadas | [REPO: `app/simulation/results_reader.py:46-96`; `anexos/repo/trt_transitorios_simulacao.md:35,46`] |
+| DM (ponte PL4 → perfil) | adaptador `AtpResults` → `extract_stress_events` | **Falta**; nenhum consumidor lê PL4 a partir de `RunResult.run_dir` | [REPO: `anexos/repo/trt_transitorios_simulacao.md:28`] |
 | DM (extração) | `extract_stress_events` | **Implementado**, 142 testes verdes | [REPO: `stress_profile.py:405`; teste `tests/test_pp_prognosis_core.py:170-311`] |
 | SD | estatísticas de `StressProfile`, `warnings`, γ(t) | **Implementado** | [REPO: `stress_profile.py:269-356`; `damage_models.py:845-881`] |
 | HA | `CombinedDamageAccumulator`, `AssetHealthIndex` | **Implementado** | [REPO: `damage_models.py:699`; `health_index.py:256`] |
@@ -140,9 +140,9 @@ Legenda de ação: **[C]** criado nesta sessão; **[N]** a criar; **[A]** a alte
 | `app/postprocessor/prognosis/damage_models.py` | [C] | D1–D6 (`:122,158,188,216,261,294,324`), `DamageModelParams` (`:374`), `supportable_events`/`event_damage` (`:531,616`), `psi_linear` (`:647`), `ThermalInterval` (`:680`), `CombinedDamageAccumulator` (`:699`) | Leis de vida, D7 nos dois modos de normalização e acumulador (5.1)–(5.2) com γ(t), ψ(D), RUL em manobras e anos | `stress_profile`; stdlib |
 | `app/postprocessor/prognosis/rul_estimator.py` | [C] | `RulPrediction` (`:110`), `EkfRulEstimator` (`:166`), `rul_from_damage` (`:470`) | EKF de 3 estados $[I,\alpha,\beta]$ sobre $I(t)=\alpha e^{\beta t}$; IC por método delta com quantil de `statistics.NormalDist`; caminho determinístico | `numpy` (já em `requirements.txt:4`), stdlib |
 | `app/postprocessor/prognosis/health_index.py` | [C] | `AssetHealthIndex` (`:256`), `HealthIndexWeights` (`:88`), `HealthIndexThresholds` (`:149`), `HealthContribution` (`:223`), `DEFAULT_BANDS` (`:79`) | AHI 0–100 com renormalização sobre componentes disponíveis e decomposição explicável somando 100 % | stdlib |
-| `tests/test_pp_prognosis_core.py` | [C] | 11 classes de teste, 142 casos | Cobertura do núcleo, incluindo *guards* de arquitetura (`:1157` não importa GUI/plot; `:1174` não faz I/O) | `pytest` |
+| `tests/test_pp_prognosis_core.py` | [C] | 16 classes de teste, 142 casos | Cobertura do núcleo, incluindo *guards* de arquitetura (`:1157` não importa GUI/plot; `:1174` não faz I/O) | `pytest` |
 
-**Verificação de execução** [CÁLCULO PRÓPRIO]: `python -m pytest tests/test_pp_prognosis_core.py -q` → `142 passed in 0.34s`.
+**Verificação de execução** [CÁLCULO PRÓPRIO]: `python -m pytest tests/test_pp_prognosis_core.py -q` → `142 passed` em ~0,2-0,3 s. A contagem de 142 é propriedade do repositório e reproduzível; o **tempo** é grandeza dependente de máquina e carga, citado apenas como ordem de grandeza [CÁLCULO PRÓPRIO, dependente de máquina].
 
 ### 2.2 Integrações pendentes com as convenções do repositório
 
@@ -164,7 +164,7 @@ Legenda de ação: **[C]** criado nesta sessão; **[N]** a criar; **[A]** a alte
 | `app/preprocessor/vcb_model_emitter.py` | [A] | `VCB_REIGNITION_PROPS` (`:74-83`), `VCB3_REIGNITION_PROPS` (`:86-95`), `VCB_REIGNITION_DEFAULTS` (`:103-112`) | Acrescentar as propriedades **ao final** dos índices (10+ e 14+) para não deslocar o *layout* existente; nenhum default atual muda | Teste de integridade de mapeamento de propriedades |
 | `app/analysis/transient_metrics.py` | [A] | `TrvMetrics` (`:29-38`), `compute_trv_metrics` (`:91-159`) | Acrescentar campos `Optional[...] = None`: `max_dvdt_kv_per_us` (derivada instantânea, distinta do `rrrv_kv_per_us` médio de `:131`) e `n_excursions_above` | Nenhuma; campos opcionais preservam chamadores |
 | `app/postprocessor/trt_analyzer.py` | [A] | `TrtAnalysisReport` (`:168-204`), `analyze_trt` (`:372`) | Expor a contagem de excursões acima de um limiar configurável, ao lado de `rrrv_max_kV_per_us` (`:183`) — insumo direto de `n_reignitions` | `_compute_max_rrrv` (`:299`) já percorre a janela |
-| `app/postprocessor/motor_starting.py` | [A] | `MotorStartingReport` (`:260-329`) | Expor `i2t_A2s` e `t_acc_s` como campos opcionais: `starting_time_s` já existe (`:294`, tempo até 95 % da rotação nominal, calculado em `:410`), mas **I²t não é calculado** — hoje o módulo apenas menciona a curva I²t em texto de *rationale* (`:540`) | `estimate_starting_time_s` (`:410`) |
+| `app/postprocessor/motor_starting.py` | [A] | `MotorStartingReport` (`:260-329`) | Expor `i2t_A2s` e `t_acc_s` como campos opcionais: `starting_time_s` já existe (`:295`, tempo até 95 % da rotação nominal, calculado em `:410`), mas **I²t não é calculado** — hoje o módulo apenas menciona a curva I²t em texto de *rationale* (`:540`) | `estimate_starting_time_s` (`:410`) |
 
 ### 2.3 Ressalva sobre a alteração do modelo de VCB
 
@@ -179,7 +179,7 @@ A recomendação arquitetural é **parametrizar a lei, não substituí-la**: acr
 ### 3.1 Princípios
 
 1. **Versionamento explícito.** Todo documento persistido carrega `schema_version` (SemVer). Mudança compatível (campo novo opcional) incrementa o *minor*; mudança que remove ou reinterpreta campo incrementa o *major*.
-2. **Unidades no nome do campo.** O `AtpResults` do repositório não carrega metadado de unidade — volts × kV, A × kA são indistinguíveis [REPO: `anexos/repo/trt_transitorios_simulacao.md:40`]. O contrato do módulo de RUL corrige isso: todo campo numérico traz o sufixo de unidade, exatamente como já ocorre nos *dataclasses* (`V_pk_kV`, `T1_us`, `dvdt_kV_per_us`, `energy_J`, `theta_C`) [REPO: `stress_profile.py:146-155`].
+2. **Unidades no nome do campo.** O `AtpResults` do repositório não carrega metadado de unidade — volts × kV, A × kA são indistinguíveis [REPO: `anexos/repo/trt_transitorios_simulacao.md:46`]. O contrato do módulo de RUL corrige isso: todo campo numérico traz o sufixo de unidade, exatamente como já ocorre nos *dataclasses* (`V_pk_kV`, `T1_us`, `dvdt_kV_per_us`, `energy_J`, `theta_C`) [REPO: `stress_profile.py:146-155`].
 3. **Rótulo de proveniência.** `StressEvent.source` e `StressProfile.label` já existem para isso [REPO: `stress_profile.py:156,248`].
 4. **Auditoria antes da compressão.** O *hash* de proveniência é calculado sobre um **resumo determinístico** (parâmetros do caso + estatísticas por evento + SHA-256 do arquivo `.pl4`), nunca sobre a série temporal bruta — `_to_jsonable` faz `repr` de objetos desconhecidos, o que tornaria o *hash* não determinístico entre versões do numpy [REPO: `audit_trail.py:164-191`; risco R6 em `anexos/repo/convencoes_auditoria_gui_docs.md`].
 
@@ -240,7 +240,7 @@ Fronteira **usuário/GUI → HA/PA**. Reúne o que **não** é extraível da for
 | `measured_indicators.{ir_Mohm, pi, tan_delta, pd_qm_mV}` | MΩ, —, —, mV | ensaios; todos opcionais | [REPO: `health_index.py:295-298`] |
 | `psi_min`, `state_dependent_threshold`, `synergy_fn_id` | — | decisão do analista | [REPO: `damage_models.py:742-746`] |
 
-O caso **deve** carregar `calibration_warnings` materializadas no momento da execução, produzidas por `DamageModelParams.calibration_warnings()` [REPO: `damage_models.py:484-526`], para que o laudo não possa ser emitido sem elas.
+O caso **deve** carregar `calibration_warnings` materializadas no momento da execução, produzidas por `DamageModelParams.calibration_warnings()` [REPO: `damage_models.py:484-515`], para que o laudo não possa ser emitido sem elas.
 
 ### 3.4 Contrato C3 — resultado (`rul_result.v1.json`) e C4 — série de indicador (`rul_indicator_series.v1.csv`)
 
@@ -270,9 +270,9 @@ C3, fronteira **PA → AG**, é a serialização de `CombinedDamageAccumulator.s
 }
 ```
 
-O campo `is_lower_bound` é **estrutural**: quando `synergy_fn` é `None`, `D` é cota inferior de dano e cota superior de RUL, e o resumo textual já o declara [REPO: `damage_models.py:819-822,1053-1057`]. `contribution_pct` soma 100 % sobre os componentes disponíveis, e componentes indisponíveis aparecem com `available=false` em vez de serem omitidos — a ausência de dado é visível, não silenciosa [REPO: `health_index.py:501-547`; teste `tests/test_pp_prognosis_core.py:990`].
+O campo `is_lower_bound` é **estrutural**: quando `synergy_fn` é `None`, `D` é cota inferior de dano e cota superior de RUL, e o resumo textual já o declara [REPO: `damage_models.py:819-822,1054-1058`]. `contribution_pct` soma 100 % sobre os componentes disponíveis, e componentes indisponíveis aparecem com `available=false` em vez de serem omitidos — a ausência de dado é visível, não silenciosa [REPO: `health_index.py:501-547`; teste `tests/test_pp_prognosis_core.py:990`].
 
-C4 é a série que alimenta o EKF, em CSV com cabeçalho versionado (`# schema_version=1.0.0; kind=rul_indicator_series`) e colunas `t_h,indicator,unit,source`. O estimador exige tempo **não decrescente** e ergue `ValueError` caso contrário [REPO: `rul_estimator.py:314-317`; teste `:882`].
+C4 é a série que alimenta o EKF, em CSV com cabeçalho versionado (`# schema_version=1.0.0; kind=rul_indicator_series`) e colunas `t_h,indicator,unit,source`. O estimador exige tempo **não decrescente** e ergue `ValueError` caso contrário [REPO: `rul_estimator.py:317-320`; teste `:882`].
 
 ### 3.5 Como o vetor de estresse é auditado
 
@@ -288,6 +288,8 @@ Três garantias, todas já suportadas pelo código:
 
 ### 4.1 Tabela de rastreabilidade equação → função → `arquivo:linha` → teste
 
+A tabela abaixo mapeia **23 relações** — D1 a D5, D6 nas duas formas (a/b), D7 em três recortes ($N_j$, $1/N_j$ e fator térmico), (5.1) e suas duas parcelas, (5.2), ψ(D), γ(t), RUL determinística, RUL_N/RUL_t, EKF, RUL com intervalo, AHI, $T_1$ e eventos equivalentes — a **24 âncoras de teste distintas** em `tests/test_pp_prognosis_core.py`. Cada linha aponta função, `arquivo:linha` e ao menos um `def test_...` que trava o comportamento; nenhuma relação fica sem âncora [CÁLCULO PRÓPRIO: contagem das linhas da tabela e das âncoras `:NNN` citadas].
+
 | Eq. | Forma | Função | `arquivo:linha` | Teste (`tests/test_pp_prognosis_core.py`) |
 |---|---|---|---|---|
 | **D1** | $L(V) = k\,V^{-n}$ | `inverse_power_law_life(V, k, n)` | `damage_models.py:122` | `:360` valor de mão; `:364` monotonicidade; `:370,374` validação |
@@ -299,7 +301,7 @@ Três garantias, todas já suportadas pelo código:
 | **D6b** | $L(\theta)=L_0\,2^{(\theta_0-\theta)/\mathrm{HIC}}$ | `montsinger_life(...)` | `damage_models.py:294` | `:434` $\theta = \theta_0 + \mathrm{HIC} \Rightarrow L_0/2$; `:439` neutro na referência |
 | **D7 (N_j)** | $N_j = N_0\left[\frac{a V_{pk}-V_{th}}{V_{ref}-V_{th}}\right]^{-n}\left(\frac{t_f}{t_{f0}}\right)^{m} 2^{(\theta_0-\theta_j)/\mathrm{HIC}}$ | `supportable_events(...)` | `damage_models.py:531` | `:518` valor-ouro do exemplo da Etapa 1; `:585,591` modos e validação |
 | **D7 (1/N_j)** | $1/N_j$, exatamente 0 se $aV_{pk}\le V_{th}$ | `event_damage(...)` | `damage_models.py:616` | `:538` dano exatamente zero; `:545` acima do limiar ainda danifica; `:531` monotonicidade em tensão |
-| **D7 (térmico)** | fator térmico multiplica o **dano**, não a capacidade | `supportable_events` (`thermal_expo`) | `damage_models.py:609-614` | `:550` fator multiplica o dano; `:563` $+20$ K com HIC = 10 K → dano $\times\,4{,}0$ |
+| **D7 (térmico)** | fator térmico multiplica o **dano**, não a capacidade | `supportable_events` (`thermal_expo`) | `damage_models.py:609-613` | `:550` fator multiplica o dano; `:563` $+20$ K com HIC = 10 K → dano $\times\,4{,}0$ |
 | **(5.1)** | $D = D^{th} + D^{el} + D_{sin}$ | `CombinedDamageAccumulator.D_total` | `damage_models.py:808-812` | `:622` total é a soma das parcelas; `:651` `synergy_fn` é usada |
 | **(5.1) — $D^{th}$** | $\int \mathrm{d}\tau/L(\theta(\tau))$ | `add_thermal_interval` / `add_thermal_profile` | `damage_models.py:953,970` | `:632` valor de mão da integral; `:639` acumulação por trajetória |
 | **(5.1) — $D^{el}$** | $\sum_m \sum_j 1/N_j$ | `add_event` / `add_events` / `add_profile` | `damage_models.py:890,917,921` | `:622`, `:721` RUL em manobras e anos |
@@ -316,7 +318,7 @@ Três garantias, todas já suportadas pelo código:
 
 ### 4.2 Duas decisões de modelagem materializadas no código
 
-**(a) Convenção de sinal térmico.** A forma impressa por Feilat, $\exp[-B(1/T - 1/T_0)]$, faria a vida **crescer** com a temperatura, o que é fisicamente incorreto [FATO: Etapa 1, §5.4, D5, "Nota de sinal"]. O código adota $c_T = 1/T_0 - 1/T$ e o teste `test_arrhenius_sign_convention_life_decreases_with_heat` trava essa escolha [REPO: `damage_models.py:261-293`; teste `:452`]. Em D7, o fator $2^{(\theta_0-\theta_j)/\mathrm{HIC}}$ multiplica $N_j$, logo $1/N_j \propto 2^{(\theta_j-\theta_0)/\mathrm{HIC}}$ — **o fator térmico multiplica o dano** [REPO: `damage_models.py:582-584,609-614`; Etapa 2, §3.1]. Com HIC = 10 K, $+20$ K multiplicam a taxa de dano por 4,0 [REPO: teste `:563`; limitação `rul_thermal_state_not_derived`, `prognosis/__init__.py:214-219`].
+**(a) Convenção de sinal térmico.** A forma impressa por Feilat, $\exp[-B(1/T - 1/T_0)]$, faria a vida **crescer** com a temperatura, o que é fisicamente incorreto [FATO: Etapa 1, §5.4, D5, "Nota de sinal"]. O código adota $c_T = 1/T_0 - 1/T$ e o teste `test_arrhenius_sign_convention_life_decreases_with_heat` trava essa escolha [REPO: `damage_models.py:261-293`; teste `:452`]. Em D7, o fator $2^{(\theta_0-\theta_j)/\mathrm{HIC}}$ multiplica $N_j$, logo $1/N_j \propto 2^{(\theta_j-\theta_0)/\mathrm{HIC}}$ — **o fator térmico multiplica o dano** [REPO: convenção declarada na docstring de `supportable_events`, `damage_models.py:546-547`, implementada em `:609-613`; Etapa 2, §3.1]. Com HIC = 10 K, $+20$ K multiplicam a taxa de dano por 4,0 [REPO: teste `:563`; limitação `rul_thermal_state_not_derived`, `prognosis/__init__.py:214-219`].
 
 **(b) Os dois modos de normalização de D7.** `threshold_shift` reproduz D7 como impressa; `residual_withstand` normaliza o estresse pela suportabilidade residual, $\big(aV_{pk}/U_w\big)\big/\big(V_{ref}/U_{w0}\big)$, de modo que $(V = V_{ref}, U_w = U_{w0}) \Rightarrow \text{razão} = 1$ [REPO: `damage_models.py:593-607`]. A razão de existir os dois modos é a **monotonicidade perversa** demonstrada na Etapa 2: em `threshold_shift`, para eventos mais severos que a referência ($aV_{pk} > V_{ref}$) — exatamente o regime dos 30 a 41 kV do Documento A —, reduzir $V_{th}$ pelo envelhecimento **reduz** o dano calculado, dando $\partial F/\partial D < 0$ [FATO: Etapa 2, §5.2, cálculo próprio sobre D7]. O modo `residual_withstand` torna $\partial F/\partial D > 0$ **estrutural**, e o teste `test_residual_withstand_is_monotonic_in_damage` verifica isso [REPO: teste `:683`]. A limitação `rul_synergy_lower_bound` declara textualmente esse condicionamento [REPO: `prognosis/__init__.py:178-185`].
 
@@ -334,7 +336,7 @@ O Documento A publica, na Tabela III (p. 3), pico de TRV e RRRV por fase, com e 
 | B | 41,44 | 15,05 | 13,65 | 13,11 | 67,1 % |
 | C | −38,30 | 19,00 | −9,98 | 9,43 | 73,9 % |
 
-**F1 — reprodução de pico e RRRV.** *Fixture* `_ramp_waveform(peak_kV, slope_kV_per_us, dt_s)`: rampa linear até o pico da fase B (41,44 kV) com inclinação 15,05 kV/µs, seguida de cauda exponencial de 20 µs [REPO: `tests/test_pp_prognosis_core.py:63-88`]. A rampa linear é escolhida porque nela o dv/dt máximo é **exatamente** a inclinação, o que permite comparar a extração com um valor fechado [REPO: `tests/test_pp_prognosis_core.py:73-76`]. Com passo fino de 10 ns, `test_doc_a_table_iii_phase_b_peak_and_rrrv` recupera pico e dv/dt com `rel=1e-3` e `warnings == []` [REPO: testes `:171-183,195-201`]; `test_t1_matches_iec_60034_15_definition` confirma $T_1 = 1{,}67 \times 0{,}60 \times t_{rampa} = 2{,}759$ µs [REPO: teste `:185-193`]. **F1b — passo grosseiro**: repetir a mesma *fixture* com o passo de 1 µs efetivamente usado em A [FATO: doc A, Tabela II, p. 3]; o critério passa a ser a **presença** dos avisos de passo grosseiro e de frente subamostrada, e o dv/dt reportado deve ser tratado como limite inferior [REPO: testes `:202-226`].
+**F1 — reprodução de pico e RRRV.** *Fixture* `_ramp_waveform(peak_kV, slope_kV_per_us, dt_s)`: rampa linear até o pico da fase B (41,44 kV) com inclinação 15,05 kV/µs, seguida de cauda exponencial de 20 µs [REPO: `tests/test_pp_prognosis_core.py:63-88`]. A rampa linear é escolhida porque nela o dv/dt máximo é **exatamente** a inclinação, o que permite comparar a extração com um valor fechado [REPO: `tests/test_pp_prognosis_core.py:73-76`]. Com passo fino de 10 ns, `test_doc_a_table_iii_phase_b_peak_and_rrrv` recupera pico e dv/dt com `rel=1e-3` e `warnings == []` [REPO: testes `:171-183,195-201`]; `test_t1_matches_iec_60034_15_definition` confirma $T_1 = 1{,}67 \times 0{,}60 \times t_{rampa} = 2{,}759$ µs [REPO: teste `:185-193`]. **F1b — passo grosseiro (*fixture* A CRIAR)**: repetir a mesma *fixture* com o passo de **1 µs** efetivamente usado em A [FATO: doc A, Tabela II, p. 3]. Esse caso **ainda não está coberto**: os dois testes de passo grosseiro existentes usam 2 µs, não 1 µs [REPO: `tests/test_pp_prognosis_core.py:202-213` e `:215-225`, docstring em `:203` — "Passo de 2 µs > 1 µs ⇒ aviso"]. Eles são citados aqui apenas como evidência de que o **mecanismo** de aviso funciona. O limiar do código é `if dt >= coarse_step_s` com `DEFAULT_COARSE_STEP_S = 1,0e-6` [REPO: `stress_profile.py:87,520`], de modo que o passo de 1 µs de A dispararia o aviso — mas isso é [INFERÊNCIA] a partir da comparação `>=`, não resultado de teste existente. Criado o caso, o critério passa a ser a **presença** dos avisos de passo grosseiro e de frente subamostrada, e o dv/dt reportado deve ser tratado como limite inferior.
 
 **F2 — mitigação atravessa o limiar de dano.** Com $V_{th}$ posicionado entre 13,65 e 41,44 kV, o evento "com *snubber*" da fase B deve produzir dano **exatamente** zero e o "sem *snubber*" dano positivo. O teste `test_mitigation_moves_event_below_threshold` já cobre a lógica [REPO: teste `:1120-1135`]. **Ressalva obrigatória**: isso valida a *mecânica* do limiar, **não** o valor de $V_{th}$, que é não calibrado.
 
@@ -393,7 +395,7 @@ Versão corrente `4.0.0-beta` [REPO: `app/core/version.py:1959-1968`]; o `CHANGE
 | Entregue | Evidência |
 |---|---|
 | Pacote `app/postprocessor/prognosis/` — 4 módulos mais a fachada, 3 052 linhas (`__init__` 248, `stress_profile` 672, `damage_models` 1 060, `rul_estimator` 494, `health_index` 578) | [CÁLCULO PRÓPRIO: `wc -l`] |
-| 142 testes verdes em 0,34 s | [CÁLCULO PRÓPRIO: `pytest -q`] |
+| 142 testes verdes (tempo de suíte ~0,2-0,3 s, dependente de máquina) | [CÁLCULO PRÓPRIO: `pytest -q`] |
 | Zero dependência nova (stdlib + `numpy`, já em `requirements.txt:4`) | [REPO: `rul_estimator.py` importa `numpy`; os demais módulos, apenas stdlib] |
 | *Guards* de arquitetura: núcleo não importa GUI/plot nem faz I/O | [REPO: testes `:1157,1174`] |
 
@@ -406,15 +408,15 @@ Confronto com os **oito critérios de aceite de release** [REPO: `docs/PTW_TOTAL
 | # | Critério | Estado após v4.1.0 |
 |---|---|---|
 | 1 | TodoWrite completo das features endereçadas | A fazer no sprint |
-| 2 | Cada feature cita seção+página em docstring | **Já atendido** no núcleo [REPO: `prognosis/__init__.py:39-65`; `stress_profile.py:20-31`] |
+| 2 | Cada feature cita seção+página **do manual** em docstring [REPO: `docs/PTW_TOTAL_PARITY_DIRECTIVE.md:133`] | **Reinterpretado, não atendido na letra**: não há feature PTW correspondente (ver critério 3), logo não há seção+página de manual a citar. As docstrings do núcleo citam **norma + cláusula** e seção das Etapas 1/2 [REPO: `prognosis/__init__.py:39-65`; `stress_profile.py:20-31`]. Exige **aceite explícito do revisor de release** para valer como equivalente |
 | 3 | Entrada na `PTW_SURPASSING_MATRIX.md` com ≥ 1 dimensão de superação | A fazer — declarar como superação (não há feature PTW de RUL) |
-| 4 | Testes cobrem ≥ 80 % do módulo, ≥ 5 testes | **Já atendido** (142 testes) |
+| 4 | Testes próprios cobrem ≥ 80 % do módulo novo (≥ 5 testes) [REPO: `docs/PTW_TOTAL_PARITY_DIRECTIVE.md:135`] | **Parcialmente atendido**: 142 testes (≫ 5), mas a cobertura ≥ 80 % **NÃO É MEDIDA** — `pytest-cov`/`coverage` ausentes no ambiente e `app.postprocessor.prognosis` fora da lista `--cov` do CI [REPO: `.github/workflows/test.yml:79-84`; §7.4 deste documento] |
 | 5 | *Sweep* *targeted* verde | A fazer |
 | 6 | *Restore point* criado | A fazer (local, *gitignored*) |
 | 7 | *Handoff doc* + `SESSION_HANDOFF` atualizados | A fazer |
 | 8 | *Smoke test* reproduzindo exemplo do tutorial | A fazer — "Para usar RUL, o usuário clica em Análise → Prognóstico de isolamento / RUL" |
 
-**Bloqueadores para fechar a release**: critérios 1, 3, 5, 6, 7 e 8 — todos de processo/integração, nenhum de núcleo computacional. O critério 8 é o que materializa a 7ª garantia.
+**Situação verificável hoje: 1/8** — apenas a metade "≥ 5 testes" do critério 4 é demonstrável por execução, e nenhum dos oito critérios está integralmente satisfeito. **Bloqueadores para fechar a release**: critérios 1, 3, 5, 6, 7 e 8 (processo/integração, nenhum de núcleo computacional), mais a metade não medida do critério 4 (instalar `pytest-cov` e acrescentar `--cov=app.postprocessor.prognosis` ao *job* de CI, §7.4) e o aceite explícito do revisor quanto à reinterpretação do critério 2. O critério 8 é o que materializa a 7ª garantia.
 
 ### 6.4 v4.2.0 — "RUL Sprint 2: laudo, cadeia ATP e métricas de prognóstico"
 
@@ -442,25 +444,25 @@ Confronto com os **oito critérios de aceite de release** [REPO: `docs/PTW_TOTAL
 
 ### 7.1 Risco dominante: ausência de curva de vida calibrada
 
-O risco de maior magnitude não é de engenharia de software: é que **nenhum valor de $n$ para mica-epóxi pré-formada de MT sob impulsos de VCB foi localizado na literatura acessada**, e que a vida em manobras varia por fator 6,6 ao mover $n$ de 4 para 9 [REPO: `prognosis/__init__.py:169-177`; Etapa 1, §5.4, D1]. Consequência arquitetural já implementada: `DamageModelParams.calibration_warnings()` **sempre** devolve ao menos uma advertência, independentemente da parametrização, e o `summary()` do acumulador a anexa [REPO: `damage_models.py:484-526,1058`; teste `:605`]. Consequência de produto: nenhum número absoluto de RUL pode ser publicado; o uso defensável do MVP é **comparativo** (com *snubber* × sem *snubber*, solução A de corte × solução B), no qual os parâmetros não calibrados se cancelam parcialmente na razão [INFERÊNCIA].
+O risco de maior magnitude não é de engenharia de software: é que **nenhum valor de $n$ para mica-epóxi pré-formada de MT sob impulsos de VCB foi localizado na literatura acessada**, e que a vida em manobras varia por fator 6,6 ao mover $n$ de 4 para 9 [REPO: `prognosis/__init__.py:169-177`; Etapa 1, §5.4, D1]. Consequência arquitetural já implementada: `DamageModelParams.calibration_warnings()` **sempre** devolve ao menos uma advertência, independentemente da parametrização, e o `summary()` do acumulador a anexa [REPO: `damage_models.py:484-515,1059`; teste `:605`]. Consequência de produto: nenhum número absoluto de RUL pode ser publicado; o uso defensável do MVP é **comparativo** (com *snubber* × sem *snubber*, solução A de corte × solução B), no qual os parâmetros não calibrados se cancelam parcialmente na razão [INFERÊNCIA].
 
 ### 7.2 Desempenho
 
 | Aspecto | Medida / estimativa | Evidência |
 |---|---|---|
-| Suíte do núcleo | 142 testes em 0,34 s | [CÁLCULO PRÓPRIO] |
+| Suíte do núcleo | 142 testes em ~0,2-0,3 s | [CÁLCULO PRÓPRIO, dependente de máquina e carga] |
 | `extract_stress_events` | uma passada sobre a série para detectar excursões, mais uma busca retroativa por excursão; complexidade $O(N)$ no número de amostras, com constante pequena | [REPO: `stress_profile.py:529-540,556-575`] |
 | Janela do Documento A | 45 ms a passo de 1 µs = 45 000 amostras por variável [FATO: doc A, Tabela II, p. 3] — irrelevante para o custo | [CÁLCULO PRÓPRIO] |
 | EKF | matrizes 3×3 em numpy; custo por atualização constante | [REPO: `rul_estimator.py:325-355`] |
-| Ponto de atenção | listas Python nativas em `results_reader` (`float32` → `list[float]`), o que multiplica o custo de memória para varreduras longas | [REPO: `anexos/repo/trt_transitorios_simulacao.md:38`] |
+| Ponto de atenção | listas Python nativas em `results_reader` (`float32` → `list[float]`), o que multiplica o custo de memória para varreduras longas | [REPO: `anexos/repo/trt_transitorios_simulacao.md:45`] |
 
 ### 7.3 Dependências novas
 
-**Nenhuma.** `stress_profile.py`, `damage_models.py` e `health_index.py` usam apenas a biblioteca padrão; `rul_estimator.py` usa `numpy`, já declarado [REPO: `requirements.txt:4`]. Isso evita o risco R4 do mapa de convenções (dependência nova quebra o *job* `imports`, que instala apenas `numpy`, `pydantic` e `PyYAML`, incha o PyInstaller e o Docker e exige `THIRD_PARTY_NOTICES`/`LICENSING` e o `Dockerfile`, que está na lista travada) [REPO: `anexos/repo/convencoes_auditoria_gui_docs.md:R4`]. O intervalo de confiança usa `statistics.NormalDist` da *stdlib* em vez de `scipy` [REPO: `rul_estimator.py:449`].
+**Nenhuma.** `stress_profile.py`, `damage_models.py` e `health_index.py` usam apenas a biblioteca padrão; `rul_estimator.py` usa `numpy`, já declarado [REPO: `requirements.txt:4`]. Isso evita o risco R4 do mapa de convenções (dependência nova quebra o *job* `imports`, que instala apenas `numpy`, `pydantic` e `PyYAML`, incha o PyInstaller e o Docker e exige `THIRD_PARTY_NOTICES`/`LICENSING` e o `Dockerfile`, que está na lista travada) [REPO: `anexos/repo/convencoes_auditoria_gui_docs.md:R4`]. O intervalo de confiança usa `statistics.NormalDist` da *stdlib* em vez de `scipy` [REPO: `rul_estimator.py:75` (import), `:447` (`NormalDist().inv_cdf(0.5 + confidence / 2.0)`)].
 
 ### 7.4 *Subset* de CI
 
-O *job* de teste do CI público roda uma **lista fixa de 12 arquivos**, porque o *sweep* completo inclui testes legados que abrem `QDialog` modal e travam em ambiente *headless* [REPO: `.github/workflows/test.yml:50-78`]. Consequência direta: **`tests/test_pp_prognosis_core.py` não roda no CI hoje** e sua cobertura não é medida. Mitigação obrigatória no Sprint 1: acrescentar o arquivo à lista e `--cov=app.postprocessor.prognosis` ao comando. Como o núcleo não importa PySide6 nem matplotlib, ele roda sem *display* [REPO: teste `:1157`].
+O *job* de teste do CI público roda uma **lista fixa de 12 arquivos**, porque o *sweep* completo inclui testes legados que abrem `QDialog` modal e travam em ambiente *headless* [REPO: `.github/workflows/test.yml:50-78`]. Consequência direta: **`tests/test_pp_prognosis_core.py` não roda no CI hoje** e sua cobertura não é medida. O módulo também **não** consta da lista `--cov` do *job* [REPO: `.github/workflows/test.yml:79-84`], e no ambiente desta sessão `pytest-cov`/`coverage` não estão instalados (`python -m pytest --cov …` → *unrecognized arguments*; `import coverage` → `ModuleNotFoundError`) [CÁLCULO PRÓPRIO]. Por isso o critério 4 de release é declarado **parcialmente atendido** na §6.3: a metade "≥ 5 testes" é demonstrada, a metade "≥ 80 % de cobertura" **não é medida em lugar nenhum**. Mitigação obrigatória no Sprint 1: instalar `pytest-cov` no ambiente de CI, acrescentar o arquivo à lista de testes e `--cov=app.postprocessor.prognosis` ao comando. Como o núcleo não importa PySide6 nem matplotlib, ele roda sem *display* [REPO: teste `:1157`].
 
 ### 7.5 Demais riscos
 

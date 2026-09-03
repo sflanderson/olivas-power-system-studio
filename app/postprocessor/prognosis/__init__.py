@@ -239,6 +239,19 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "declaram que suas tendências não predizem tempo até a falha "
         "(IEC 60034-27-2:2023, -27-3:2015 e -27-4:2018, Introdução)."
     ),
+    "rul_numerical_saturation": (
+        "Saturações numéricas declaradas, todas registradas em WARNING no "
+        "log: (i) expoentes de exp()/2** são limitados a ±700, e o valor "
+        "retornado deixa de ser o do modelo analítico; (ii) quando N_j "
+        "sofre underflow para 0, o incremento de dano por evento é "
+        "saturado em 1,0 — a falha convencionada D = 1 da regra de Miner "
+        "(Etapa 1 §5.4, D4) —, o que significa apenas que o evento saiu "
+        "da faixa numérica do modelo, não que a magnitude do dano foi "
+        "calculada; (iii) ψ(D) é congelado em D = 1 para D > 1, pois a "
+        "suportabilidade residual além da falha convencionada não está "
+        "definida. Nenhum desses valores é resultado do modelo e nenhum "
+        "deve ir a laudo como número de projeto."
+    ),
     "rul_energy_surge_impedance_proxy": (
         "A energia por evento é aproximada por E = ∫ v²/Z dt com impedância "
         "de surto informada pelo usuário (faixa reportada para cabos de MT: "

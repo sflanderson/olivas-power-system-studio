@@ -27,6 +27,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from app.postprocessor.prognosis import (
+    DEFAULT_BANDS,
     KNOWN_LIMITATIONS,
     AssetHealthIndex,
     CombinedDamageAccumulator,
@@ -620,12 +621,21 @@ class TestD7EventDamage:
 
 class TestCombinedDamageAccumulator:
     def test_total_is_sum_of_parcels(self) -> None:
+        """D = D_th + D_el + D_sin (eq. 5.1) contra parcelas calculadas à mão.
+
+        D_el = (41,44/26,50)^4/1e4 = 5,9799e-4 [Etapa 1 §5.5, Passo 2];
+        D_th = 8 760 h / 175 200 h = 0,05 (θ = θ_0 ⇒ L = L_0).
+        Comparar D_total com ``D_el + D_th`` recalculados pelo próprio
+        objeto seria tautologia; aqui as parcelas são independentes.
+        """
         acc = CombinedDamageAccumulator(params=_doc_a_params())
         acc.add_event(
             StressEvent(V_pk_kV=41.44, T1_us=2.76, dvdt_kV_per_us=15.05)
         )
         acc.add_thermal_interval(40.0, 8760.0)
-        assert acc.D_total == pytest.approx(acc.D_el + acc.D_th + acc.D_sin)
+        assert acc.D_el == pytest.approx(5.9799e-4, rel=1e-3)
+        assert acc.D_th == pytest.approx(0.05)
+        assert acc.D_total == pytest.approx(0.05 + 5.9799e-4, rel=1e-4)
         assert acc.D_sin == 0.0
         assert acc.is_lower_bound is True
 
@@ -731,8 +741,10 @@ class TestCombinedDamageAccumulator:
         delta = (41.44 / 26.50) ** 4 / 1.0e4
         assert acc.n_operations == 1
         assert acc.rul_operations() == pytest.approx((1.0 - delta) / delta)
-        # λ_m = 10 partidas abortadas/ano [Etapa 1 §5.5, H5].
-        assert acc.rul_years(10.0) == pytest.approx(acc.rul_operations() / 10.0)
+        # Valor fechado independente: 1/5,9799e-4 - 1 = 1 671 manobras.
+        assert acc.rul_operations() == pytest.approx(1671.0, rel=1e-3)
+        # λ_m = 10 partidas abortadas/ano [Etapa 1 §5.5, H5] ⇒ 167,1 anos.
+        assert acc.rul_years(10.0) == pytest.approx(167.1, rel=1e-3)
 
     def test_rul_years_rejects_non_positive_lambda(self) -> None:
         acc = CombinedDamageAccumulator(params=_doc_a_params())
@@ -1184,3 +1196,395 @@ class TestModuleAudit:
             src = inspect.getsource(mod)
             assert "open(" not in src, mod.__name__
             assert "import os" not in src, mod.__name__
+
+
+# ---------------------------------------------------------------------------
+# 10. Regressões de revisão adversarial
+#
+# Cada teste desta seção fixa um defeito encontrado na revisão do núcleo ou
+# uma propriedade que a revisão exigiu demonstrar. Nenhum deles repete a
+# implementação: todos comparam com valor calculado à parte, com norma, ou
+# com o enunciado explícito do estudo.
+# ---------------------------------------------------------------------------
+
+
+class TestSignConventionRegression:
+    """Convenção de sinal — o ponto mais fácil de inverter em todo o núcleo."""
+
+    def test_capacity_decreases_with_temperature(self) -> None:
+        """``N_j`` CAI com θ — a forma impressa de D7 faria o contrário.
+
+        A Etapa 1 §5.4 imprime ``N_j ∝ 2^((θ_j-θ_0)/HIC)``, que é
+        inconsistente com D6 (Montsinger, ``L ∝ 2^((θ_0-θ)/HIC)``) e faria
+        a capacidade CRESCER com a temperatura. A forma corrigida, adotada
+        em toda a Etapa 2 (§3.1, §5.3), é ``1/N_j ∝ 2^((θ_j-θ_0)/HIC)``.
+        Este teste falharia se a implementação seguisse a forma impressa.
+        """
+        params = _doc_a_params()
+        cold = StressEvent(
+            V_pk_kV=41.44, T1_us=2.0, dvdt_kV_per_us=15.05, theta_C=40.0
+        )
+        hot = StressEvent(
+            V_pk_kV=41.44, T1_us=2.0, dvdt_kV_per_us=15.05, theta_C=50.0
+        )
+        n_cold = supportable_events(cold, params)
+        n_hot = supportable_events(hot, params)
+        assert n_hot < n_cold
+        assert n_hot == pytest.approx(0.5 * n_cold)
+
+    def test_c_t_convention_arrhenius_equals_closed_form(self) -> None:
+        """``c_T = 1/T_0 - 1/T`` e ``L = L_0 exp(-B c_T)`` (D5/D6).
+
+        Valor fechado independente com B = 12 000 K, θ_0 = 40 °C,
+        θ = 100 °C: c_T = 1/313,15 - 1/373,15 = 5,13470e-4 K⁻¹ e
+        L/L_0 = exp(-12 000 × 5,13470e-4) = 2,10878e-3 [CÁLCULO PRÓPRIO].
+        """
+        c_T = 1.0 / 313.15 - 1.0 / 373.15
+        expected_ratio = math.exp(-12_000.0 * c_T)
+        assert c_T == pytest.approx(5.13470e-4, rel=1e-5)
+        assert expected_ratio == pytest.approx(2.10878e-3, rel=1e-5)
+        life = arrhenius_life(100.0, L0_h=1.0, theta0_C=40.0, B_K=12_000.0)
+        assert life == pytest.approx(expected_ratio, rel=1e-9)
+
+    def test_simoni_uses_same_c_t_as_arrhenius(self) -> None:
+        """Em ``V = V_0`` Simoni (D5) degenera na parcela térmica de D6."""
+        thermal = arrhenius_life(90.0, L0_h=1000.0, theta0_C=40.0, B_K=9000.0)
+        simoni = simoni_life(
+            5.0, 90.0, t0_h=1000.0, V0=5.0, n=6.4, B_K=9000.0, theta0_C=40.0
+        )
+        assert simoni == pytest.approx(thermal, rel=1e-12)
+
+
+class TestEtapa1Section55GoldenValues:
+    """Tabela do Passo 2 da Etapa 1 §5.5, reproduzida ponta a ponta."""
+
+    # Escada de reignições da fase B lida na Fig. 3 do Documento A
+    # [HIPÓTESE de leitura de figura H4, Etapa 1 §5.5 — os números dela
+    # derivados NÃO devem ser citados como valores fechados].
+    _LADDER_KV = (18.0, 23.0, 28.0, 37.0, 41.44)
+
+    def _profile(self) -> StressProfile:
+        return StressProfile(
+            events=[
+                StressEvent(
+                    V_pk_kV=v,
+                    T1_us=2.76,
+                    dvdt_kV_per_us=15.05,
+                    n_reignitions=len(self._LADDER_KV),
+                )
+                for v in self._LADDER_KV
+            ],
+            label="fase B sem snubber (H4)",
+        )
+
+    @pytest.mark.parametrize(
+        ("n", "n_eq", "delta_D", "operations"),
+        [
+            (4.0, 1.97, 1.18e-3, 846),
+            (6.4, 1.59, 2.79e-3, 358),
+            (9.0, 1.40, 7.82e-3, 128),
+        ],
+    )
+    def test_step1_and_step2_table(
+        self, n: float, n_eq: float, delta_D: float, operations: int
+    ) -> None:
+        """n_eq e ΔD_m da tabela do Passo 2 [CÁLCULO PRÓPRIO, Etapa 1 §5.5]."""
+        prof = self._profile()
+        assert prof.equivalent_events(n) == pytest.approx(n_eq, rel=2e-2)
+        acc = CombinedDamageAccumulator(params=_doc_a_params(n_voltage=n))
+        acc.add_profile(prof)
+        assert acc.n_operations == 1
+        assert acc.D_el == pytest.approx(delta_D, rel=2e-2)
+        assert acc.rul_operations() == pytest.approx(operations, rel=2e-2)
+
+    def test_step2_mitigated_branch(self) -> None:
+        """ΔD_m com snubber = 7,04e-6 (evento único de 13,65 kV, n = 4)."""
+        acc = CombinedDamageAccumulator(params=_doc_a_params())
+        acc.add_event(StressEvent(V_pk_kV=13.65, T1_us=1.04, dvdt_kV_per_us=13.11))
+        assert acc.D_el == pytest.approx(7.04e-6, rel=2e-2)
+
+    def test_step3_exponent_uncertainty_factor_66(self) -> None:
+        """"Fator de 6,6" ao mover n de 4 para 9 [Etapa 1 §5.5, Passo 3]."""
+        prof = self._profile()
+        lives = []
+        for n in (4.0, 9.0):
+            acc = CombinedDamageAccumulator(params=_doc_a_params(n_voltage=n))
+            acc.add_profile(prof)
+            lives.append(acc.rul_operations())
+        assert lives[0] / lives[1] == pytest.approx(6.6, rel=5e-2)
+
+
+class TestPerverseMonotonicity:
+    """Etapa 2 §5.2: a normalização de D7 pode violar ∂F/∂D > 0."""
+
+    def test_threshold_shift_is_perverse_above_v_ref(self) -> None:
+        """Com ``a V_pk > V_ref``, envelhecer REDUZ o dano por evento.
+
+        Etapa 2 §5.2 demonstra que ``∂r/∂V_th = (aV_pk - V_ref)/(V_ref -
+        V_th)²`` é positivo para eventos mais severos que a referência;
+        logo baixar ``V_th`` pelo envelhecimento reduz ``r``, aumenta
+        ``N_j`` e DIMINUI o dano — ``∂F/∂D < 0``. O módulo não pode
+        esconder essa patologia: ela é a razão declarada para preferir a
+        normalização ``residual_withstand``.
+        """
+        params = _doc_a_params(V_th_kV=10.0, V_ref_kV=26.50)
+        ev = StressEvent(V_pk_kV=41.44, T1_us=2.76, dvdt_kV_per_us=15.05)
+
+        pristine = CombinedDamageAccumulator(
+            params=params,
+            U_w0_kV=14.07,
+            psi_min=0.5,
+            normalization="threshold_shift",
+            state_dependent_threshold=True,
+        )
+        aged = CombinedDamageAccumulator(
+            params=params,
+            U_w0_kV=14.07,
+            psi_min=0.5,
+            normalization="threshold_shift",
+            state_dependent_threshold=True,
+        )
+        aged.add_thermal_interval(40.0, 87_600.0)  # D_th = 0,5
+
+        assert aged.add_event(ev) < pristine.add_event(ev)
+
+    def test_residual_withstand_is_not_perverse_in_the_same_case(self) -> None:
+        """No mesmo caso, a normalização preferida dá ∂F/∂D > 0."""
+        params = _doc_a_params(V_th_kV=10.0, V_ref_kV=26.50)
+        ev = StressEvent(V_pk_kV=41.44, T1_us=2.76, dvdt_kV_per_us=15.05)
+        pristine = CombinedDamageAccumulator(
+            params=params,
+            U_w0_kV=14.07,
+            psi_min=0.5,
+            normalization="residual_withstand",
+            state_dependent_threshold=True,
+        )
+        aged = CombinedDamageAccumulator(
+            params=params,
+            U_w0_kV=14.07,
+            psi_min=0.5,
+            normalization="residual_withstand",
+            state_dependent_threshold=True,
+        )
+        aged.add_thermal_interval(40.0, 87_600.0)
+        assert aged.add_event(ev) > pristine.add_event(ev)
+
+    def test_known_limitations_declare_the_perversity(self) -> None:
+        assert "monotonicidade" in KNOWN_LIMITATIONS["rul_synergy_lower_bound"]
+        assert "threshold_shift" in KNOWN_LIMITATIONS["rul_synergy_lower_bound"]
+
+
+class TestNumericalGuards:
+    """Saturações e fallbacks: devem produzir valor declarado + WARNING."""
+
+    def test_event_damage_saturates_at_conventional_failure(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """``N_j`` com underflow ⇒ incremento 1,0 (D = 1, D4), não exceção.
+
+        Antes da correção esta chamada levantava ``ZeroDivisionError``,
+        fora do contrato de erro do módulo.
+        """
+        params = DamageModelParams(n_voltage=11.7, V_ref_kV=1.0, N0_events=1.0e4)
+        ev = StressEvent(V_pk_kV=1.0e30, T1_us=1.0, dvdt_kV_per_us=1.0)
+        assert supportable_events(ev, params) == 0.0
+        with caplog.at_level("WARNING"):
+            assert event_damage(ev, params) == 1.0
+        assert "underflow" in caplog.text
+
+    def test_thermal_exponent_saturation_is_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level("WARNING"):
+            montsinger_life(1.0e6, L0_h=1.0, theta0_C=40.0, HIC=10.0)
+        assert "saturado" in caplog.text
+
+    def test_psi_beyond_failure_is_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level("WARNING"):
+            assert psi_linear(3.0, psi_min=0.4) == pytest.approx(0.4)
+        assert "D4" in caplog.text
+
+    def test_nan_threshold_is_rejected(self) -> None:
+        prof = StressProfile(
+            events=[StressEvent(V_pk_kV=41.44, T1_us=2.0, dvdt_kV_per_us=1.0)]
+        )
+        with pytest.raises(ValueError, match="finito"):
+            prof.events_above(float("nan"))
+
+    def test_nan_exponent_is_rejected(self) -> None:
+        prof = StressProfile(
+            events=[StressEvent(V_pk_kV=41.44, T1_us=2.0, dvdt_kV_per_us=1.0)]
+        )
+        with pytest.raises(ValueError, match="finito"):
+            prof.equivalent_events(float("nan"))
+
+    def test_nan_base_in_per_unit_is_rejected(self) -> None:
+        ev = StressEvent(V_pk_kV=41.44, T1_us=2.0, dvdt_kV_per_us=1.0)
+        with pytest.raises(ValueError, match="finito"):
+            ev.in_per_unit(float("nan"))
+
+
+class TestEkfNumerics:
+    """Correção numérica do EKF: jacobiano, covariância e contrato de erro."""
+
+    @staticmethod
+    def _f(x: "list[float]", tau: float) -> "list[float]":
+        return [x[1] * math.exp(x[2] * tau), x[1], x[2]]
+
+    def test_jacobian_matches_central_differences(self) -> None:
+        """F = ∂f/∂x conferido por diferenças centradas (tolerância 1e-6).
+
+        O artigo 02 não imprime o jacobiano; a reconstrução do módulo é
+        [INFERÊNCIA] e por isso precisa ser verificada numericamente.
+        """
+        x = [0.9, 1.05, 0.031]
+        tau = 37.0
+        e = math.exp(x[2] * tau)
+        F = [[0.0, e, x[1] * tau * e], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        for j in range(3):
+            h = 1.0e-6 * max(1.0, abs(x[j]))
+            xp = list(x)
+            xm = list(x)
+            xp[j] += h
+            xm[j] -= h
+            fp = self._f(xp, tau)
+            fm = self._f(xm, tau)
+            for i in range(3):
+                numeric = (fp[i] - fm[i]) / (2.0 * h)
+                assert F[i][j] == pytest.approx(numeric, rel=1e-6, abs=1e-6)
+
+    def test_covariance_stays_symmetric_and_positive_semidefinite(self) -> None:
+        """Forma de Joseph: P simétrica e PSD após série longa e ruidosa.
+
+        A forma curta ``P = (I - K H) M`` perde a simetria por
+        arredondamento; a de Joseph é algebricamente idêntica para o ganho
+        ótimo e mantém a estrutura.
+        """
+        np = pytest.importorskip("numpy")
+        rng = __import__("random").Random(20260903)
+        ekf = EkfRulEstimator(alpha0=1.0, beta0=1.0e-3, q_diag=(0.0, 0.0, 0.0))
+        for k in range(500):
+            t = 10.0 * k
+            z = math.exp(2.0e-3 * t) * (1.0 + 0.02 * (rng.random() - 0.5))
+            ekf.update(t, z)
+            P = ekf.covariance
+            assert np.allclose(P, P.T, rtol=0.0, atol=0.0)
+            assert float(np.linalg.eigvalsh(P).min()) > -1.0e-15
+
+    def test_covariance_shape_and_isolation(self) -> None:
+        ekf = EkfRulEstimator(alpha0=1.0, beta0=0.05)
+        ekf.update(1.0, 1.05)
+        P = ekf.covariance
+        assert P.shape == (3, 3)
+        P[0, 0] = -999.0  # cópia: não pode contaminar o estado interno
+        assert ekf.covariance[0, 0] != -999.0
+
+    def test_predict_indicator_uses_model_time_origin(self) -> None:
+        """``I(t) = α e^{β(t - t0)}`` com t0 != 0 (eq. 7)."""
+        ekf = EkfRulEstimator(alpha0=2.0, beta0=0.1, t0=100.0)
+        assert ekf.predict_indicator(100.0) == pytest.approx(2.0)
+        assert ekf.predict_indicator(110.0) == pytest.approx(
+            2.0 * math.exp(1.0)
+        )
+
+    def test_predict_rul_with_non_zero_t0(self) -> None:
+        """RUL não pode depender da escolha da origem t0."""
+        times = [float(k) for k in range(51)]
+        values = [math.exp(0.05 * t) for t in times]
+        a = EkfRulEstimator(alpha0=1.0, beta0=0.05)
+        a.update_series(times, values)
+        b = EkfRulEstimator(alpha0=1.0, beta0=0.05, t0=1000.0)
+        b.update_series([t + 1000.0 for t in times], values)
+        thr = math.exp(0.05 * 100.0)
+        assert a.predict_rul(thr).rul == pytest.approx(
+            b.predict_rul(thr).rul, rel=1e-6
+        )
+
+    def test_zero_alpha_state_raises_value_error(self) -> None:
+        """α = 0 é estado alcançável: deve dar ValueError, não ZeroDivisionError."""
+        ekf = EkfRulEstimator(alpha0=1.0, beta0=1.0e-3)
+        ekf._x[1] = 0.0  # noqa: SLF001 — simula α filtrado até zero
+        with pytest.raises(ValueError, match="α = 0"):
+            ekf.predict_rul(2.0)
+
+    def test_crossing_before_observation_window_is_distinguished(self) -> None:
+        """Cruzamento extrapolado para antes de t0 tem mensagem própria."""
+        ekf = EkfRulEstimator(alpha0=1.0, beta0=-1.0e-3, t0=0.0)
+        with pytest.raises(ValueError, match="ANTES da origem"):
+            ekf.predict_rul(2.0)
+
+    def test_sigma_grows_with_state_uncertainty(self) -> None:
+        """σ do método delta cresce com P_αβ — não é constante decorativa."""
+        times = [float(k) for k in range(31)]
+        values = [math.exp(0.05 * t) for t in times]
+        tight = EkfRulEstimator(
+            alpha0=1.0, beta0=0.05, p0_diag=(1.0e-2, 1.0e-4, 1.0e-8)
+        )
+        loose = EkfRulEstimator(
+            alpha0=1.0, beta0=0.05, p0_diag=(1.0e-2, 1.0e-1, 1.0e-4)
+        )
+        tight.update_series(times, values)
+        loose.update_series(times, values)
+        thr = math.exp(0.05 * 200.0)
+        assert loose.predict_rul(thr).sigma > tight.predict_rul(thr).sigma
+
+
+class TestHealthIndexBandOrdering:
+    def test_bands_out_of_order_are_rejected(self) -> None:
+        """Faixas fora de ordem davam classificação errada em silêncio."""
+        with pytest.raises(ValueError, match="DECRESCENTE"):
+            AssetHealthIndex(
+                bands=((0.0, "CRITICO", "vermelho"), (85.0, "BOM", "verde"))
+            )
+
+    def test_repeated_band_limits_are_rejected(self) -> None:
+        with pytest.raises(ValueError, match="DECRESCENTE"):
+            AssetHealthIndex(
+                bands=((50.0, "A", "verde"), (50.0, "B", "amarelo"))
+            )
+
+    def test_non_numeric_band_limit_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="numérico"):
+            AssetHealthIndex(bands=(("alto", "BOM", "verde"),))
+
+    def test_default_bands_are_strictly_decreasing(self) -> None:
+        limits = [b[0] for b in DEFAULT_BANDS]
+        assert limits == sorted(limits, reverse=True)
+        assert len(set(limits)) == len(limits)
+
+
+class TestKnownLimitationsCompleteness:
+    """Checklist 4.1.4: heurísticas e saturações entram em KNOWN_LIMITATIONS."""
+
+    def test_numerical_saturation_is_declared(self) -> None:
+        assert "rul_numerical_saturation" in KNOWN_LIMITATIONS
+        text = KNOWN_LIMITATIONS["rul_numerical_saturation"]
+        assert "WARNING" in text
+        assert "underflow" in text
+
+    def test_ekf_interval_is_declared_as_delta_method(self) -> None:
+        text = KNOWN_LIMITATIONS["rul_interval_delta_method"]
+        assert "ISO 13381-1" in text
+        assert "Monte Carlo" in text
+
+
+class TestPiGoodMultiplier:
+    """O fator 'PI bom' era declarado configurável mas estava embutido."""
+
+    def test_default_multiplier_reproduces_previous_behaviour(self) -> None:
+        """PI = 2 × pi_min = 4,0 pontua 100 com o multiplicador padrão."""
+        assert AssetHealthIndex(pi=4.0)._score_insulation_resistance() == (
+            pytest.approx(100.0)
+        )
+
+    def test_multiplier_is_honoured(self) -> None:
+        """Com multiplicador 3, PI = 4,0 (meio caminho de 2 a 6) pontua 50."""
+        th = HealthIndexThresholds(pi_good_multiplier=3.0)
+        ahi = AssetHealthIndex(pi=4.0, thresholds=th)
+        assert ahi._score_insulation_resistance() == pytest.approx(50.0)
+
+    def test_multiplier_below_one_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="pi_good_multiplier"):
+            HealthIndexThresholds(pi_good_multiplier=0.9)

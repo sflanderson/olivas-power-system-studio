@@ -65,6 +65,10 @@ import math
 from dataclasses import dataclass, field
 from typing import Sequence
 
+from app.core.logging_config import get_logger
+
+log = get_logger(__name__)
+
 # ---------------------------------------------------------------------------
 # Constantes físicas / normativas
 # ---------------------------------------------------------------------------
@@ -214,8 +218,8 @@ class StressEvent:
 
     def in_per_unit(self, base_kV: float) -> float:
         """Pico em pu sobre a base fase-terra informada [kV]."""
-        if base_kV <= 0.0:
-            raise ValueError(f"base_kV deve ser > 0, obtido {base_kV}")
+        if not math.isfinite(base_kV) or base_kV <= 0.0:
+            raise ValueError(f"base_kV deve ser finito e > 0, obtido {base_kV}")
         return self.abs_V_pk_kV / base_kV
 
 
@@ -274,13 +278,15 @@ class StressProfile:
     def n_operations(self) -> int:
         """Número de manobras distintas identificadas no perfil.
 
-        Uma manobra é um grupo de excursões com o mesmo
-        ``n_reignitions``/instante de agrupamento; aqui é contado pelo
-        número de grupos criados na extração (ver
-        :func:`extract_stress_events`), reconstruído como
-        ``ceil(n_events / n_reignitions)`` por grupo homogêneo. Para
-        perfis montados manualmente com ``n_reignitions=1`` retorna
-        ``n_events``.
+        Cada evento carrega ``n_reignitions`` = tamanho do grupo (manobra)
+        a que pertence, atribuído em :func:`extract_stress_events`. A
+        contagem de manobras é, portanto, ``round(Σ_j 1/n_{r,j})``: um
+        grupo completo de ``k`` eventos com ``n_r = k`` soma exatamente 1.
+        Para perfis montados manualmente com ``n_reignitions = 1`` retorna
+        ``n_events``. **Ressalva**: perfis montados à mão com um número de
+        eventos incompatível com ``n_r`` (por exemplo 1 evento declarando
+        ``n_r = 5``) devolvem a fração arredondada — aqui 1 —, não o
+        número real de manobras da campanha.
         """
         if not self.events:
             return 0
@@ -329,9 +335,11 @@ class StressProfile:
 
     def events_above(self, threshold_kV: float) -> list[StressEvent]:
         """Eventos cujo pico em módulo excede ``threshold_kV``."""
-        if threshold_kV < 0.0:
+        # `nan < 0.0` é False: sem o teste de finitude o filtro aceitaria
+        # NaN e devolveria silenciosamente lista vazia.
+        if not math.isfinite(threshold_kV) or threshold_kV < 0.0:
             raise ValueError(
-                f"threshold_kV deve ser >= 0, obtido {threshold_kV}"
+                f"threshold_kV deve ser finito e >= 0, obtido {threshold_kV}"
             )
         return [ev for ev in self.events if ev.abs_V_pk_kV > threshold_kV]
 
@@ -343,9 +351,11 @@ class StressProfile:
         quantifica quantas excursões "valem" a maior. Retorna 0,0 para
         perfil vazio.
         """
-        if n_exponent < 0.0:
+        # `nan < 0.0` é False: sem o teste de finitude n_eq devolveria o
+        # número de eventos (x**nan == 1 apenas para x == 1) sem erro.
+        if not math.isfinite(n_exponent) or n_exponent < 0.0:
             raise ValueError(
-                f"n_exponent deve ser >= 0, obtido {n_exponent}"
+                f"n_exponent deve ser finito e >= 0, obtido {n_exponent}"
             )
         if not self.events:
             return 0.0
