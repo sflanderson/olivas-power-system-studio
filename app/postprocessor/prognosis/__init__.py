@@ -110,6 +110,16 @@ from app.postprocessor.prognosis.rul_estimator import (
     RulPrediction,
     rul_from_damage,
 )
+from app.postprocessor.prognosis.switching_campaign import (
+    RULE_OF_THREE,
+    ManeuverOutcome,
+    SwitchingCampaign,
+    TerminalRate,
+    campaign_from_summary,
+)
+from app.postprocessor.prognosis.switching_campaign import (
+    KNOWN_LIMITATIONS as _CAMPAIGN_LIMITATIONS,
+)
 from app.postprocessor.prognosis.stress_profile import (
     IEC_60034_15_T1_FACTOR,
     StressEvent,
@@ -154,6 +164,12 @@ __all__ = [
     "HealthIndexThresholds",
     "HealthContribution",
     "DEFAULT_BANDS",
+    # switching_campaign
+    "ManeuverOutcome",
+    "SwitchingCampaign",
+    "TerminalRate",
+    "campaign_from_summary",
+    "RULE_OF_THREE",
     # auditoria
     "KNOWN_LIMITATIONS",
 ]
@@ -259,3 +275,14 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "no dielétrico."
     ),
 }
+
+# As limitações da campanha vivem no próprio módulo e são agregadas aqui
+# para que o laudo tenha UM catálogo só. Colisão de chave é erro de
+# programação e deve estourar.
+for _chave, _texto in _CAMPAIGN_LIMITATIONS.items():
+    if _chave in KNOWN_LIMITATIONS:  # pragma: no cover - defensivo
+        raise RuntimeError(
+            f"colisão de chave no catálogo de limitações do prognóstico: {_chave!r}"
+        )
+    KNOWN_LIMITATIONS[_chave] = _texto
+del _chave, _texto
