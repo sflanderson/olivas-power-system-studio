@@ -892,3 +892,193 @@ class TestReprodutibilidadeDoConjuntoPublicado:
         assert a.chopping_current_A == pytest.approx(corte, rel=1e-15)
         assert a.didt_capability_A_per_us == pytest.approx(didt, rel=1e-15)
         assert a.rrds_a_kV_per_ms == pytest.approx(rrds, rel=1e-15)
+
+
+# ---------------------------------------------------------------------------
+# 10. Amostragem estratificada sobre a região de escalada
+# ---------------------------------------------------------------------------
+
+
+class TestEstratificacao:
+    """A varredura uniforme gasta 78 % das execuções onde nada acontece.
+
+    Depois que a banda de escalada foi caracterizada — 40 a 60 kV/ms neste
+    circuito —, estratificar aloca as execuções onde a variância está, sem
+    perder a não tendenciosidade. Medido no conjunto convergido: as oito
+    travessias têm RRDS de polo condutor entre 40,7 e 48,3 kV/ms, todas no
+    estrato alto; o estrato baixo dá 0 em 107.
+    """
+
+    def test_os_estratos_particionam_a_faixa(self):
+        from app.simulation.emt.vcb_scenarios import escalation_strata
+
+        e = escalation_strata()
+        assert len(e) == 2
+        assert e[0].range == (5.0, 40.0)
+        assert e[1].range == (40.0, 50.0)
+        assert sum(x.weight for x in e) == pytest.approx(1.0)
+        assert e[1].weight == pytest.approx(10.0 / 45.0)
+
+    def test_banda_alem_da_faixa_e_recortada(self):
+        from app.simulation.emt.vcb_scenarios import escalation_strata
+
+        e = escalation_strata(band_kV_per_ms=(40.0, 60.0))
+        assert e[-1].high_kV_per_ms == 50.0
+
+    def test_banda_interna_da_tres_estratos(self):
+        from app.simulation.emt.vcb_scenarios import escalation_strata
+
+        e = escalation_strata(band_kV_per_ms=(20.0, 30.0))
+        assert len(e) == 3
+        assert sum(x.weight for x in e) == pytest.approx(1.0)
+
+    @pytest.mark.parametrize(
+        "banda", [(50.0, 40.0), (60.0, 70.0), (1.0, 3.0), (float("nan"), 50.0)]
+    )
+    def test_banda_invalida_levanta(self, banda):
+        from app.simulation.emt.vcb_scenarios import escalation_strata
+
+        with pytest.raises(ValueError):
+            escalation_strata(band_kV_per_ms=banda)
+
+    def test_estimador_e_nao_tendencioso_por_construcao(self):
+        """``p = Σ W_h p_h`` recai na fração simples quando ``p_h`` é igual."""
+        from app.simulation.emt.vcb_scenarios import (
+            RrdsStratum,
+            stratified_rate,
+        )
+
+        e = (
+            RrdsStratum(5.0, 40.0, 35.0 / 45.0),
+            RrdsStratum(40.0, 50.0, 10.0 / 45.0),
+        )
+        # Mesma taxa nos dois estratos: o estimador tem de devolvê-la.
+        p, sd = stratified_rate(e, crossings=(10, 20), counts=(100, 200))
+        assert p == pytest.approx(0.1)
+        assert sd > 0.0
+
+    def test_estrato_sem_travessia_nao_contribui_variancia(self):
+        from app.simulation.emt.vcb_scenarios import (
+            RrdsStratum,
+            stratified_rate,
+        )
+
+        e = (
+            RrdsStratum(5.0, 40.0, 35.0 / 45.0),
+            RrdsStratum(40.0, 50.0, 10.0 / 45.0),
+        )
+        p, sd = stratified_rate(e, crossings=(0, 8), counts=(107, 43))
+        assert p == pytest.approx((10.0 / 45.0) * (8 / 43))
+        esperado = (10.0 / 45.0) ** 2 * (8 / 43) * (1 - 8 / 43) / 43
+        assert sd == pytest.approx(esperado**0.5)
+
+    def test_a_estratificacao_reduz_a_variancia_no_caso_real(self):
+        """O ganho medido, com a alocação de Neyman e o mesmo orçamento."""
+        from app.simulation.emt.vcb_scenarios import (
+            RrdsStratum,
+            stratified_rate,
+        )
+
+        e = (
+            RrdsStratum(5.0, 40.0, 35.0 / 45.0),
+            RrdsStratum(40.0, 50.0, 10.0 / 45.0),
+        )
+        # Uniforme: 150 execuções, 8 travessias.
+        p_u = 8 / 150
+        sd_u = (p_u * (1 - p_u) / 150) ** 0.5
+        # Neyman: quase tudo no estrato de p intermediário.
+        _p, sd_n = stratified_rate(e, crossings=(0, 28), counts=(5, 150))
+        assert sd_n < sd_u
+        assert (sd_u / sd_n) ** 2 > 4.0, "ganho de variância de ao menos 4x"
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"crossings": (0,), "counts": (10, 10)},
+            {"crossings": (0, 0), "counts": (0, 10)},
+            {"crossings": (11, 0), "counts": (10, 10)},
+        ],
+    )
+    def test_contagens_invalidas_levantam(self, kwargs):
+        from app.simulation.emt.vcb_scenarios import (
+            RrdsStratum,
+            stratified_rate,
+        )
+
+        e = (RrdsStratum(5.0, 40.0, 0.5), RrdsStratum(40.0, 50.0, 0.5))
+        with pytest.raises(ValueError):
+            stratified_rate(e, **kwargs)
+
+    def test_amostragem_respeita_o_estrato(self):
+        from app.simulation.emt.vcb_scenarios import (
+            escalation_strata,
+            stratified_three_pole_samples,
+        )
+
+        zeros = (
+            PoleCurrentZeros(phase_angle_rad=0.0),
+            PoleCurrentZeros(phase_angle_rad=-2.0 * np.pi / 3.0),
+            PoleCurrentZeros(phase_angle_rad=2.0 * np.pi / 3.0),
+        )
+        e = escalation_strata()
+        por_estrato = stratified_three_pole_samples(
+            LITERATURE_SCENARIO,
+            allocation=(10, 20),
+            strata=e,
+            zeros_abc=zeros,
+            earliest_separation_s=14.0e-3,
+            seed=1,
+        )
+        assert [len(x) for x in por_estrato] == [10, 20]
+        for estrato, realizacoes in zip(e, por_estrato):
+            for tripla in realizacoes:
+                for amostra in tripla:
+                    assert (
+                        estrato.low_kV_per_ms
+                        <= amostra.rrds_a_kV_per_ms
+                        <= estrato.high_kV_per_ms
+                    )
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"allocation": (10,)},
+            {"allocation": (0, 10)},
+            {"allocation": (-1, 10)},
+        ],
+    )
+    def test_alocacao_invalida_levanta(self, kwargs):
+        from app.simulation.emt.vcb_scenarios import (
+            escalation_strata,
+            stratified_three_pole_samples,
+        )
+
+        zeros = (PoleCurrentZeros(phase_angle_rad=0.0),) * 3
+        base = dict(
+            allocation=(10, 10),
+            strata=escalation_strata(),
+            zeros_abc=zeros,
+            earliest_separation_s=14.0e-3,
+        )
+        base.update(kwargs)
+        with pytest.raises(ValueError):
+            stratified_three_pole_samples(LITERATURE_SCENARIO, **base)
+
+    def test_pesos_que_nao_somam_um_levantam(self):
+        from app.simulation.emt.vcb_scenarios import (
+            RrdsStratum,
+            stratified_three_pole_samples,
+        )
+
+        zeros = (PoleCurrentZeros(phase_angle_rad=0.0),) * 3
+        with pytest.raises(ValueError, match="somar 1"):
+            stratified_three_pole_samples(
+                LITERATURE_SCENARIO,
+                allocation=(5, 5),
+                strata=(
+                    RrdsStratum(5.0, 40.0, 0.5),
+                    RrdsStratum(40.0, 50.0, 0.3),
+                ),
+                zeros_abc=zeros,
+                earliest_separation_s=14.0e-3,
+            )

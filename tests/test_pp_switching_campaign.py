@@ -25,12 +25,16 @@ from app.postprocessor.prognosis.damage_models import (
 )
 from app.postprocessor.prognosis.stress_profile import StressEvent, StressProfile
 from app.postprocessor.prognosis.switching_campaign import (
+    EXPONENT_LITERATURE_RANGE,
     KNOWN_LIMITATIONS,
     RULE_OF_THREE,
     ManeuverOutcome,
+    PeakDistribution,
     SwitchingCampaign,
     TerminalRate,
     campaign_from_summary,
+    exponent_robustness,
+    survival,
 )
 
 #: Envelope da IEC 60034-15:2009 para 4,16 kV [kV de pico].
@@ -488,3 +492,235 @@ class TestConversaoDeFalhaEmEnvelhecimento:
         sem, _com = self._par_de_campanhas()
         acc = sem.accumulate()
         assert acc.n_operations == 9, "a décima manobra é terminal, não entra"
+
+
+# ---------------------------------------------------------------------------
+# 7. Acoplamento: p depende do dano acumulado
+# ---------------------------------------------------------------------------
+
+
+class TestDistribuicaoDePicos:
+    def test_excedencia_e_a_contagem(self):
+        d = PeakDistribution(peaks_kV=(1.0, 5.0, 10.0, 30.0))
+        assert d.n == 4
+        assert d.max_kV == 30.0
+        assert d.exceedance(9.0) == pytest.approx(0.5)
+        # A igualdade conta: é o critério do motor, que dispara em >=.
+        assert d.exceedance(30.0) == pytest.approx(0.25)
+        assert d.exceedance(30.001) == 0.0
+        assert d.exceedance(0.0) == 1.0
+
+    def test_os_picos_ficam_ordenados(self):
+        d = PeakDistribution(peaks_kV=(30.0, 1.0, 10.0))
+        assert d.peaks_kV == (1.0, 10.0, 30.0)
+
+    def test_pontos_de_quebra_vem_em_ordem_decrescente(self):
+        d = PeakDistribution(peaks_kV=(1.0, 5.0, 10.0, 30.0))
+        assert d.breakpoints_kV(above_kV=4.0) == (30.0, 10.0, 5.0)
+
+    def test_taxa_traz_o_intervalo(self):
+        d = PeakDistribution(peaks_kV=tuple([1.0] * 142 + [100.0] * 8))
+        t = d.rate(21.64)
+        assert (t.n_crossed, t.n_total) == (8, 150)
+        assert t.expected_maneuvers == pytest.approx(18.75)
+
+    @pytest.mark.parametrize(
+        "picos", [(), (float("nan"),), (-1.0,)]
+    )
+    def test_picos_invalidos_levantam(self, picos):
+        with pytest.raises(ValueError):
+            PeakDistribution(peaks_kV=picos)
+
+
+class TestCurvaDeSobrevivencia:
+    """O acoplamento resolvido por trechos, sem iterar manobra a manobra."""
+
+    def test_distribuicao_com_lacuna_da_taxa_constante(self):
+        """O caso do circuito sem mitigação: p não muda em toda a vida.
+
+        O corpo termina muito abaixo do limiar degradado e a cauda está
+        muito acima dele: nenhum pico entra na faixa que ψ(D) varre, e a
+        taxa fixa é EXATA, não conservadora.
+        """
+        d = PeakDistribution(peaks_kV=tuple([9.0] * 142 + [200.0] * 8))
+        c = survival(
+            d, withstand0_kV=21.64, maneuvers_to_damage_limit=1.0e6
+        )
+        assert c.rate_is_constant
+        assert c.critical_damage is None
+        assert len(c.segments) == 1
+        assert c.segments[0].p == pytest.approx(8 / 150)
+        assert c.expected_maneuvers == pytest.approx(150 / 8, rel=1e-6)
+
+    def test_distribuicao_sem_lacuna_da_taxa_crescente(self):
+        """O caso com para-raios: os picos grampeados entram no fim da vida."""
+        d = PeakDistribution(peaks_kV=tuple([9.0] * 142 + [11.7] * 8))
+        c = survival(
+            d, withstand0_kV=21.64, maneuvers_to_damage_limit=1.0e6, psi_min=0.5
+        )
+        assert not c.rate_is_constant
+        assert c.critical_damage is not None
+        # ψ·21,64 = 11,7 → ψ = 0,5406 → D = (1 − 0,5406)/0,5 = 0,919
+        assert c.critical_damage == pytest.approx(0.919, abs=0.005)
+        assert c.segments[0].p == 0.0
+        assert c.segments[-1].p > 0.0
+
+    def test_a_sobrevivencia_decai_geometricamente_no_trecho(self):
+        d = PeakDistribution(peaks_kV=(9.0, 200.0))
+        c = survival(d, withstand0_kV=21.64, maneuvers_to_damage_limit=10.0)
+        seg = c.segments[0]
+        assert seg.survival_end == pytest.approx((1.0 - seg.p) ** 10.0)
+
+    def test_taxa_nula_nao_consome_sobrevivencia(self):
+        d = PeakDistribution(peaks_kV=(1.0, 2.0, 3.0))
+        c = survival(d, withstand0_kV=100.0, maneuvers_to_damage_limit=1.0e6)
+        assert c.expected_maneuvers == pytest.approx(1.0e6)
+        assert c.survival_at_damage_limit == pytest.approx(1.0)
+
+    def test_esperanca_coincide_com_a_geometrica_quando_p_e_constante(self):
+        """Sanidade: sem acoplamento, E[N] tem de recair em 1/p."""
+        d = PeakDistribution(peaks_kV=tuple([1.0] * 90 + [500.0] * 10))
+        c = survival(d, withstand0_kV=21.64, maneuvers_to_damage_limit=1.0e9)
+        assert c.rate_is_constant
+        assert c.expected_maneuvers == pytest.approx(10.0, rel=1e-6)
+
+    def test_psi_min_unitario_desliga_o_acoplamento(self):
+        """Sem degradação da suportabilidade não há acoplamento."""
+        d = PeakDistribution(peaks_kV=tuple([9.0] * 142 + [11.7] * 8))
+        c = survival(
+            d, withstand0_kV=21.64, maneuvers_to_damage_limit=1.0e6, psi_min=1.0
+        )
+        assert c.rate_is_constant
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"withstand0_kV": 0.0},
+            {"withstand0_kV": float("nan")},
+            {"maneuvers_to_damage_limit": math.inf},
+            {"maneuvers_to_damage_limit": 0.0},
+            {"psi_min": 0.0},
+            {"psi_min": 1.5},
+        ],
+    )
+    def test_parametros_invalidos_levantam(self, kwargs):
+        d = PeakDistribution(peaks_kV=(1.0, 2.0))
+        base = {"withstand0_kV": 21.64, "maneuvers_to_damage_limit": 1.0e6}
+        base.update(kwargs)
+        with pytest.raises(ValueError):
+            survival(d, **base)
+
+
+class TestAcoplamentoNoCasoDeReferencia:
+    """Os dois vereditos que o acoplamento entrega, sobre os dados reais."""
+
+    @classmethod
+    def _distribuicao(cls, mitigacao: str) -> PeakDistribution:
+        caminho = Path(__file__).resolve().parents[1] / CONJUNTO
+        if not caminho.exists():  # pragma: no cover
+            pytest.skip(f"conjunto ausente: {CONJUNTO}")
+        d = json.loads(caminho.read_text(encoding="utf-8"))
+        base_kV = d["configuracao"]["v_base_fase_terra_V"] / 1.0e3
+        grupo = [l for l in d["realizacoes"] if l.get("mitigacao") == mitigacao]
+        return PeakDistribution(
+            peaks_kV=[max(l["motor_pu"].values()) * base_kV for l in grupo],
+            label=mitigacao,
+        )
+
+    def test_sem_mitigacao_o_acoplamento_e_inocuo(self):
+        """A lacuna de 19x na distribuição torna a taxa fixa EXATA."""
+        d = self._distribuicao("nenhuma")
+        c = survival(
+            d, withstand0_kV=ENVELOPE_KV, maneuvers_to_damage_limit=5.534e7
+        )
+        assert c.rate_is_constant
+        assert c.expected_maneuvers == pytest.approx(18.75, abs=0.05)
+
+    def test_a_lacuna_existe_e_e_de_uma_ordem_de_grandeza(self):
+        d = self._distribuicao("nenhuma")
+        picos = d.peaks_kV
+        corpo = max(v for v in picos if v < 100.0)
+        cauda = min(v for v in picos if v >= 100.0)
+        assert cauda / corpo > 10.0
+
+    def test_com_para_raios_o_acoplamento_acorda_no_fim_da_vida(self):
+        """O para-raios ADIA a travessia; não a elimina."""
+        d = self._distribuicao("para_raios")
+        c = survival(
+            d, withstand0_kV=ENVELOPE_KV, maneuvers_to_damage_limit=1.322e7
+        )
+        assert not c.rate_is_constant
+        assert c.critical_damage == pytest.approx(0.92, abs=0.01)
+        assert c.segments[0].p == 0.0
+
+    def test_a_mitigacao_prolonga_a_vida_por_ordens_de_grandeza(self):
+        sem = survival(
+            self._distribuicao("nenhuma"),
+            withstand0_kV=ENVELOPE_KV,
+            maneuvers_to_damage_limit=5.534e7,
+        )
+        com = survival(
+            self._distribuicao("para_raios"),
+            withstand0_kV=ENVELOPE_KV,
+            maneuvers_to_damage_limit=1.322e7,
+        )
+        assert com.expected_maneuvers / sem.expected_maneuvers > 1.0e4
+
+
+# ---------------------------------------------------------------------------
+# 8. Robustez da decisão ao expoente não calibrado
+# ---------------------------------------------------------------------------
+
+
+class TestRobustezAoExpoente:
+    @staticmethod
+    def _par():
+        """Uma configuração dominada pela travessia, outra pelo dano."""
+        sem = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV, label="sem")
+        for i in range(9):
+            sem.add(ManeuverOutcome(index=i, peak_pu=2.0, profile=_perfil(7.0)))
+        sem.add(ManeuverOutcome(index=9, peak_pu=10.7, crossed_withstand=True))
+
+        com = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV, label="com")
+        for i in range(10):
+            com.add(ManeuverOutcome(index=i, peak_pu=3.4, profile=_perfil(11.7)))
+        return {"sem": sem, "com": com}
+
+    def test_a_faixa_padrao_e_a_da_literatura(self):
+        assert EXPONENT_LITERATURE_RANGE == (3.8, 11.7)
+
+    def test_a_ordenacao_resiste_a_faixa_inteira(self):
+        r = exponent_robustness(self._par())
+        assert r.is_robust
+        assert r.winner == "com"
+        assert "LIVRE de calibração" in r.describe()
+
+    def test_a_configuracao_dominada_pela_travessia_nao_depende_do_expoente(self):
+        """O ponto que extingue a limitação para efeito de DECISÃO.
+
+        Quando o caminho terminal domina, a vida é ``1/p`` e o expoente
+        não calibrado **não entra na conta**: a dispersão é exatamente 1.
+        """
+        r = exponent_robustness(self._par())
+        assert r.spread["sem"] == pytest.approx(1.0)
+        assert r.spread["com"] > 10.0
+
+    def test_o_numero_absoluto_continua_dependendo_do_expoente(self):
+        """A decisão fica livre; a vida absoluta, não."""
+        r = exponent_robustness(self._par())
+        vidas = r.lives["com"]
+        assert vidas[-1] > vidas[0]
+        assert max(vidas) / min(vidas) > 100.0
+
+    def test_expoentes_explicitos_sao_respeitados(self):
+        r = exponent_robustness(self._par(), exponents=(4.0, 8.0))
+        assert r.exponents == (4.0, 8.0)
+        assert len(r.lives["sem"]) == 2
+
+    def test_uma_campanha_so_levanta(self):
+        with pytest.raises(ValueError, match="ao menos duas"):
+            exponent_robustness({"unica": self._par()["sem"]})
+
+    def test_lista_de_expoentes_vazia_levanta(self):
+        with pytest.raises(ValueError, match="exponents"):
+            exponent_robustness(self._par(), exponents=())

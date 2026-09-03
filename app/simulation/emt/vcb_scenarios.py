@@ -91,6 +91,10 @@ __all__ = [
     "LITERATURE_WORST_ARC_TIME_S",
     "LITERATURE_RRDS_WORST_KV_PER_MS",
     "PoleCurrentZeros",
+    "RrdsStratum",
+    "escalation_strata",
+    "stratified_rate",
+    "stratified_three_pole_samples",
     "FIELD_PEAK_CEILING_PU",
     "LITERATURE_CHOPPING_RANGE_A",
     "LITERATURE_DIDT_RANGE_A_PER_US",
@@ -795,3 +799,205 @@ def sweep_three_pole_samples(
             )
         realizacoes.append((polos[0], polos[1], polos[2]))
     return realizacoes
+
+
+# ---------------------------------------------------------------------------
+# Amostragem ESTRATIFICADA sobre a região de escalada
+# ---------------------------------------------------------------------------
+#
+# A varredura uniforme gasta 78 % das execuções na faixa de RRDS em que
+# NADA acontece. Depois que a região de escalada foi caracterizada — banda
+# de 40 a 60 kV/ms neste circuito
+# [REPO: docs/research/rul_isolamento/09_PARA_RAIOS_E_CRITERIO_DE_
+# ACEITACAO.md, §4.3] —, a estratificação permite alocar as execuções onde
+# a variância está, sem perder a não tendenciosidade: o estimador
+#
+#     p = Σ_h W_h · p_h
+#
+# com W_h a largura relativa do estrato e p_h a taxa observada nele, é
+# EXATAMENTE não tendencioso para qualquer alocação, e sua variância
+#
+#     Var(p) = Σ_h W_h² · p_h(1 − p_h) / n_h
+#
+# cai quando n_h cresce nos estratos de p_h intermediário. Estratos com
+# p_h = 0 contribuem variância nula e podem receber poucas execuções.
+
+
+@dataclass(frozen=True)
+class RrdsStratum:
+    """Um estrato da faixa de RRDS.
+
+    Attributes
+    ----------
+    low_kV_per_ms, high_kV_per_ms:
+        Limites do estrato.
+    weight:
+        Peso ``W_h`` — a fração da faixa completa que o estrato ocupa sob
+        a distribuição ORIGINAL (uniforme). É o que devolve a
+        não tendenciosidade ao estimador.
+    """
+
+    low_kV_per_ms: float
+    high_kV_per_ms: float
+    weight: float
+
+    def __post_init__(self) -> None:
+        lo, hi = float(self.low_kV_per_ms), float(self.high_kV_per_ms)
+        if not (math.isfinite(lo) and math.isfinite(hi)) or lo <= 0.0 or hi <= lo:
+            raise ValueError(
+                f"estrato inválido: (({lo!r}, {hi!r}))"
+            )
+        w = float(self.weight)
+        if not math.isfinite(w) or not (0.0 < w <= 1.0):
+            raise ValueError(f"weight deve estar em (0, 1], obtido {w!r}")
+
+    @property
+    def range(self) -> tuple[float, float]:
+        """Par ``(mín, máx)`` do estrato."""
+        return (float(self.low_kV_per_ms), float(self.high_kV_per_ms))
+
+
+def escalation_strata(
+    ranges: VcbParameterRanges = None,  # type: ignore[assignment]
+    *,
+    band_kV_per_ms: tuple[float, float] = (40.0, 60.0),
+) -> tuple[RrdsStratum, ...]:
+    """Estratos da faixa de RRDS em torno da banda de escalada.
+
+    Divide a faixa do cenário em até três estratos — abaixo da banda,
+    banda, acima da banda — com pesos proporcionais às larguras, de modo
+    que ``Σ W_h = 1``. Estratos fora da faixa do cenário são omitidos.
+
+    Parameters
+    ----------
+    ranges:
+        Cenário; ``None`` usa :data:`LITERATURE_SCENARIO`.
+    band_kV_per_ms:
+        Banda de escalada. O padrão é a medida neste circuito, **não** os
+        20 a 30 kV/ms que Wong reporta no dele: o limiar é a corrida entre
+        a rampa de recuperação e a TRV da rede, e a TRV deste caso não é a
+        do sistema de ensaio dele.
+
+    Raises
+    ------
+    ValueError
+        Banda inválida ou disjunta da faixa do cenário.
+    """
+    faixas = ranges if ranges is not None else LITERATURE_SCENARIO
+    lo, hi = (float(x) for x in faixas.rrds_kV_per_ms)
+    b0, b1 = float(band_kV_per_ms[0]), float(band_kV_per_ms[1])
+    if not (math.isfinite(b0) and math.isfinite(b1)) or b1 <= b0:
+        raise ValueError(
+            f"band_kV_per_ms deve ser (mín < máx) finito, obtido {band_kV_per_ms!r}"
+        )
+    if b1 <= lo or b0 >= hi:
+        raise ValueError(
+            f"a banda {band_kV_per_ms!r} é disjunta da faixa do cenário "
+            f"{faixas.rrds_kV_per_ms!r}"
+        )
+    largura = hi - lo
+    cortes = sorted({lo, max(lo, b0), min(hi, b1), hi})
+    return tuple(
+        RrdsStratum(
+            low_kV_per_ms=a,
+            high_kV_per_ms=b,
+            weight=(b - a) / largura,
+        )
+        for a, b in zip(cortes[:-1], cortes[1:])
+        if b > a
+    )
+
+
+def stratified_three_pole_samples(
+    ranges: VcbParameterRanges,
+    *,
+    allocation: Sequence[int],
+    strata: Sequence[RrdsStratum],
+    zeros_abc: Sequence["PoleCurrentZeros"],
+    arc_time_window_s: tuple[float, float] = LITERATURE_WORST_ARC_TIME_S,
+    earliest_separation_s: float = 0.0,
+    leading_pole: int = 0,
+    seed: int = 0,
+) -> tuple[tuple[tuple, ...], ...]:
+    """Realizações por estrato, para o estimador estratificado.
+
+    Cada estrato recebe ``allocation[h]`` realizações sorteadas com a RRDS
+    restrita ao seu intervalo; o resto dos parâmetros segue o cenário. O
+    resultado é uma tupla POR ESTRATO — a separação tem de ser preservada,
+    porque o estimador precisa saber de qual estrato veio cada realização.
+
+    Raises
+    ------
+    ValueError
+        Alocação e estratos de tamanhos diferentes, alocação com valor não
+        positivo, ou pesos que não somam 1.
+    """
+    estratos = tuple(strata)
+    aloc = tuple(int(x) for x in allocation)
+    if len(aloc) != len(estratos):
+        raise ValueError(
+            f"allocation deve ter um valor por estrato ({len(estratos)}), "
+            f"obtidos {len(aloc)}"
+        )
+    if not estratos:
+        raise ValueError("strata não pode ser vazia")
+    if any(n <= 0 for n in aloc):
+        raise ValueError(f"allocation deve ser positiva em todo estrato, obtida {aloc!r}")
+    soma = sum(e.weight for e in estratos)
+    if abs(soma - 1.0) > 1.0e-9:
+        raise ValueError(
+            f"os pesos dos estratos devem somar 1, obtido {soma!r}"
+        )
+    saida = []
+    for h, (estrato, n) in enumerate(zip(estratos, aloc)):
+        saida.append(
+            tuple(
+                sweep_three_pole_samples(
+                    replace(ranges, rrds_kV_per_ms=estrato.range),
+                    n=n,
+                    zeros_abc=zeros_abc,
+                    arc_time_window_s=arc_time_window_s,
+                    earliest_separation_s=earliest_separation_s,
+                    leading_pole=leading_pole,
+                    seed=int(seed) + h,
+                )
+            )
+        )
+    return tuple(saida)
+
+
+def stratified_rate(
+    strata: Sequence[RrdsStratum], crossings: Sequence[int], counts: Sequence[int]
+) -> tuple[float, float]:
+    """Estimador estratificado ``(p, desvio padrão)``.
+
+    ``p = Σ W_h p_h`` é não tendencioso para qualquer alocação, e
+    ``Var(p) = Σ W_h² p_h(1 − p_h)/n_h``.
+
+    Raises
+    ------
+    ValueError
+        Sequências de tamanhos diferentes, contagem não positiva ou
+        travessias fora de ``0..n_h``.
+    """
+    e = tuple(strata)
+    c = tuple(int(x) for x in crossings)
+    n = tuple(int(x) for x in counts)
+    if not (len(e) == len(c) == len(n)):
+        raise ValueError(
+            f"strata, crossings e counts devem ter o mesmo tamanho, obtidos "
+            f"{len(e)}, {len(c)} e {len(n)}"
+        )
+    if not e:
+        raise ValueError("strata não pode ser vazia")
+    if any(x <= 0 for x in n):
+        raise ValueError(f"counts deve ser positiva, obtida {n!r}")
+    if any(not (0 <= ci <= ni) for ci, ni in zip(c, n)):
+        raise ValueError("crossings deve estar em 0..counts em todo estrato")
+    p = 0.0
+    var = 0.0
+    for estrato, ci, ni in zip(e, c, n):
+        ph = ci / ni
+        p += estrato.weight * ph
+        var += estrato.weight**2 * ph * (1.0 - ph) / ni
+    return p, math.sqrt(var)
