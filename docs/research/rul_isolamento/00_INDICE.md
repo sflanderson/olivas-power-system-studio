@@ -246,12 +246,16 @@ docs/research/rul_isolamento/
 ├── 03_ETAPA3_contexto_c_level.md                      (Etapa 3, parte 1,    701 l.)
 ├── 04_ARQUITETURA_MVP_RUL_OLIVAS.md                   (Etapa 3, parte 2,    733 l.)
 ├── 05_MOTOR_EMT_DEDICADO.md                           (motor EMT próprio,   818 l.)
+├── 06_CASO_BASE_ATP_ESPECIFICACAO.md                  (caso base extraído do .atp)
+├── 07_AUDITORIA_DO_CASO_ATP.md                        (auditoria do caso e do MODEL)
+├── 08_VARREDURA_ESTATISTICA_VCB.md                    (varredura Monte Carlo do VCB)
 └── anexos/
     ├── fichamentos/        13 arquivos — literatura de apoio
     ├── fichamentos_AB/      2 arquivos — Documentos A e B do autor
     ├── pesquisa/            9 arquivos — 3 pesquisas dirigidas + 6 pesquisas web
     ├── repo/                5 arquivos — mapas do código
     ├── cruzamento/          2 arquivos — A × B × literatura × repositório
+    ├── dados/               1 arquivo  — resultados brutos da varredura (JSON)
     └── verdicts/            2 arquivos — veredictos da verificação adversarial (JSON)
 ```
 
@@ -275,6 +279,18 @@ Todos os caminhos de documento citados adiante são **relativos a `docs/research
 | `03_ETAPA3_contexto_c_level.md` | 9 seções (Etapa 3, parte 1): tabela-mestra fenômeno → KPI; custo de indisponibilidade com ressalva por levantamento; modelo de decisão econômica $E[C]$ e valor de opção; argumentos e objeções; painel executivo e o que ele **não** deve exibir; narrativa de valor de A e B; roteiro de entrega do trabalho computacional; riscos; referências | 701 linhas |
 | `04_ARQUITETURA_MVP_RUL_OLIVAS.md` | 9 seções (Etapa 3, parte 2): fluxo de dados do gêmeo digital em camadas; inventário de arquivos (criado, a criar, a alterar); contratos de dados entre camadas; realização de D1–D7 e (5.1)–(5.2) no código; plano de validação; *roadmap* por versão; riscos técnicos; limitações e o que **não** foi implementado; referências | 733 linhas |
 | `05_MOTOR_EMT_DEDICADO.md` | 13 seções: por que um motor dedicado e próprio (F1–F3) e o `.atp` como fonte da verdade; MNA e modelos companheiros; CDA; partida em regime permanente; Bergeron e JMarti lado a lado, com o viés de $T_1$ medido; VCB dinâmico; *snubber* e a lacuna do nível de *breakover*; validação (fontes primárias + regressão dígito a dígito contra as Listas EEE873); *benchmark* aberto contra o Documento A; desempenho medido e critério objetivo de migração para C++; integração com o prognóstico e papel do `.atp`; 41 limitações catalogadas e trabalho futuro; referências | 818 linhas |
+
+
+Os três documentos acrescentados depois do fechamento das etapas — `06`, `07` e `08` — formam a
+linha de **confrontação com a literatura**, e não com os Documentos A e B: eles substituem a
+validação contra a Tabela III de A, que seria circular, pela confrontação com as faixas
+publicadas e com os critérios de validade internos do motor.
+
+| Caminho relativo | Conteúdo | Extensão |
+|---|---|---|
+| `06_CASO_BASE_ATP_ESPECIFICACAO.md` | Especificação do caso base extraída do `.atp`: topologia, cartões, parâmetros do disjuntor e do amortecedor, com a listagem do ATP como fonte da solução de regime | 94 linhas |
+| `07_AUDITORIA_DO_CASO_ATP.md` | Ancoragem do regime permanente por equivalente de Thévenin; decodificação da matriz do transformador; defeito corrigido no motor dedicado; **dois defeitos no `MODEL` do arquivo** que tornam a escalada impossível; confronto com a Tabela III; achados da listagem; cinco correções recomendadas | 193 linhas |
+| `08_VARREDURA_ESTATISTICA_VCB.md` | Varredura Monte Carlo com o **tempo de arco** como variável de controle e o disjuntor tratado como **tripolar**; três cenários (literatura, medido, caso de referência) com e sem amortecedor, 900 realizações; supressão da escalada pelo amortecedor e seu custo em regime; **delimitação do domínio de validade da cauda de escalada**, com o mecanismo diagnosticado e o caminho de correção | 221 linhas |
 
 ### 3.3 `anexos/fichamentos/` — literatura de apoio (13)
 

@@ -2066,6 +2066,29 @@ def three_phase_atp_literal_poles(
 # ---------------------------------------------------------------------------
 
 KNOWN_LIMITATIONS: dict[str, str] = {
+    "emt_vcb_escalation_driven_by_recovery_ramp": (
+        "A ESCALADA produzida por este modelo é comandada pela rampa de "
+        "recuperação dielétrica, não pela física de alta frequência. Em cada "
+        "reignição a tensão do gap iguala a suportabilidade instantânea, de "
+        "modo que o pico atingido é RRDS·Δt_escalada: a rampa DEFINE o pico "
+        "em vez de limitá-lo. Consequências medidas na varredura de 150 "
+        "realizações (docs/research/rul_isolamento/"
+        "08_VARREDURA_ESTATISTICA_VCB.md): (i) a escalada é máxima no TOPO da "
+        "faixa de RRDS (40,7 a 48,3 kV/ms), ao contrário do publicado, que a "
+        "põe na faixa intermediária de 20 a 30 kV/ms [LITERATURA: Wong, "
+        "Snider e Lo, IPST 2003, p. 5-6]; (ii) os picos chegam a 77 pu contra "
+        "o teto de campo de 4,6 pu e até 107 reignições contra as 'até 10' "
+        "de Vollet e de Metz-Noblat (IPST 2007, p. 2). A causa é a ausência "
+        "do caminho capacitivo nos terminais do disjuntor: a corrente de "
+        "reignição oscila a 6-26 kHz (a LC do lado da carga) em vez dos "
+        "100-200 kHz publicados, o di/dt no zero fica quase uma década abaixo "
+        "da capacidade de extinção, o polo interrompe todas as vezes e nada "
+        "termina a sequência. O resultado é INSENSÍVEL AO PASSO (±5 % num "
+        "refinamento de 10 vezes), ou seja, é propriedade do modelo e não "
+        "degrau numérico. A cauda acima de FIELD_PEAK_CEILING_PU não deve "
+        "alimentar modelo de dano enquanto o caminho capacitivo não for "
+        "representado."
+    ),
     "emt_vcb_no_arc_voltage": (
         "O arco a vácuo é representado por uma chave IDEAL comandada: "
         "durante a condução a queda de tensão no arco é ZERO e não há "

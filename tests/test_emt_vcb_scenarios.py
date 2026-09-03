@@ -555,3 +555,97 @@ class TestVarreduraTripolar:
         base.update(kwargs)
         with pytest.raises(ValueError):
             sweep_three_pole_samples(LITERATURE_SCENARIO, **base)
+
+
+# ---------------------------------------------------------------------------
+# 7. Domínio de validade da cauda de escalada
+# ---------------------------------------------------------------------------
+
+
+class TestEscaladaComandadaPelaRampaDeRecuperacao:
+    """Fixa o DEFEITO diagnosticado na varredura de 150 realizações.
+
+    A escalada que o motor produz não é a publicada: em cada reignição a
+    tensão do *gap* iguala a suportabilidade instantânea, de modo que o
+    pico é ``RRDS·Δt`` — a rampa dielétrica define o pico em vez de
+    limitá-lo. O diagnóstico completo, com as medições, está em
+    ``docs/research/rul_isolamento/08_VARREDURA_ESTATISTICA_VCB.md``.
+
+    Estes testes existem para que a correção — representar o caminho
+    capacitivo nos terminais do disjuntor — seja DETECTÁVEL: quando ela
+    entrar, eles falham e devem ser reescritos com o comportamento
+    publicado (escalada máxima em RRDS de 20 a 30 kV/ms, pico abaixo de
+    ``FIELD_PEAK_CEILING_PU``).
+    """
+
+    def test_limitacao_esta_declarada(self):
+        from app.simulation.emt.vcb import KNOWN_LIMITATIONS
+
+        chave = "emt_vcb_escalation_driven_by_recovery_ramp"
+        assert chave in KNOWN_LIMITATIONS
+        texto = KNOWN_LIMITATIONS[chave]
+        assert "Wong" in texto and "Vollet" in texto
+        assert "FIELD_PEAK_CEILING_PU" in texto
+
+    def test_tensao_de_reignicao_acompanha_a_rampa_de_suportabilidade(self):
+        """``|v_gap| ≈ RRDS·(t − t_sep)`` em cada evento — a assinatura do defeito."""
+        from app.simulation.emt.cases.atp_reference import AtpReferenceCase
+        from app.simulation.emt.vcb_scenarios import VcbSample
+
+        rrds = 44.3  # kV/ms — a da pior realização da varredura
+        t_sep = 14.6865e-3
+        amostras = tuple(
+            VcbSample(
+                scenario_name="literatura",
+                chopping_current_A=corte,
+                didt_capability_A_per_us=didt,
+                rrds_a_kV_per_ms=rrds,
+                rrds_b_kV_per_ms2=0.0,
+                separation_time_s=t_sep,
+                arc_time_s=None,
+            )
+            for corte, didt in ((2.71, 460.0), (2.84, 457.0), (5.41, 199.0))
+        )
+        modelo = AtpReferenceCase(with_snubber=False, vcb_samples=amostras).build()
+        modelo.run()
+
+        polo = modelo.poles[0]
+        r = polo.result
+        assert r.reignition_count > 10, "a realização precisa entrar em escalada"
+
+        t = np.array(r.reignition_times_s)
+        v = np.abs(np.array(r.reignition_voltages_V))
+        w = np.array(r.reignition_withstand_V)
+
+        # A suportabilidade registrada É a rampa, referenciada à separação.
+        rampa = rrds * 1.0e3 * (t - t_sep) * 1.0e3  # kV/ms · ms → V
+        assert np.allclose(w, rampa, rtol=1e-9, atol=1.0)
+
+        # E a tensão de reignição a acompanha: nunca fica muito acima dela.
+        assert np.all(v >= w)
+        assert float(np.median(v / w)) < 1.5
+
+        # Consequência: o pico escala com a rampa, e não com o teto de campo.
+        assert v.max() > FIELD_PEAK_CEILING_PU * 3396.6
+
+    def test_o_freio_de_didt_nunca_engata_na_escalada(self):
+        """O ``di/dt`` no zero fica muito abaixo da capacidade sorteada.
+
+        É por isso que o polo interrompe todas as vezes e a sequência não
+        termina: o mecanismo publicado — o arco persistir quando o
+        ``di/dt`` excede a capacidade — exige o caminho de alta frequência
+        que o caso não representa.
+        """
+        from app.simulation.emt.cases.atp_reference import AtpReferenceCase
+        from app.simulation.emt.vcb_scenarios import VcbSample
+
+        capacidade = 460.0
+        amostras = tuple(
+            VcbSample("literatura", 2.71, capacidade, 44.3, 0.0, 14.6865e-3, None)
+            for _ in range(3)
+        )
+        modelo = AtpReferenceCase(with_snubber=False, vcb_samples=amostras).build()
+        modelo.run()
+        polo = modelo.poles[0]
+        assert polo.result.reignition_count > 10
+        assert polo.last_didt_A_per_us < 0.5 * capacidade
