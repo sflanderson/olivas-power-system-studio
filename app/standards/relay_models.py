@@ -671,6 +671,130 @@ WEG_SRW01 = RelayModel(
 )
 
 
+# Eaton (Cutler-Hammer) Digitrip 3000/3030 — relé de proteção de MÉDIA
+# TENSÃO (retrofit para disjuntores a vácuo VCP-W e qualquer disjuntor
+# com bobina de abertura por shunt trip) — NÃO é unidade de disparo
+# integrada de disjuntor Magnum LV (confirmado: sem qualquer menção a
+# "Magnum"/"DS"/"SB" nas 92 páginas do manual).
+# Fonte: Cutler-Hammer/Eaton I.B. 17555C (efetivo nov/1999), Tabelas
+# 2.2, 2.3, 2.4 e Seção 2-3.
+EATON_DIGITRIP_3000 = RelayModel(
+    manufacturer="Eaton",
+    model="Digitrip 3000/3030",
+    family="Cutler-Hammer/Eaton Digitrip 3000 Protective Relay",
+    application="feeder",
+    firmware_version="—",
+    manual_path="Cutler-Hammer/Eaton I.B. 17555C (efetivo 11/1999)",
+    ansi_functions=("50", "51", "50N", "51N"),
+    tc_curve_standards=(
+        CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.ANSI,
+        CurveStandard.DEFINITE_TIME, CurveStandard.CUSTOM,
+    ),
+    iec_curves_supported=(
+        IecCurveType.STANDARD_INVERSE, IecCurveType.VERY_INVERSE,
+        IecCurveType.EXTREMELY_INVERSE, IecCurveType.LONG_TIME_INVERSE,
+    ),
+    ieee_curves_supported=(
+        IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE,
+    ),
+    pickup_range_per_in=(0.20, 2.20),
+    tms_range=(0.025, 1.00),
+    time_dial_range=(0.1, 5.0),
+    description=(
+        "Relé de proteção standalone para redes de MÉDIA TENSÃO — "
+        "substitui 3-4 relés eletromecânicos + amperímetro + relé de "
+        "bloqueio (86); alimentado por TCs externos (5 A secundário, "
+        "relações 5:5 a 5000:5, mesmo conjunto para fase e terra), não é "
+        "uma unidade de disparo integrada de disjuntor. Pickup de "
+        "sobrecorrente de tempo inverso: fase 0.20-2.20×In "
+        "(passo 0.05/0.10, 29 posições); terra 0.100-2.00×In (ou OFF) — "
+        "pickup_range_per_in acima usa a faixa de fase. Multiplicador de "
+        "tempo por família de curva: IT/I2T/I4T 0.20-40.0 (48 posições); "
+        "FLAT (tempo definido) 0.20-2.00 s direto; ANSI MOD/VERY/XTRM "
+        "0.1-5.0 (usado em time_dial_range); IEC A/B/C/D 0.025-1.00 "
+        "(usado em tms_range). Curto retardo (fase): 1.00-11.0×In ou "
+        "OFF; terra: 0.100-11.0×In ou OFF; tempo 0.05-1.50 s (ambos). "
+        "Instantâneo: fase 1.00-25.0×In ou OFF (discriminador fixo em "
+        "11×In se OFF); terra 0.50-11.0×In ou OFF. Curvas IEC A/B/C/D "
+        "mapeadas por convenção BS142 (A=SI, B=VI, C=EI, D=LTI, mesma "
+        "convenção usada em vendor_curve_constants.py para a GE). "
+        "Certificação UL 1053 / ANSI C37.90. Alimentação DT3000: "
+        "48-250 Vdc ou 120-240 Vac; DT3030: 24-48 Vdc."
+    ),
+)
+
+
+# SEL-487E — relé DIFERENCIAL DE TRANSFORMADOR (87T/87Q/REF), distinto
+# do SEL-487B (diferencial de barra, não digitalizado). Reutiliza a
+# mesma família de curvas U1-U5 (US)/C1-C5 (IEC) do SEL-751 — mesma
+# base IEEE C37.112-1996.
+# Fonte: SEL-487E Data Sheet (487E_DS_20120810.pdf) e Instruction
+# Manual (Date Code 20090626), Tabelas 1, 3, 4.3, 4.4.
+SEL_487E = RelayModel(
+    manufacturer="SEL",
+    model="SEL-487E",
+    family="SEL Transformer Protection",
+    application="transformer",
+    firmware_version="—",
+    manual_path="SEL-487E Instruction Manual, Date Code 20090626",
+    ansi_functions=(
+        "87U",          # Diferencial sem restrição
+        "87R",          # Diferencial com restrição
+        "87Q",          # Diferencial de sequência negativa
+        "REF",          # Falha à terra restrita (até 3 elementos F/R)
+        "50",           # Instantâneo (P/Q/N)
+        "51S",          # Sobrecorrente de tempo adaptativo (seletivo)
+        "50BF",         # Falha de disjuntor
+        "46",           # Desbalanço de corrente
+        "32",           # Potência direcional
+        "67",           # Sobrecorrente direcional
+        "81",           # Frequência (over/under)
+        "27",           # Subtensão
+        "59",           # Sobretensão
+        "24",           # Volts/Hertz
+        "49",           # Térmico
+    ),
+    tc_curve_standards=(
+        CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.DEFINITE_TIME,
+    ),
+    iec_curves_supported=(
+        IecCurveType.STANDARD_INVERSE, IecCurveType.VERY_INVERSE,
+        IecCurveType.EXTREMELY_INVERSE, IecCurveType.LONG_TIME_INVERSE,
+    ),
+    ieee_curves_supported=(
+        IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE, IeeeCurveType.INVERSE,
+        IeeeCurveType.SHORT_TIME_INVERSE,
+    ),
+    pickup_range_per_in=(0.05, 3.20),
+    tms_range=(0.05, 1.00),
+    time_dial_range=(0.50, 15.00),
+    description=(
+        "Relé diferencial de transformador (não de barra — o modelo de "
+        "barra da SEL é o SEL-487B, produto distinto, não digitalizado). "
+        "Até 5 enrolamentos, 1 zona de proteção. TAP pickup: 0.1-32.0×INOM "
+        "A secundário (TAPMAX/TAPMIN≤35). Diferencial restrita: pickup "
+        "0.1-4.0 pu, inclinação (slope) 1 e 2 ajustáveis 5-100 %. "
+        "Diferencial sem restrição: 1.0-20.0×TAP. Diferencial de "
+        "sequência negativa (87Q): pickup 0.05-1 pu, slope 5-100 %, "
+        "detecta falta a partir de 2 % do enrolamento. REF (falha à "
+        "terra restrita): até 3 elementos independentes F/R, pickup "
+        "0.05-5 pu. Sobrecorrente instantânea (50): 5 A nom. "
+        "0.25-100.00 A sec.; 1 A nom. 0.05-20.00 A sec. Sobrecorrente de "
+        "tempo adaptativa (51S), 10 curvas selecionáveis por elemento "
+        "(5 US + 5 IEC — mesmas U1-U5/C1-C5 do SEL-751, mesma base IEEE "
+        "C37.112-1996): pickup 5 A nom. 0.25-16.00 A sec. (=0.05-3.20×In, "
+        "usado em pickup_range_per_in), 1 A nom. 0.05-3.20 A sec.; Time "
+        "Dial US 0.50-15.00 (usado em time_dial_range), IEC 0.05-1.00 "
+        "(usado em tms_range) — nota: constantes de curva U1-U5/C1-C5 "
+        "não recodificadas aqui por imperfeição de extração de frações "
+        "empilhadas no PDF; usar as já verificadas em "
+        "vendor_curve_constants.py (mesma família SEL)."
+    ),
+)
+
+
 # ---------------------------------------------------------------------------
 # Registry global
 # ---------------------------------------------------------------------------
@@ -688,6 +812,8 @@ RELAY_MODELS_REGISTRY: dict[str, RelayModel] = {
     "GE-850": GE_850,
     "Schneider-MiCOM-P127": SCHNEIDER_MICOM_P127,
     "WEG-SRW01": WEG_SRW01,
+    "Eaton-Digitrip-3000": EATON_DIGITRIP_3000,
+    "SEL-487E": SEL_487E,
 }
 
 

@@ -1167,6 +1167,106 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "manual."
         ),
     ),
+    # WEG — ACW ETS (MCCB — NÃO disjuntor aberto), disparador eletrônico
+    # LSI — Catálogo "Disjuntor em Caixa Moldada de Alta Capacidade ACW"
+    # 50022907. Confirmado: WEG não possui segunda linha de disjuntor
+    # aberto além do ABW/ABWC — ACW é caixa moldada, categoria à parte.
+    TripUnitModel(
+        model_id="WEG-ACW-ETS-LSI",
+        manufacturer="WEG",
+        full_name="ACW ETS400/ETS630/ETS800 — disparador eletrônico LSI",
+        breaker_family="ACW400/ACW630/ACW800 (MCCB alta capacidade, 400-800 A)",
+        category="MCCB",
+        market_standard="IEC 60947-2 (norma não declarada explicitamente no catálogo)",
+        source_doc="WEG Catálogo Disjuntor em Caixa Moldada de Alta Capacidade ACW, doc. 50022907",
+        adjustment_mode="discrete_dial",
+        functions_available=("L", "S", "I"),
+        L_pickup_Ir=_dial((0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8,
+                          0.85, 0.9, 0.95, 1.0)),
+        L_delay_tr=None,
+        tr_reference_multiple=6.0,
+        S_pickup_Isd=_dial((1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0),
+                           unit="xIr"),
+        S_delay_tsd=_dial((0.05, 0.1, 0.2, 0.3), unit="s"),
+        S_i2t_selectable=False,
+        I_pickup_Ii=_dial((11.0,)),
+        notes=(
+            "Único disparador eletrônico da linha ACW (frames ACW100/160/250 "
+            "usam disparadores termomagnéticos FMU/ATU, não modelados aqui "
+            "por não terem proteção L/S/I eletrônica comparável). Diferente "
+            "da linha ABW (disjuntor aberto): sem função G, sem opção I²t, "
+            "sem curva selecionável. tr NÃO é ajustável — a fonte informa "
+            "apenas que a tolerância de disparo é verificada em 6×Ir "
+            "(±20 %), sem publicar o valor de tempo em si; L_delay_tr "
+            "deixado em branco por ausência de dado, não por omissão. Ii "
+            "fixo em 11×In, sem dial (I_pickup_Ii modelado como valor único "
+            "discreto). tsd convertido de ms para s (50/100/200/300 ms). "
+            "Referências por frame: ACW400H-ETS400-3 (160-400 A), "
+            "ACW630H-ETS630-3 (252-630 A), ACW800U-ETS800-3 (320-800 A)."
+        ),
+    ),
+    # Siemens — SENTRON 3WA, disparador eletrônico ETU600 (sucessor do
+    # 3WL) — Equipment Manual MAN_92310000002-04, ed. 08/2021, IEC 60947-2
+    TripUnitModel(
+        model_id="SIEMENS-3WA-ETU600",
+        manufacturer="Siemens",
+        full_name="SENTRON 3WA ETU600 LSI / LSIG / LSIG Hi-Z",
+        breaker_family="3WA1 Size 1/2/3 (630-6300 A)",
+        category="ACB",
+        market_standard="IEC 60947-2",
+        source_doc="Siemens 3WA Equipment Manual MAN_92310000002-04, ed. 08/2021",
+        adjustment_mode="fine_digital",
+        functions_available=("L", "S", "I", "N", "G"),
+        # Ajuste contínuo 'e.SET' (display/software) como faixa primária —
+        # inclui o default de fábrica Ir=0.4×In, que fica FORA da faixa da
+        # chave rotativa (0.5-1.0×In, 9 posições). As posições discretas da
+        # chave rotativa (base xIr para S/I, distinta de xIn do e.SET) e os
+        # tetos dependentes do disjuntor (0.8×Icw, 0.8×Ics) ficam em notes.
+        L_pickup_Ir=_sr(0.4, 1.0, unit="xIn", default=0.4),
+        L_delay_tr=_sr(0.5, 30.0, unit="s", default=0.5),
+        tr_reference_multiple=6.0,
+        S_pickup_Isd=_sr(1.5, 10.0, unit="xIr", default=1.5),
+        S_delay_tsd=_sr(0.02, 0.4, unit="s", default=0.1),
+        S_i2t_selectable=True,
+        I_pickup_Ii=_sr(1.5, 15.0, default=1.5),
+        G_pickup_Ig=_sr(15.0, 2000.0, unit="A", default=100.0, off=True),
+        G_delay_tg=_sr(0.0, 5.0, unit="s", default=0.1),
+        G_i2t_selectable=True,
+        curve_options=(
+            "L: I²t ou I⁴t (tr a I²t: 0.5-30 s; a I⁴t: 0.5-5 s)",
+            "S: I0t (tempo fixo) ou I²t",
+            "G: I0t/I²t/I4t/I6t (LSIG); I0t/I2t/I4t/I6t (LSIG Hi-Z, zonas UREF/REF)",
+        ),
+        rated_voltage_V=1000.0,
+        notes=(
+            "Ir/tr/Ii acima em faixa contínua 'e.SET' (xIn), unidade padrão "
+            "deste dataclass. S_pickup_Isd modelado em xIr (base da chave "
+            "rotativa, 1.5-10×Ir, 9 posições) — a faixa e.SET usa base "
+            "DIFERENTE, xIn: 0.6×In...0.8×Icw (teto depende do Icw do "
+            "disjuntor, não modelável como número fixo). Ii e.SET: "
+            "1.5×In...0.8×Ics (mesmo tipo de teto dependente do disjuntor; "
+            "chave rotativa 1.5-15×In, 9 posições, usada acima). Chave "
+            "rotativa — demais campos: Ir {0.5,0.6,0.7,0.75,0.8,0.85,0.9,"
+            "0.95,1.0}×In (SEM a posição 0.4, só via e.SET); tr(6×Ir) "
+            "{1,2,5,8,10,14,17,21,25} s; tsd {0.08,0.15,0.22,0.3,0.4} s "
+            "(I²t OFF) ou {0.1,0.2,0.3,0.4} s (I²t ON). Referência tsd "
+            "(IST ref) ajustável 6-12×Ir (default 8, valor de fábrica). "
+            "Defaults de fábrica (Anexo A.1): Ir=0.4×In, tr(6×Ir)=0.5s, "
+            "Isd=0.6×In, tsd=0.1s, Ii=1.5×In, Ig=100A (size 1/2) ou 400A "
+            "(size 3), tg=0.1s; G desligado de fábrica. IN (neutro): "
+            "3 polos 0.2-2.0×In, 4 polos 0.2×In-In máx (não modelado — "
+            "função separada da fase). Proteção reversa de potência RP "
+            "(32R) e direcional dST (67, opcional) disponíveis, não "
+            "modeladas (fora do escopo LSIG). Ig por método/tamanho: "
+            "residual size 1/2 100-2000A, size 3 400-2000A; direto "
+            "15-2000A (faixa ampla 15-2000A usada acima; default 100A é "
+            "o de fábrica para size 1/2, size 3 usa 400A). tg: "
+            "I²t/I⁴t/I⁶t OFF 0-5s, ON (a 3×Ig) 0-30s. Alarme Ig "
+            "(não-disparo) com teto mais alto (5000A), não modelado. "
+            "Tensão nominal até 1000 V CA (1150 V citado em material "
+            "comercial, não confirmado no manual técnico)."
+        ),
+    ),
     # Eaton — NZM PXR25 (EMEA) — MN012005EN, Tabela 4
     TripUnitModel(
         model_id="EATON-NZM-PXR25",

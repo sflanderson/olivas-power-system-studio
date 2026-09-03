@@ -225,6 +225,31 @@ class TestTripUnits:
             assert t.category in ("MCCB", "ACB")
             assert t.adjustment_mode in ("discrete_dial", "fine_digital")
 
+    def test_weg_acw_is_mccb_not_open_breaker(self):
+        """ACW é caixa moldada (MCCB), não disjuntor aberto — WEG só tem
+        uma linha de ACB (ABW/ABWC)."""
+        t = library.get_trip_unit("WEG-ACW-ETS-LSI")
+        assert t is not None
+        assert t.category == "MCCB"
+        assert "G" not in t.functions_available          # sem falha à terra
+        assert t.L_delay_tr is None                       # tr não ajustável
+        assert t.I_pickup_Ii.discrete == (11.0,)           # Ii fixo, sem dial
+        assert t.S_i2t_selectable is False
+
+    def test_siemens_3wa_etu600(self):
+        t = library.get_trip_unit("SIEMENS-3WA-ETU600")
+        assert t is not None
+        assert t.category == "ACB"
+        assert t.L_pickup_Ir.min == 0.4 and t.L_pickup_Ir.default == 0.4
+        assert t.G_pickup_Ig.unit == "A" and t.G_pickup_Ig.off_selectable
+        assert t.tr_reference_multiple == 6.0
+        # todos os campos com default devem satisfazer min<=default<=max
+        for name in ("L_pickup_Ir", "L_delay_tr", "S_pickup_Isd",
+                     "S_delay_tsd", "I_pickup_Ii", "G_pickup_Ig", "G_delay_tg"):
+            sr = getattr(t, name)
+            if sr is not None and sr.default is not None:
+                assert sr.min <= sr.default <= sr.max, name
+
 
 # ---------------------------------------------------------------------------
 # Fuses
@@ -426,6 +451,27 @@ class TestRelayRegistryAdditions:
         assert m.application == "motor"
         assert supports_function(m, "49")
         assert iec60255.CurveStandard.IEC not in m.tc_curve_standards
+
+    def test_eaton_digitrip_3000_is_mv_relay_not_magnum_trip_unit(self):
+        """Digitrip 3000 é relé standalone de MT (retrofit VCP-W), não
+        unidade de disparo integrada de disjuntor Magnum LV."""
+        m = get_model("Eaton-Digitrip-3000")
+        assert m is not None
+        assert m.manufacturer == "Eaton"
+        assert supports_function(m, "51") and supports_function(m, "50N")
+        assert "Magnum" not in m.manual_path
+        assert m.pickup_range_per_in == (0.20, 2.20)
+
+    def test_sel_487e_is_transformer_not_bus_differential(self):
+        """SEL-487E é diferencial de TRANSFORMADOR (87T); o de barra é
+        o SEL-487B, produto distinto não digitalizado aqui."""
+        m = get_model("SEL-487E")
+        assert m is not None
+        assert m.application == "transformer"
+        assert supports_function(m, "87R") and supports_function(m, "87U")
+        assert supports_function(m, "87Q")
+        assert m.time_dial_range == (0.50, 15.00)
+        assert m.tms_range == (0.05, 1.00)
 
 
 # ---------------------------------------------------------------------------
