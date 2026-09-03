@@ -373,3 +373,98 @@ def test_limitacoes_declaradas_e_sem_colisao():
     for chave, texto in KNOWN_LIMITATIONS.items():
         assert chave.startswith("emt_arrester_")
         assert len(texto) > 80
+
+
+# ---------------------------------------------------------------------------
+# 7. O critério de aceitação de Wong
+# ---------------------------------------------------------------------------
+
+
+class TestCriterioDeAceitacaoDeWong:
+    """A dependência da escalada com a RRDS deve ter MÁXIMO INTERIOR.
+
+    Wong, Snider e Lo mostram que a escalada é mais severa em RRDS
+    intermediária: recuperação rápida demais impede a reignição, lenta
+    demais permite a extinção no primeiro zero de alta frequência
+    [LITERATURA: IPST 2003, p. 5-6]. Antes da correção o motor produzia
+    dependência monotônica crescente até 92 pu; a forma correta é a que se
+    fixa aqui.
+
+    A LOCALIZAÇÃO do máximo é de circuito: 40 a 60 kV/ms neste caso,
+    contra 20 a 30 kV/ms no sistema de ensaio de Wong. O limiar é a
+    corrida entre a rampa RRDS·(t − t_sep) e a TRV da rede, e a TRV deste
+    caso não é a do dele. O que se testa é a FORMA.
+
+    Medições consolidadas em
+    ``docs/research/rul_isolamento/anexos/dados/varredura_rrds_*.json``.
+    """
+
+    #: RRDS abaixo da banda de escalada, dentro dela e acima [kV/ms].
+    ABAIXO, DENTRO, ACIMA = 20.0, 45.0, 120.0
+
+    @staticmethod
+    def _roda(rrds_kV_per_ms: float, t_sep: float = 0.014686548756377423):
+        from app.simulation.emt.cases.atp_reference import AtpReferenceCase
+        from app.simulation.emt.vcb_scenarios import VcbSample
+
+        amostras = tuple(
+            VcbSample("wong", 2.71, 255.0, float(rrds_kV_per_ms), 0.0, t_sep, None, -0.034)
+            for _ in range(3)
+        )
+        modelo = AtpReferenceCase(
+            with_snubber=False,
+            vcb_samples=amostras,
+            motor_arrester_system_voltage_V=4160.0,
+        ).build()
+        modelo.run()
+        return (
+            max(modelo.motor_voltage_summary().values()) * 1.0e3 / V_BASE_V,
+            sum(modelo.reignition_counts.values()),
+        )
+
+    def test_recuperacao_rapida_demais_impede_a_reignicao(self):
+        """A cauda SUPERIOR: acima da banda o disjuntor simplesmente abre."""
+        _pico, reig = self._roda(self.ACIMA)
+        assert reig <= 1
+
+    def test_dentro_da_banda_ha_escalada(self):
+        _pico, reig = self._roda(self.DENTRO)
+        assert reig > 1
+
+    def test_a_dependencia_nao_e_monotonica(self):
+        """A forma exigida: mais reignições no meio do que nos dois extremos."""
+        _p_baixo, r_baixo = self._roda(self.ABAIXO)
+        _p_meio, r_meio = self._roda(self.DENTRO)
+        _p_alto, r_alto = self._roda(self.ACIMA)
+        assert r_meio > r_alto
+        assert r_meio >= r_baixo
+
+    def test_a_cauda_superior_independe_do_para_raios(self):
+        """Quem suprime a reignição em RRDS alta é a corrida com a TRV.
+
+        O para-raios só atua dentro da banda de escalada, grampeando a
+        amplitude; acima dela o resultado é o mesmo com e sem ele.
+        """
+        from app.simulation.emt.cases.atp_reference import AtpReferenceCase
+        from app.simulation.emt.vcb_scenarios import VcbSample
+
+        amostras = tuple(
+            VcbSample(
+                "wong", 2.71, 255.0, self.ACIMA, 0.0, 0.014686548756377423, None, -0.034
+            )
+            for _ in range(3)
+        )
+        picos, reignicoes = [], []
+        for moa in (None, 4160.0):
+            modelo = AtpReferenceCase(
+                with_snubber=False,
+                vcb_samples=amostras,
+                motor_arrester_system_voltage_V=moa,
+            ).build()
+            modelo.run()
+            picos.append(max(modelo.motor_voltage_summary().values()))
+            reignicoes.append(sum(modelo.reignition_counts.values()))
+        assert reignicoes[0] == reignicoes[1]
+        # A diferença que resta é a corrente de fuga do para-raios abaixo
+        # do joelho — microampères carregando o nó, na quinta casa.
+        assert picos[1] == pytest.approx(picos[0], rel=1.0e-4)

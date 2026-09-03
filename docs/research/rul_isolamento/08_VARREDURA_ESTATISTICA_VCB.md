@@ -201,6 +201,12 @@ que falta.
 
 ## 4. Caminho de implementação que a literatura sustenta
 
+> **Estado.** Os itens 1 e 2 foram executados e estão fechados; o registro está em
+> `09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md`. Com o para-raios no terminal do motor a cauda cai
+> de 77,53 para 3,45 pu e de 128 para 6 reignições — ambas na faixa publicada —, e a dependência
+> com a RRDS passa a ter máximo interior, como Wong descreve. A lista abaixo permanece como o
+> raciocínio que levou até lá.
+
 Em ordem de precedência, para tornar a cauda utilizável:
 
 1. **Representar o limite dielétrico da carga.** É o elemento ausente. Em ordem de preferência:

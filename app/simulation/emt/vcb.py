@@ -309,6 +309,131 @@ class LinearRecovery:
 
 
 # ---------------------------------------------------------------------------
+# Capacidade de extinção de alta frequência
+# ---------------------------------------------------------------------------
+
+
+class ExtinctionCapability(Protocol):
+    """Contrato de uma lei de capacidade de extinção de corrente de AF."""
+
+    def capability_A_per_us(self, elapsed_s: float) -> float:
+        """Capacidade [A/µs] após ``elapsed_s`` da separação dos contatos."""
+        ...
+
+
+@dataclass(frozen=True)
+class LinearExtinction:
+    """Lei LINEAR de Wong: ``di/dt = C·(t − t_open) + D``.
+
+    O modelo estocástico de Wong, Snider e Lo, ajustado sobre 48
+    disjuntores, trata a capacidade de extinção como FUNÇÃO DO TEMPO
+    desde a separação dos contatos, e não como constante
+    [LITERATURA: Wong, Snider e Lo, IPST 2003, p. 1-2]. Os quatro pares
+    ``(C, D)`` publicados estão em :data:`WONG_EXTINCTION_LAWS`.
+
+    A inclinação NEGATIVA é a que interessa: com ela o disjuntor
+    interrompe correntes de alta frequência com facilidade logo após a
+    separação e vai perdendo essa capacidade, e é essa combinação — com
+    RRDS intermediária e tempo de arco curto — que Wong identifica como a
+    mais severa para a escalada [LITERATURA: idem, p. 5-6].
+
+    Attributes
+    ----------
+    c_A_per_us2:
+        Inclinação ``C`` [A/µs²]; negativa faz a capacidade decair.
+    d_A_per_us:
+        Valor ``D`` na separação [A/µs], > 0.
+    floor_A_per_us:
+        Piso da capacidade [A/µs]. Impede que a lei linear produza valor
+        negativo, que não tem sentido físico — abaixo do piso o
+        disjuntor simplesmente não interrompe corrente de AF nenhuma.
+    """
+
+    c_A_per_us2: float = 0.0
+    d_A_per_us: float = 600.0
+    floor_A_per_us: float = 0.0
+
+    def __post_init__(self) -> None:
+        for label, value in (
+            ("c_A_per_us2", self.c_A_per_us2),
+            ("d_A_per_us", self.d_A_per_us),
+            ("floor_A_per_us", self.floor_A_per_us),
+        ):
+            v = float(value)
+            if not math.isfinite(v):
+                raise ValueError(f"{label} deve ser finito, obtido {value!r}")
+        if float(self.d_A_per_us) <= 0.0:
+            raise ValueError(
+                f"d_A_per_us deve ser > 0, obtido {self.d_A_per_us!r}"
+            )
+        if float(self.floor_A_per_us) < 0.0:
+            raise ValueError(
+                f"floor_A_per_us deve ser >= 0, obtido {self.floor_A_per_us!r}"
+            )
+
+    def capability_A_per_us(self, elapsed_s: float) -> float:
+        """``C·t + D`` [A/µs], com ``t`` em µs desde a separação."""
+        t_us = max(0.0, float(elapsed_s)) * 1.0e6
+        return max(
+            float(self.floor_A_per_us),
+            float(self.c_A_per_us2) * t_us + float(self.d_A_per_us),
+        )
+
+
+@dataclass(frozen=True)
+class ConstantExtinction:
+    """Capacidade de extinção CONSTANTE — o comportamento histórico.
+
+    É o caso ``C = 0`` da lei de Wong e o que o Documento A adota. Existe
+    como classe própria para que a escolha entre lei constante e lei
+    dependente do tempo apareça explicitamente no caso.
+    """
+
+    value_A_per_us: float = 600.0
+
+    def __post_init__(self) -> None:
+        v = float(self.value_A_per_us)
+        if not math.isfinite(v) or v <= 0.0:
+            raise ValueError(
+                f"value_A_per_us deve ser finito e > 0, obtido {self.value_A_per_us!r}"
+            )
+
+    def capability_A_per_us(self, elapsed_s: float) -> float:
+        """Constante, independente de ``elapsed_s``."""
+        return float(self.value_A_per_us)
+
+
+#: Pares ``(C, D)`` publicados, em ``(A/µs², A/µs)`` com ``t`` em µs.
+#:
+#: RECONCILIAÇÃO DE UNIDADES — as duas transcrições do levantamento
+#: diferem por exatamente ``10⁶``: Wong traz ``(−0,34·10⁵; 255)`` e
+#: ``(0,31·10⁶; 155)`` [F8], Abdulahovic traz ``(−0,034; 255)``,
+#: ``(0,31; 155)`` e ``(1; 190)`` para a MESMA lei de Glinkowski [F21]. O
+#: fator é a conversão de ``t`` em segundos para ``t`` em µs, e a leitura
+#: que fecha fisicamente é a de Abdulahovic: com ``C = −0,034 A/µs²`` e
+#: ``D = 255 A/µs`` a capacidade zera em ``255/0,034 = 7500 µs = 7,5 ms``,
+#: que é a escala de tempo da abertura mecânica. Com a leitura literal de
+#: Wong em A/µs² o decaimento levaria 7,5 µs, o que não corresponde a
+#: nenhuma escala do fenômeno [CÁLCULO PRÓPRIO].
+#:
+#: Adotada, portanto, a convenção ``t`` em µs. Os dois pares de
+#: inclinação nula (100 e 600 A/µs) delimitam a faixa usual e são o caso
+#: constante.
+WONG_EXTINCTION_LAWS: tuple[tuple[float, float], ...] = (
+    (-0.034, 255.0),
+    (0.0, 100.0),
+    (0.0, 600.0),
+    (0.31, 155.0),
+    (1.0, 190.0),
+)
+
+#: O par de inclinação NEGATIVA — o que Wong identifica como o mais
+#: severo para a escalada, junto com RRDS de 20 a 30 kV/ms e tempo de arco
+#: de 0 a 100 µs [LITERATURA: Wong, Snider e Lo, IPST 2003, p. 5-6].
+WONG_DECAYING_EXTINCTION: tuple[float, float] = (-0.034, 255.0)
+
+
+# ---------------------------------------------------------------------------
 # Resultado por polo
 # ---------------------------------------------------------------------------
 
@@ -471,7 +596,9 @@ class VacuumCircuitBreakerModel:
         chopping_sigma_A: float = 0.0,
         seed: int | None = None,
         recovery: DielectricRecovery | None = None,
-        didt_capability_A_per_us: float = DOC_A_DIDT_RANGE_A_PER_US[1],
+        didt_capability_A_per_us: float | ExtinctionCapability = (
+            DOC_A_DIDT_RANGE_A_PER_US[1]
+        ),
         didt_convention: str = DIDT_INTERRUPT_WITHIN,
         recovery_reference: str = RECOVERY_FROM_SEPARATION,
         require_zero_crossing: bool = True,
@@ -495,7 +622,18 @@ class VacuumCircuitBreakerModel:
             raise ValueError(
                 f"chopping_range_A deve satisfazer 0 < lo <= hi, obtida {chopping_range_A!r}"
             )
-        didt = float(didt_capability_A_per_us)
+        # A capacidade de extinção aceita um número — o caso constante,
+        # que é o do Documento A — ou uma LEI dependente do tempo desde a
+        # separação, que é o que Wong, Snider e Lo ajustam
+        # [LITERATURA: IPST 2003, p. 1-2]. Guarda-se o valor nominal em
+        # ``didt_capability_A_per_us`` para leitura e auditoria, e a lei
+        # em ``didt_law``.
+        if hasattr(didt_capability_A_per_us, "capability_A_per_us"):
+            self.didt_law: ExtinctionCapability = didt_capability_A_per_us  # type: ignore[assignment]
+            didt = float(self.didt_law.capability_A_per_us(0.0))
+        else:
+            didt = float(didt_capability_A_per_us)
+            self.didt_law = ConstantExtinction(value_A_per_us=didt) if didt > 0.0 else None  # type: ignore[assignment]
         if not math.isfinite(didt) or didt <= 0.0:
             raise ValueError(
                 f"didt_capability_A_per_us deve ser finito e > 0, obtido "
@@ -563,6 +701,7 @@ class VacuumCircuitBreakerModel:
         self._chopping_setpoint_A = None if chopping_current_A is None else float(chopping_current_A)
         self.recovery: DielectricRecovery = recovery if recovery is not None else ParabolicRecovery()
         self.didt_capability_A_per_us = didt
+        self._last_didt_capability_A_per_us: float = didt
         self.didt_convention = str(didt_convention)
         if str(recovery_reference) not in RECOVERY_REFERENCES:
             raise ValueError(
@@ -800,7 +939,9 @@ class VacuumCircuitBreakerModel:
         if dt > 0.0:
             didt_A_per_us = abs(i_now - self._i_prev) / dt * 1.0e-6
         self._last_didt_A_per_us = didt_A_per_us
-        capable = didt_A_per_us <= self.didt_capability_A_per_us
+        capacidade = self.didt_capability_at(t)
+        self._last_didt_capability_A_per_us = capacidade
+        capable = didt_A_per_us <= capacidade
         if self.didt_convention == DIDT_INTERRUPT_ABOVE:
             capable = not capable
         if capable:
@@ -832,6 +973,24 @@ class VacuumCircuitBreakerModel:
             self._result.reignition_times_s.append(t)
             self._result.reignition_voltages_V.append(v_gap)
             self._result.reignition_withstand_V.append(v_wth)
+
+    def didt_capability_at(self, t: float) -> float:
+        """Capacidade de extinção no instante ``t`` [A/µs].
+
+        Com lei constante devolve o valor nominal; com a lei linear de
+        Wong, ``C·(t − t_sep) + D``, referenciada à SEPARAÇÃO DOS
+        CONTATOS — o mesmo referencial da recuperação dielétrica, e pela
+        mesma razão física: as duas grandezas acompanham o afastamento
+        dos contatos [LITERATURA: Wong, Snider e Lo, IPST 2003, p. 1-2].
+        """
+        return float(
+            self.didt_law.capability_A_per_us(float(t) - self.separation_time_s)
+        )
+
+    @property
+    def last_didt_capability_A_per_us(self) -> float:
+        """Capacidade avaliada no último zero de AF testado [A/µs]."""
+        return self._last_didt_capability_A_per_us
 
     def _recovery_origin(self) -> float:
         """Instante de origem do relógio da recuperação dielétrica [s].
@@ -2092,7 +2251,15 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "resultado é INSENSÍVEL AO PASSO (±5 % num refinamento de 10 vezes), "
         "ou seja, é propriedade do modelo e não degrau numérico. A cauda "
         "acima de FIELD_PEAK_CEILING_PU não deve alimentar modelo de dano "
-        "enquanto o limite dielétrico da carga não for representado."
+        "enquanto o limite dielétrico da carga não for representado. "
+        "RESOLVIDO na configuração COM para-raios "
+        "(app.simulation.emt.arrester): com o MOA no terminal do motor a "
+        "cauda cai a 3,45 pu e 6 reignições, e a dependência com a RRDS "
+        "passa a ter MÁXIMO INTERIOR (banda de 40 a 60 kV/ms neste "
+        "circuito), como Wong descreve; ver "
+        "docs/research/rul_isolamento/09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md. "
+        "Esta limitação continua valendo para a instalação SEM para-raios, "
+        "que é a do arquivo de referência."
     ),
     "emt_vcb_no_arc_voltage": (
         "O arco a vácuo é representado por uma chave IDEAL comandada: "
@@ -2232,6 +2399,11 @@ KNOWN_LIMITATIONS: dict[str, str] = {
 
 
 __all__ = [
+    "ConstantExtinction",
+    "ExtinctionCapability",
+    "LinearExtinction",
+    "WONG_DECAYING_EXTINCTION",
+    "WONG_EXTINCTION_LAWS",
     # constantes do Documento A
     "DOC_A_RRDS_A_KV_PER_MS",
     "DOC_A_RRDS_B_KV_PER_MS2",

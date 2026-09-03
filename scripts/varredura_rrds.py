@@ -111,21 +111,52 @@ def main(argv: list[str] | None = None) -> int:
         help="roda também a configuração sem para-raios, para contraste",
     )
     parser.add_argument(
+        "--cenario",
+        default="literatura",
+        help=(
+            "cenário das faixas: 'literatura' (capacidade de extinção "
+            "CONSTANTE) ou 'wong' (lei di/dt = C·(t − t_sep) + D)"
+        ),
+    )
+    parser.add_argument(
+        "--rrds",
+        nargs=3,
+        type=float,
+        metavar=("INICIO", "FIM", "PASSO"),
+        default=None,
+        help=(
+            "grade de RRDS [kV/ms]; padrão 5 50 2.5, a faixa publicada. "
+            "Estender além de 50 serve para localizar o máximo interior "
+            "que Wong reporta, se ele existir fora da faixa"
+        ),
+    )
+    parser.add_argument(
         "--processos", type=int, default=max(1, (os.cpu_count() or 1))
     )
     args = parser.parse_args(argv)
     if args.n <= 0:
         parser.error("--n deve ser > 0")
 
+    grade = (
+        RRDS_GRID_KV_PER_MS
+        if args.rrds is None
+        else tuple(
+            float(x)
+            for x in np.arange(args.rrds[0], args.rrds[1] + 1e-9, args.rrds[2])
+        )
+    )
+    if len(grade) == 0:
+        parser.error("--rrds produziu grade vazia")
+
     ref = load_reference()
     zeros = tuple(
         PoleCurrentZeros.from_phasor(i, FREQUENCY_HZ) for i in ref.breaker_currents()
     )
-    faixas = scenario("literatura")
+    faixas = scenario(str(args.cenario))
 
     configs = [True] + ([False] if args.sem_para_raios else [])
     tarefas: list[tuple[float, int, tuple, bool]] = []
-    for k, rrds in enumerate(RRDS_GRID_KV_PER_MS):
+    for k, rrds in enumerate(grade):
         # Sorteia corte, di/dt e tempo de arco; IMPÕE a RRDS aos três polos.
         triplas = sweep_three_pole_samples(
             faixas,
@@ -141,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
                 tarefas.append((float(rrds), i, fixada, com))
 
     print(
-        f"{len(tarefas)} realizações em {len(RRDS_GRID_KV_PER_MS)} pontos de RRDS "
+        f"{len(tarefas)} realizações em {len(grade)} pontos de RRDS "
         f"({args.processos} processos)",
         flush=True,
     )
@@ -154,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
 
     resumo = []
     for com in configs:
-        for rrds in RRDS_GRID_KV_PER_MS:
+        for rrds in grade:
             g = [
                 l
                 for l in linhas
@@ -181,11 +212,12 @@ def main(argv: list[str] | None = None) -> int:
                 "configuracao": {
                     "n_por_ponto": int(args.n),
                     "seed": int(args.seed),
-                    "grade_rrds_kV_por_ms": list(RRDS_GRID_KV_PER_MS),
+                    "grade_rrds_kV_por_ms": list(grade),
                     "faixa_literatura_kV_por_ms": list(
                         LITERATURE_RRDS_RANGE_KV_PER_MS
                     ),
                     "janela_tempo_de_arco_s": list(LITERATURE_WORST_ARC_TIME_S),
+                    "cenario": str(args.cenario),
                     "tensao_sistema_para_raios_V": SYSTEM_VOLTAGE_V,
                     "v_base_V": V_BASE_V,
                 },

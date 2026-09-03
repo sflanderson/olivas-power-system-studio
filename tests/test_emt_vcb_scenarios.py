@@ -36,10 +36,12 @@ from app.simulation.emt.vcb_scenarios import (
     LITERATURE_RRDS_WORST_KV_PER_MS,
     LITERATURE_SCENARIO,
     LITERATURE_WORST_ARC_TIME_S,
+    WONG_SCENARIO,
     MEASURED_SCENARIO,
     SCENARIOS,
     PoleCurrentZeros,
     VcbParameterRanges,
+    VcbSample,
     sample_vcb_parameters,
     sample_vcb_parameters_by_arc_time,
     scenario,
@@ -96,7 +98,7 @@ def test_cenario_medido_esta_dentro_da_faixa_publicada():
 
 def test_selecao_por_nome_e_cenario_desconhecido_levanta():
     assert scenario("literatura") is LITERATURE_SCENARIO
-    assert set(SCENARIOS) == {"literatura", "medido", "caso_de_referencia"}
+    assert set(SCENARIOS) == {"literatura", "medido", "wong", "caso_de_referencia"}
     with pytest.raises(ValueError, match="cenário desconhecido"):
         scenario("inexistente")
 
@@ -571,12 +573,12 @@ class TestEscaladaComandadaPelaRampaDeRecuperacao:
     limitá-lo. O diagnóstico completo, com as medições, está em
     ``docs/research/rul_isolamento/08_VARREDURA_ESTATISTICA_VCB.md``.
 
-    Estes testes existem para que a correção — representar o LIMITE
-    DIELÉTRICO DA CARGA (para-raios no terminal do motor ou, no mínimo, um
-    limiar de disrupção no envelope da IEC 60034-15) — seja DETECTÁVEL:
-    quando ela entrar, eles falham e devem ser reescritos com o
-    comportamento publicado (escalada máxima em RRDS de 20 a 30 kV/ms,
-    pico abaixo de ``FIELD_PEAK_CEILING_PU``).
+    A correção — representar o LIMITE DIELÉTRICO DA CARGA — já existe,
+    em :mod:`app.simulation.emt.arrester`, e com ela a cauda volta à faixa
+    publicada [REPO: ``docs/research/rul_isolamento/
+    09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md``]. Estes testes
+    caracterizam, portanto, a configuração SEM para-raios, que é a do
+    arquivo de referência e continua fora do domínio físico na cauda.
     """
 
     def test_limitacao_esta_declarada(self):
@@ -666,3 +668,127 @@ class TestEscaladaComandadaPelaRampaDeRecuperacao:
         assert w_ultima > 0.5 * v_ultima
         # A rampa continua depois da última reignição — a folga só cresce.
         assert polo.withstand_V(t_ultima + 1.0e-3) > w_ultima
+
+
+# ---------------------------------------------------------------------------
+# 8. Lei de extinção dependente do tempo
+# ---------------------------------------------------------------------------
+
+
+class TestLeiDeExtincaoDeWong:
+    """Capacidade de extinção como FUNÇÃO DO TEMPO, e não constante.
+
+    Wong, Snider e Lo ajustam ``di/dt = C·(t − t_open) + D`` sobre 48
+    disjuntores e identificam a escalada máxima na combinação de RRDS
+    intermediária com capacidade de inclinação NEGATIVA
+    [LITERATURA: IPST 2003, p. 1-2 e 5-6]. Com capacidade constante essa
+    dependência não pode aparecer.
+    """
+
+    def test_pares_publicados_estao_na_convencao_de_microssegundo(self):
+        """A reconciliação de unidades entre as duas transcrições.
+
+        Wong traz ``C = −0,34·10⁵`` e Abdulahovic ``C = −0,034`` para a
+        mesma lei de Glinkowski. O fator ``10⁶`` é a conversão de ``t`` em
+        segundos para ``t`` em µs, e a leitura que fecha fisicamente é a
+        de µs: a capacidade zera em 7,5 ms, a escala da abertura mecânica.
+        """
+        from app.simulation.emt.vcb import (
+            WONG_DECAYING_EXTINCTION,
+            WONG_EXTINCTION_LAWS,
+            LinearExtinction,
+        )
+
+        assert WONG_DECAYING_EXTINCTION == (-0.034, 255.0)
+        assert WONG_DECAYING_EXTINCTION in WONG_EXTINCTION_LAWS
+        lei = LinearExtinction(*WONG_DECAYING_EXTINCTION)
+        assert lei.capability_A_per_us(0.0) == pytest.approx(255.0)
+        assert lei.capability_A_per_us(7.5e-3) == pytest.approx(0.0, abs=1e-9)
+        # Piso: a lei linear não produz capacidade negativa.
+        assert lei.capability_A_per_us(20.0e-3) == 0.0
+
+    def test_capacidade_constante_e_o_caso_C_nulo(self):
+        from app.simulation.emt.vcb import ConstantExtinction, LinearExtinction
+
+        c = ConstantExtinction(value_A_per_us=460.0)
+        l = LinearExtinction(c_A_per_us2=0.0, d_A_per_us=460.0)
+        for t in (0.0, 1.0e-3, 50.0e-3):
+            assert c.capability_A_per_us(t) == pytest.approx(
+                l.capability_A_per_us(t)
+            )
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"d_A_per_us": 0.0},
+            {"d_A_per_us": -1.0},
+            {"c_A_per_us2": float("nan")},
+            {"floor_A_per_us": -1.0},
+        ],
+    )
+    def test_lei_invalida_levanta(self, kwargs):
+        from app.simulation.emt.vcb import LinearExtinction
+
+        base = {"c_A_per_us2": 0.0, "d_A_per_us": 255.0}
+        base.update(kwargs)
+        with pytest.raises(ValueError):
+            LinearExtinction(**base)
+
+    def test_cenario_de_wong_sorteia_um_par_publicado(self):
+        from app.simulation.emt.vcb import WONG_EXTINCTION_LAWS
+
+        rng = np.random.default_rng(5)
+        vistos = set()
+        for _ in range(200):
+            a = sample_vcb_parameters(
+                WONG_SCENARIO, rng=rng, separation_window_s=JANELA
+            )
+            vistos.add((a.didt_slope_A_per_us2, a.didt_capability_A_per_us))
+        assert vistos <= {(c, d) for c, d in WONG_EXTINCTION_LAWS}
+        assert len(vistos) == len(WONG_EXTINCTION_LAWS)
+
+    def test_cenario_padrao_continua_com_capacidade_constante(self):
+        rng = np.random.default_rng(5)
+        for _ in range(50):
+            a = sample_vcb_parameters(
+                LITERATURE_SCENARIO, rng=rng, separation_window_s=JANELA
+            )
+            assert a.didt_slope_A_per_us2 == 0.0
+            assert isinstance(a.extinction(), float)
+
+    def test_amostra_com_inclinacao_devolve_a_lei(self):
+        from app.simulation.emt.vcb import LinearExtinction
+
+        a = VcbSample("wong", 3.0, 255.0, 30.0, 0.0, 14.0e-3, None, -0.034)
+        lei = a.extinction()
+        assert isinstance(lei, LinearExtinction)
+        assert lei.d_A_per_us == pytest.approx(255.0)
+        assert lei.c_A_per_us2 == pytest.approx(-0.034)
+        assert a.as_pole_kwargs()["didt_capability_A_per_us"] == lei
+
+    @pytest.mark.parametrize(
+        "leis",
+        [(), ((0.0, 0.0),), ((0.0, -1.0),), ((float("nan"), 100.0),)],
+    )
+    def test_leis_invalidas_no_cenario_levantam(self, leis):
+        with pytest.raises(ValueError):
+            VcbParameterRanges(name="x", extinction_laws=leis)
+
+    def test_polo_avalia_a_capacidade_no_instante(self):
+        """A capacidade segue o relógio da SEPARAÇÃO, como a recuperação."""
+        from app.simulation.emt.components import Switch
+        from app.simulation.emt.vcb import (
+            WONG_DECAYING_EXTINCTION,
+            LinearExtinction,
+            VacuumCircuitBreakerModel,
+        )
+
+        polo = VacuumCircuitBreakerModel(
+            Switch("sw", "a", "b", closed=True),
+            separation_time_s=10.0e-3,
+            chopping_current_A=3.0,
+            didt_capability_A_per_us=LinearExtinction(*WONG_DECAYING_EXTINCTION),
+        )
+        assert polo.didt_capability_at(10.0e-3) == pytest.approx(255.0)
+        assert polo.didt_capability_at(11.0e-3) == pytest.approx(221.0)
+        assert polo.didt_capability_at(17.5e-3) == pytest.approx(0.0, abs=1e-9)

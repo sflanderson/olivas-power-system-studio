@@ -77,7 +77,9 @@ from app.core.logging_config import get_logger
 
 from .vcb import (
     DIDT_INTERRUPT_WITHIN,
+    WONG_EXTINCTION_LAWS,
     DielectricRecovery,
+    LinearExtinction,
     LinearRecovery,
     ParabolicRecovery,
 )
@@ -95,6 +97,7 @@ __all__ = [
     "LITERATURE_RRDS_RANGE_KV_PER_MS",
     "LITERATURE_SCENARIO",
     "MEASURED_SCENARIO",
+    "WONG_SCENARIO",
     "SCENARIOS",
     "VcbParameterRanges",
     "VcbSample",
@@ -174,6 +177,13 @@ class VcbParameterRanges:
         Termo quadrático [kV/ms²]. ``None`` (padrão) usa recuperação
         linear, que é a forma adotada pelas fontes primárias. Um valor
         numérico ativa a forma parabólica ``A·t + B·t²``.
+    extinction_laws:
+        Pares ``(C, D)`` da lei ``di/dt = C·(t − t_sep) + D``, em
+        ``(A/µs², A/µs)``. ``None`` (padrão) amostra ``D`` de
+        ``didt_A_per_us`` com ``C = 0``, isto é, capacidade CONSTANTE.
+        Uma tupla de pares faz o amostrador escolher UM deles: são
+        alternativas discretas publicadas, não uma faixa contínua
+        [LITERATURA: Wong, Snider e Lo, IPST 2003, p. 1-2].
     source:
         Procedência declarada, citada no relatório.
     within_literature:
@@ -186,6 +196,7 @@ class VcbParameterRanges:
     didt_A_per_us: tuple[float, float] = LITERATURE_DIDT_RANGE_A_PER_US
     rrds_kV_per_ms: tuple[float, float] = LITERATURE_RRDS_RANGE_KV_PER_MS
     rrds_parabolic_kV_per_ms2: float | None = None
+    extinction_laws: tuple[tuple[float, float], ...] | None = None
     source: str = ""
     within_literature: bool = True
 
@@ -205,6 +216,19 @@ class VcbParameterRanges:
                 raise ValueError(
                     f"rrds_parabolic_kV_per_ms2 deve ser None ou finito e >= 0, obtido {b!r}"
                 )
+        if self.extinction_laws is not None:
+            leis = tuple(self.extinction_laws)
+            if not leis:
+                raise ValueError("extinction_laws não pode ser uma tupla vazia")
+            for c, d in leis:
+                if not (math.isfinite(float(c)) and math.isfinite(float(d))):
+                    raise ValueError(
+                        f"extinction_laws: par não finito {(c, d)!r}"
+                    )
+                if float(d) <= 0.0:
+                    raise ValueError(
+                        f"extinction_laws: D deve ser > 0, obtido {d!r}"
+                    )
         if not str(self.name).strip():
             raise ValueError("name não pode ser vazio")
 
@@ -257,9 +281,22 @@ DOC_A_SCENARIO = VcbParameterRanges(
     within_literature=False,
 )
 
+#: Cenário com a lei de extinção DEPENDENTE DO TEMPO de Wong, em vez da
+#: capacidade constante. É o cenário do critério de aceitação: Wong
+#: identifica a escalada máxima em RRDS intermediária (20 a 30 kV/ms)
+#: justamente na combinação com capacidade de inclinação NEGATIVA
+#: [LITERATURA: Wong, Snider e Lo, IPST 2003, p. 5-6]. Com capacidade
+#: constante essa dependência não pode aparecer, porque nada distingue
+#: o início do fim da abertura.
+WONG_SCENARIO = VcbParameterRanges(
+    name="wong",
+    extinction_laws=WONG_EXTINCTION_LAWS,
+    source="Wong, Snider e Lo (IPST 2003), lei di/dt = C·(t − t_sep) + D",
+)
+
 SCENARIOS: dict[str, VcbParameterRanges] = {
     s.name: s
-    for s in (LITERATURE_SCENARIO, MEASURED_SCENARIO, DOC_A_SCENARIO)
+    for s in (LITERATURE_SCENARIO, MEASURED_SCENARIO, WONG_SCENARIO, DOC_A_SCENARIO)
 }
 
 
@@ -304,6 +341,11 @@ class VcbSample:
         Tempo entre a separação e o zero de corrente seguinte [s],
         quando informado ao amostrador. É a variável que mais governa a
         escalada [LITERATURA: Wong 2003].
+    didt_slope_A_per_us2:
+        Inclinação ``C`` da lei ``di/dt = C·(t − t_sep) + D`` [A/µs²].
+        ``0`` (padrão) dá capacidade CONSTANTE, que é o caso do
+        Documento A; valor não nulo ativa a lei de Wong, com ``D`` em
+        ``didt_capability_A_per_us``.
     """
 
     scenario_name: str
@@ -313,6 +355,7 @@ class VcbSample:
     rrds_b_kV_per_ms2: float
     separation_time_s: float
     arc_time_s: float | None = None
+    didt_slope_A_per_us2: float = 0.0
 
     def recovery(self) -> DielectricRecovery:
         """Modelo de recuperação dielétrica desta realização.
@@ -341,14 +384,44 @@ class VcbSample:
             "separation_time_s": self.separation_time_s,
             "chopping_current_A": self.chopping_current_A,
             "recovery": self.recovery(),
-            "didt_capability_A_per_us": self.didt_capability_A_per_us,
+            "didt_capability_A_per_us": self.extinction(),
             "didt_convention": DIDT_INTERRUPT_WITHIN,
         }
+
+    def extinction(self):
+        """Capacidade de extinção desta realização.
+
+        Devolve o número — a capacidade CONSTANTE — quando a inclinação
+        é nula, e a lei linear de Wong quando não é. O polo aceita as
+        duas formas.
+        """
+        if self.didt_slope_A_per_us2 == 0.0:
+            return self.didt_capability_A_per_us
+        return LinearExtinction(
+            c_A_per_us2=float(self.didt_slope_A_per_us2),
+            d_A_per_us=float(self.didt_capability_A_per_us),
+        )
 
 
 def _uniform(rng: np.random.Generator, faixa: tuple[float, float]) -> float:
     lo, hi = float(faixa[0]), float(faixa[1])
     return lo if hi <= lo else float(rng.uniform(lo, hi))
+
+
+def _extincao(
+    rng: np.random.Generator, ranges: VcbParameterRanges
+) -> tuple[float, float]:
+    """Sorteia ``(D, C)`` da capacidade de extinção.
+
+    Sem ``extinction_laws`` o ``D`` sai da faixa contínua e ``C`` é nulo —
+    capacidade constante. Com ``extinction_laws``, escolhe UM dos pares
+    publicados, porque são alternativas discretas e não uma faixa.
+    """
+    if ranges.extinction_laws is None:
+        return _uniform(rng, ranges.didt_A_per_us), 0.0
+    leis = tuple(ranges.extinction_laws)
+    c, d = leis[int(rng.integers(len(leis)))]
+    return float(d), float(c)
 
 
 def sample_vcb_parameters(
@@ -383,13 +456,15 @@ def sample_vcb_parameters(
         raise ValueError(
             f"separation_window_s deve ser (início >= 0, fim >= início) finito, obtido {(t0, t1)!r}"
         )
+    d, c = _extincao(rng, ranges)
     return VcbSample(
         scenario_name=ranges.name,
         chopping_current_A=_uniform(rng, ranges.chopping_A),
-        didt_capability_A_per_us=_uniform(rng, ranges.didt_A_per_us),
+        didt_capability_A_per_us=d,
         rrds_a_kV_per_ms=_uniform(rng, ranges.rrds_kV_per_ms),
         rrds_b_kV_per_ms2=float(ranges.rrds_parabolic_kV_per_ms2 or 0.0),
         separation_time_s=t0 if t1 <= t0 else float(rng.uniform(t0, t1)),
+        didt_slope_A_per_us2=c,
     )
 
 
@@ -614,14 +689,16 @@ def sample_vcb_parameters_by_arc_time(
     t_sep = zeros.separation_for_arc_time(
         tau, earliest_separation_s=earliest_separation_s
     )
+    d, c = _extincao(rng, ranges)
     return VcbSample(
         scenario_name=ranges.name,
         chopping_current_A=_uniform(rng, ranges.chopping_A),
-        didt_capability_A_per_us=_uniform(rng, ranges.didt_A_per_us),
+        didt_capability_A_per_us=d,
         rrds_a_kV_per_ms=_uniform(rng, ranges.rrds_kV_per_ms),
         rrds_b_kV_per_ms2=float(ranges.rrds_parabolic_kV_per_ms2 or 0.0),
         separation_time_s=t_sep,
         arc_time_s=tau,
+        didt_slope_A_per_us2=c,
     )
 
 
