@@ -473,6 +473,38 @@ class TestRelayRegistryAdditions:
         assert m.time_dial_range == (0.50, 15.00)
         assert m.tms_range == (0.05, 1.00)
 
+    def test_abb_ref620_has_no_distance_protection(self):
+        """REF620 (linha feeder) NÃO tem proteção de distância (21) —
+        confirmado exclusiva do REM620 (motor) na mesma plataforma
+        620 series; premissa de pesquisa corrigida."""
+        m = get_model("ABB-REF620")
+        assert m is not None
+        assert m.application == "feeder"
+        assert not supports_function(m, "21P") and not supports_function(m, "21")
+        assert supports_function(m, "51P") and supports_function(m, "67/51N")
+        assert m.pickup_range_per_in == (0.05, 40.0)
+        assert m.tms_range == (0.05, 15.0)
+
+    def test_ge_369_is_motor_relay_with_proprietary_curve(self):
+        """GE 369 é o relé de motor correto da GE (750 é alimentador,
+        845 é transformador — nenhum dos dois é de motor)."""
+        m = get_model("GE-369")
+        assert m is not None
+        assert m.application == "motor"
+        assert supports_function(m, "51") and supports_function(m, "50G")
+        assert iec60255.CurveStandard.IEC not in m.tc_curve_standards
+        assert "2.2116623" in m.description   # constante da curva térmica própria
+
+    def test_schneider_sepam_s40_distinct_from_micom(self):
+        """Sepam é linhagem nativa Schneider, MiCOM é ex-Alstom/GE —
+        vendors distintos apesar do mesmo fabricante atual."""
+        m = get_model("Schneider-Sepam-S40")
+        assert m is not None
+        micom = get_model("Schneider-MiCOM-P127")
+        assert m.family != micom.family
+        assert m.time_dial_range == (0.1, 12.5)
+        assert m.tms_range == (0.05, 1.0)
+
 
 # ---------------------------------------------------------------------------
 # Vendor curve constants — cross-checks entre fontes independentes

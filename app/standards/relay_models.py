@@ -808,6 +808,218 @@ SEL_487E = RelayModel(
 )
 
 
+# ABB Relion 620 series (ANSI) — REF620 (feeder protection; linha
+# superior à REF615/REF615R, mesma plataforma 620 usada também por
+# RET620/transformador e REM620/motor). Achado relevante: proteção de
+# DISTÂNCIA (21) e diferencial de alta impedância (87) na revisão do
+# Technical Manual consultada (2019) são exclusivas do REM620 — o
+# REF620 (linha feeder) NÃO tem 21P; o Product Guide REF620 mais
+# recente (2022) já lista 87 de alta impedância, mas sem tabela de
+# faixas numéricas confirmada para essa revisão especificamente.
+# Fonte: ABB 1MAC504801-IB Rev. E (620 series ANSI Technical Manual,
+# 2019-05-29, Seções 1.4.3, 4.1.1-4.1.5, 12.1-12.2) + 1MRS757844 Rev. G
+# (REF620 Product Guide, 2022). REF630 (produto legado): Product
+# Guide/Application Manual oficiais obtidos não continham tabelas de
+# faixas de ajuste — não digitalizado por ausência de dado.
+ABB_REF620 = RelayModel(
+    manufacturer="ABB",
+    model="REF620",
+    family="ABB Relion 620 series (ANSI)",
+    application="feeder",
+    firmware_version="2.0/2.1",
+    manual_path="ABB 1MAC504801-IB Rev. E (620 series Technical Manual, ANSI)",
+    ansi_functions=(
+        "51P", "50P-1", "50P-2", "50P-3", "51LT",
+        "67/51P", "67/50P-1", "67/50P-2",
+        "51G", "50SEF", "50G-1", "50G-2", "50G-3",
+        "67/51N", "67/50N-1", "67/50N-2",
+        "46-1", "46-2", "46PD",
+        "59G", "59N", "27-1", "27-2", "59-1", "59-2", "47-1", "47-2",
+        "81-1", "81-2", "81LSH", "49F", "50BF", "51BF",
+        "86", "94", "HIZ", "AFD", "60", "25", "79", "52",
+    ),
+    tc_curve_standards=(
+        CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.ANSI,
+        CurveStandard.DEFINITE_TIME, CurveStandard.CUSTOM,
+    ),
+    iec_curves_supported=(
+        IecCurveType.STANDARD_INVERSE, IecCurveType.VERY_INVERSE,
+        IecCurveType.EXTREMELY_INVERSE, IecCurveType.LONG_TIME_INVERSE,
+    ),
+    ieee_curves_supported=(
+        IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE,
+    ),
+    pickup_range_per_in=(0.05, 40.0),
+    tms_range=(0.05, 15.0),
+    time_dial_range=(0.05, 15.0),
+    description=(
+        "Funções de sobrecorrente com 2 estágios de tempo definido "
+        "(50-1/2, terra 50G/N-1/2) + 1 instantâneo (50-3) + 1 IDMT "
+        "(51/51G). Estágio IDMT (51P/51G/51LT, 67/51P, 67/51N): pickup "
+        "0.05-5.00 xIn passo 0.01 (51N/G: 0.010-5.000 passo 0.005), "
+        "multiplicador de escala 0.8-10.0. Estágio alto (50-1/2): "
+        "0.10-40.00 xIn passo 0.01. Estágio instantâneo (50-3): "
+        "1.00-40.00 xIn passo 0.01. Retardo de tempo definido: "
+        "40-200000 ms (IDMT) / 20-200000 ms (instantâneo); reset "
+        "0-60000 ms. Time multiplier (IEC/ANSI IDMT): 0.05-15.00 passo "
+        "0.01, idêntico em todos os estágios de baixa/direcionais. "
+        "Curvas: ANSI EI/VI/NI/MI (esta última faixa 4, 'Normal "
+        "Inverse', não mapeada a nenhum membro de IeeeCurveType — "
+        "coeficientes A=0.0086/B=0.0185/C=0.02, distinta das 3 "
+        "mapeadas); Long-Time EI/VI/Inverse (3 curvas adicionais, "
+        "tr distinto: A=64.07/28.55/0.086); IEC NI/VI/Inverse/EI/STI/"
+        "LTI/DT; Programável (RI, RD). Curva programável A-E "
+        "(idêntica ao REF615R): A 0.0086-120.0000 (default 28.2000), "
+        "B 0.0000-0.7120 (default 0.1217), C 0.02-2.00 (default 2.00), "
+        "D 0.46-30.00 (default 29.10), E 0.0-1.0 (default 1.0) — "
+        "defaults reproduzem a curva ANSI Extremely Inverse. Fórmula "
+        "publicada (Tab. 612): t[s] = A/((I/I>)^C-1) + B·k. Constantes "
+        "IEC (SI 0.14/0.02; VI 13.5/1.0; EI 80.0/2.0; STI 0.05/0.04; "
+        "LTI 120/1.0) e ANSI EI/VI (28.2/0.1217/2.0; 19.61/0.491/2.0) "
+        "idênticas às já digitalizadas para REF615R/GE — confirma "
+        "consistência entre fontes independentes. Direcionalidade "
+        "(67): ângulo característico -179..180°, quantidade de "
+        "polarização configurável (self/neg-seq/cross/pos-seq). "
+        "Distância (21P) e diferencial de alta impedância de barra "
+        "(87/HIPDIF) confirmados como exclusivos do REM620 na revisão "
+        "2019 do manual técnico consultada; o Product Guide REF620 "
+        "2022 já anuncia 87 (fase A/B/C) mas sem faixa numérica "
+        "confirmada para essa revisão — não modelado aqui por "
+        "ausência de dado verificado."
+    ),
+)
+
+
+# GE Multilin 369 — Motor Management Relay (linha de proteção de
+# motor da GE, distinta da 8-Series feeder/transformer 750/845/850 —
+# premissa original do pedido corrigida: 750 é relé de ALIMENTADOR,
+# não de motor; 845 é de transformador e não pôde ser obtido).
+# Curva de sobrecarga térmica PRÓPRIA da GE (forma quadrática em
+# (pickup-1), não pertence a nenhuma família IEC 60255-151/IEEE
+# C37.112 já codificada — não recodificada em vendor_curve_constants.py
+# por ser específica de proteção térmica de motor, fora do escopo de
+# curvas de sobrecorrente de linha daquele módulo.
+# Fonte: GE Power Management GEK-106288, P/N 1601-0077-BC (2001),
+# Seções 2.1.3, 2.2.5, 5.3.2, 5.4.3.
+GE_369 = RelayModel(
+    manufacturer="GE",
+    model="369",
+    family="GE Multilin 369 Motor Management Relay",
+    application="motor",
+    firmware_version="53CMB18x.000",
+    manual_path="GE GEK-106288, P/N 1601-0077-BC (2001)",
+    ansi_functions=(
+        "14", "27", "37", "38", "46", "47", "49", "50", "50G", "51G",
+        "51", "55", "59", "66", "74", "81", "86", "87",
+    ),
+    tc_curve_standards=(CurveStandard.CUSTOM, CurveStandard.DEFINITE_TIME),
+    description=(
+        "Relé de proteção de motor (não usa as famílias de curva IEC "
+        "60255-151/IEEE C37.112 — proteção 51/sobrecarga usa réplica "
+        "térmica proprietária da GE). 51 Sobrecarga/Rotor "
+        "bloqueado/Modelo térmico: pickup 1.01-1.25×FLA; 15 formas de "
+        "curva padrão (1-15) ou curva customizada (30 pontos "
+        "tempo-corrente, 1.01-20.0×FLA); dropout 96-98% do pickup. "
+        "Alarme de sobrecarga: 1.01-1.50×FLA passo 0.01, retardo "
+        "0.1-60.0 s. 50 Curto-circuito: 2.0-20.0×TC passo 0.1, retardo "
+        "0-255.00 s, retardo de retaguarda 0.10-255.00 s. Emperramento "
+        "mecânico: 1.01-6.00×FLA, retardo 0.5-125.0 s. 37 Subcorrente: "
+        "0.10-0.99×FLA, retardo 1-255 s, retardo de partida 0-15000 s. "
+        "46 Desbalanço: 4-30% passo 1%, retardo 1-255 s. 50G/51G/50N/"
+        "51N Falha à terra: 0.10-1.00×TC (TC 1A/5A) ou 0.25-25.00 A "
+        "(TC sensível 50:0.025), retardo 0-255.00 s. 38/49 RTD: "
+        "1-200 °C. 27 Subtensão: 0.50-0.99×nominal passo 0.01; 59 "
+        "Sobretensão: 1.01-1.25×nominal passo 0.01; ambas retardo "
+        "0.0-255.0 s. 81 Frequência: 20.00-70.00 Hz passo 0.01, "
+        "retardo 0.0-255.0 s. 55 Fator de potência: 0.99-0.05 passo "
+        "0.01. Curva de sobrecarga padrão (fórmula publicada, "
+        "verbatim): tempo_disparo = (multiplicador_curva × 2.2116623) "
+        "/ [0.02530337×(pickup-1) + 0.05054758×(pickup-1)²], onde "
+        "pickup = corrente/FLA e multiplicador_curva ∈ {1..15}; acima "
+        "de 8.0×pickup o tempo é mantido no valor de 8.0× (curva "
+        "achatada para não agir como elemento instantâneo). Não é a "
+        "mesma fórmula/família de nenhuma curva já em "
+        "vendor_curve_constants.py — proteção térmica de motor "
+        "verdadeira, não sobrecorrente de linha."
+    ),
+)
+
+
+# Schneider Electric Sepam série 40 (plataforma Sepam 1000+) — linha
+# NATIVA Schneider, distinta do MiCOM P12x (linhagem ex-Alstom/GE já
+# digitalizada). 14 variantes (S40-S53 alimentador, T40-T52
+# transformador, M41 motor, G40 gerador) compartilham o mesmo motor
+# de proteção/curvas — modelado aqui como S40 (variante básica).
+# Fonte: Schneider PCRED301006EN ed. 02/2017 (User's manual, faixas de
+# ajuste pp. 47-50, curvas pp. 104-106) + PCRED301002EN ed. 01/2010
+# (Technical data sheet, matriz de funções por variante).
+SCHNEIDER_SEPAM_S40 = RelayModel(
+    manufacturer="Schneider Electric",
+    model="Sepam S40",
+    family="Sepam série 40 (plataforma Sepam 1000+)",
+    application="feeder",
+    firmware_version="—",
+    manual_path="Schneider PCRED301006EN ed. 02/2017 (Sepam série 40 User's Manual)",
+    ansi_functions=(
+        "50", "51", "50N", "51N", "50G", "51G", "50BF",
+        "46", "46BC", "27", "27R", "27S", "59", "59N", "47",
+        "81H", "81L", "79",
+    ),
+    tc_curve_standards=(
+        CurveStandard.IEC, CurveStandard.IEEE, CurveStandard.DEFINITE_TIME,
+        CurveStandard.CUSTOM,
+    ),
+    iec_curves_supported=(
+        IecCurveType.STANDARD_INVERSE, IecCurveType.VERY_INVERSE,
+        IecCurveType.EXTREMELY_INVERSE, IecCurveType.LONG_TIME_INVERSE,
+    ),
+    ieee_curves_supported=(
+        IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
+        IeeeCurveType.EXTREMELY_INVERSE,
+    ),
+    pickup_range_per_in=(0.1, 24.0),
+    tms_range=(0.05, 1.0),
+    time_dial_range=(0.1, 12.5),
+    description=(
+        "Variante básica de 14 da plataforma Sepam 1000+ (S40-S53 "
+        "alimentador; T40-T52 transformador +49RMS/RTD; M41 motor "
+        "+37/48/51LR/66; G40 gerador +50V/51V/32Q). 50/51 (fase): Is "
+        "0.1-24×In (tempo definido) ou 0.1-2.4×In (IDMT); tempo "
+        "definido 0.05-300 s; IDMT 0.1-12.5 s @10×Is (usado em "
+        "pickup_range_per_in/time_dial_range); reset (timer hold) "
+        "0.5-20 s (IDMT) ou 0.05-300 s (DT). 50N/51N e 50G/51G "
+        "(terra): Is0 0.1-15×In0 (DT) ou 0.1-1×In0 (IDMT); TC "
+        "toroidal 2A: 0.1-30 A, 20A: 2-300 A; TC sensível 1A: "
+        "0.05-15×In0 (mín. 0.1 A). 46 Desbalanço: tempo definido "
+        "0.1-5×Ib / 0.1-300 s; IDMT 0.1-0.5×Ib (curva Schneider) ou "
+        "0.1-1×Ib (IEC/IEEE). 27/27R/27S/59/59N/47: 5-120% Unp "
+        "(faixas específicas por função), 0.05-300 s. 81H/81L: "
+        "50-65 Hz / 40-60 Hz (faixas por banda), 0.1-300 s. Ajuste de "
+        "retardo IDMT por dois métodos equivalentes: tempo T "
+        "(operação a 10×Is) ou fator TMS = T/β (β = constante de "
+        "normalização própria de cada curva). Curvas IEC: t=k/((I/Is)^"
+        "α-1)×T/β — SI/A k=0.14 α=0.02 β=2.97; VI/B k=13.5 α=1 "
+        "β=1.50; Long-Time/B k=120 α=1 β=13.33; EI/C k=80 α=2 "
+        "β=0.808; Ultra Inverse k=315.2 α=2.5 β=1 (constantes k/α "
+        "coincidem com os valores universais IEC 60255-151 já em "
+        "vendor_curve_constants.py; β é normalização específica da "
+        "Schneider, não presente nas demais fontes). Curvas IEEE: "
+        "t=[A/((I/Is)^p-1)+B]×T/β — MI(D) A=0.010 B=0.023 p=0.02 "
+        "β=0.241; VI(E) A=3.922 B=0.098 p=2 β=0.138; EI(F) A=5.64 "
+        "B=0.0243 p=2 β=0.081 — coeficientes A/B/p DIFERENTES dos "
+        "universais IEEE C37.112 Anexo A (28.2/0.1217/2.0 etc.) já "
+        "digitalizados para ABB/GE — família numérica distinta apesar "
+        "do nome comum, mesma cautela já registrada no módulo "
+        "vendor_curve_constants.py para SEL vs GE ANSI. Curvas IAC "
+        "(forma de 5 constantes, fórmula com denominador (I/Is-C)) e "
+        "RI (t=1/(0.339-0.236/(I/Is))×T/3.1706) também suportadas, "
+        "não recodificadas. Acima de 20×Is tempo de disparo travado "
+        "no valor de 20×Is."
+    ),
+)
+
+
 # ---------------------------------------------------------------------------
 # Registry global
 # ---------------------------------------------------------------------------
@@ -827,6 +1039,9 @@ RELAY_MODELS_REGISTRY: dict[str, RelayModel] = {
     "WEG-SRW01": WEG_SRW01,
     "Eaton-Digitrip-3000": EATON_DIGITRIP_3000,
     "SEL-487E": SEL_487E,
+    "ABB-REF620": ABB_REF620,
+    "GE-369": GE_369,
+    "Schneider-Sepam-S40": SCHNEIDER_SEPAM_S40,
 }
 
 
