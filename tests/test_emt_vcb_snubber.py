@@ -65,15 +65,47 @@ from app.simulation.emt.cases import (
 from app.simulation.emt.cases import motor_switching as case_mod
 from app.simulation.emt.probes import to_stress_profile
 from app.simulation.emt.snubber import (
+    ATP_SNUBBER_BREAKOVER_V,
+    ATP_SNUBBER_DEIONIZATION_TIME_S,
+    ATP_SNUBBER_GATE_NAMES,
+    ATP_SNUBBER_HOLDING_CURRENT_A,
+    ATP_SNUBBER_LATCH_THRESHOLD,
+    ATP_SNUBBER_RESISTANCE_OHM,
     DOC_A_SNUBBER_RESISTANCE_OHM,
     SNUBBER_BLOCKED,
     SNUBBER_CONDUCTING,
+    SnubberMasterTrigger,
     ThyristorSnubber,
+    atp_state_code,
+    build_atp_literal_snubber_branch,
     build_snubber_branch,
     three_phase_snubber,
 )
 from app.simulation.emt.snubber import KNOWN_LIMITATIONS as SNUBBER_LIMITATIONS
 from app.simulation.emt.vcb import (
+    ATP_C_ARC_F,
+    ATP_C_CLOSED_F,
+    ATP_C_OPEN_F,
+    ATP_CB_ARCING,
+    ATP_CB_ARCING_HF,
+    ATP_CB_CLOSED,
+    ATP_CB_OPEN,
+    ATP_CURRENT_FROM_POLE,
+    ATP_CURRENT_FROM_SWITCH,
+    ATP_DIDT_CRIT_A_PER_US,
+    ATP_I_CHOP_A,
+    ATP_L_ARC_H,
+    ATP_L_CLOSED_H,
+    ATP_L_OPEN_H,
+    ATP_R_ARC_OHM,
+    ATP_R_CLOSED_OHM,
+    ATP_R_OPEN_OHM,
+    ATP_REIGNITION_MARGIN,
+    ATP_RRDS_A_KV_PER_MS,
+    ATP_RRDS_B_KV_PER_MS2,
+    ATP_T_OPEN_S,
+    ATP_ZERO_ORDER_DEFERRED,
+    ATP_ZERO_ORDER_LITERAL,
     DIDT_INTERRUPT_ABOVE,
     DIDT_INTERRUPT_WITHIN,
     DOC_A_CHOPPING_RANGE_A,
@@ -83,10 +115,20 @@ from app.simulation.emt.vcb import (
     STATE_CLEARED,
     STATE_CLOSED,
     STATE_OPEN,
+    AtpLiteralPole,
+    AtpModelCompatibility,
+    AtpVcbParameters,
     LinearRecovery,
     ParabolicRecovery,
+    SwitchedCapacitor,
+    SwitchedInductor,
+    SwitchedResistor,
     VacuumCircuitBreakerModel,
+    VcbPole,
+    build_atp_literal_pole,
+    build_vcb_pole,
     stagger_times,
+    three_phase_atp_literal_poles,
     three_phase_vcb,
     vcb_from_mod_parameters,
 )
@@ -1012,6 +1054,646 @@ def test_ponto_da_onda_e_parametro_declarado_do_monte_carlo():
 # ===========================================================================
 # 10. Auditoria — limitações declaradas
 # ===========================================================================
+
+
+# ===========================================================================
+# 8. Modo de compatibilidade LITERAL com o arquivo ATP
+# ===========================================================================
+#
+# Um teste por item da lógica escrita no arquivo. A referência destes
+# testes NÃO é a física idealizada do disjuntor a vácuo: é o texto do
+# MODEL ``VCB_R*`` e do MODEL ``SNUB_CTRL``
+# [REPO: tests/fixtures/atp/trt_all_motors_dt_ea.atp:110-199 e
+# tests/fixtures/atp/trt_all_motors_com_snubber_2026-04.atp:532-581].
+
+
+#: Parâmetros de bancada do modo literal: separação em 1 ms para caber na
+#: janela curta dos testes, o resto com os valores do arquivo.
+def _par_literal(**overrides) -> AtpVcbParameters:
+    base = {"t_open_s": 1.0e-3}
+    base.update(overrides)
+    return AtpVcbParameters(**base)
+
+
+def _polo_literal(**kwargs):
+    """Polo literal solto (não ligado a circuito), acionado por ``step``."""
+    par = kwargs.pop("parameters", _par_literal())
+    kwargs.setdefault("zero_crossing_order", ATP_ZERO_ORDER_DEFERRED)
+    return build_atp_literal_pole("cb", "p", "n1", parameters=par, **kwargs)
+
+
+def _rlc(ctrl) -> tuple[float, float, float]:
+    return (ctrl.r_val, ctrl.l_val, ctrl.c_val)
+
+
+def test_literal_reproduz_as_quatro_transicoes_e_as_atribuicoes_de_rlc():
+    """Item 1: quatro estados, mesmas transições, mesmas atribuições R-L-C.
+
+    Percorre a sequência fechado → arco → aberto → arco de alta
+    frequência → aberto conferindo, em cada passo, o código de estado do
+    ARQUIVO (0, 1, 2, 3 — que não é a ordem de ``VCB_STATES``) e a terna
+    ``(R_VAL, L_VAL, C_VAL)`` que o MODEL atribui naquela transição.
+    """
+    polo = _polo_literal()
+    c = polo.controller
+    fechado = (ATP_R_CLOSED_OHM, ATP_L_CLOSED_H, ATP_C_CLOSED_F)
+    arco = (ATP_R_ARC_OHM, ATP_L_ARC_H, ATP_C_ARC_F)
+    aberto = (ATP_R_OPEN_OHM, ATP_L_OPEN_H, ATP_C_OPEN_F)
+
+    # INIT: fechado, chave conduzindo, ramo série com os valores de fechado.
+    assert c.state == ATP_CB_CLOSED and c.sw_state == 1.0
+    assert _rlc(c) == fechado
+
+    # Antes de T_OPEN nada muda.
+    c.step(v_cb=0.0, i_cb=100.0, tnow=0.5e-3)
+    assert c.state == ATP_CB_CLOSED and _rlc(c) == fechado
+
+    # TNOW >= T_OPEN: 0 → 1, a chave ideal abre e o ramo assume o arco.
+    c.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+    assert c.state == ATP_CB_ARCING
+    assert c.sw_state == 0.0
+    assert _rlc(c) == arco
+
+    # |I_CB| <= I_CHOP com CHOPPED = 0: 1 → 2, ramo assume o aberto.
+    c.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+    assert c.state == ATP_CB_OPEN and _rlc(c) == aberto
+    assert c.chopped == 1
+    assert c.result.chopping_time_s == pytest.approx(1.001e-3)
+
+    # Passagem por zero: arma o temporizador da recuperação.
+    c.step(v_cb=0.0, i_cb=-0.5, tnow=1.002e-3)
+    assert c.state == ATP_CB_OPEN
+    assert c.t_zero == pytest.approx(1.002e-3)
+
+    # TRV acima da suportabilidade: 2 → 3, ramo volta ao arco.
+    c.step(v_cb=2.0e3, i_cb=-0.5, tnow=1.102e-3)
+    assert c.state == ATP_CB_ARCING_HF and _rlc(c) == arco
+    assert c.result.reignition_count == 1
+
+    # Extinção de alta frequência: 3 → 2, ramo volta ao aberto.
+    c.step(v_cb=0.0, i_cb=-10.0, tnow=1.103e-3)
+    assert c.state == ATP_CB_ARCING_HF
+    c.step(v_cb=0.0, i_cb=0.05, tnow=1.104e-3)
+    assert c.state == ATP_CB_OPEN and _rlc(c) == aberto
+    assert c.chopped == 0
+
+    # A trilha de estados percorreu os quatro códigos do arquivo.
+    assert [s for _, s in c.result.state_changes] == [
+        ATP_CB_ARCING,
+        ATP_CB_OPEN,
+        ATP_CB_ARCING_HF,
+        ATP_CB_OPEN,
+    ]
+    assert c.outputs["CB_STATE"] == float(ATP_CB_OPEN)
+    assert c.outputs["SW_STATE"] == 0.0
+
+
+def test_literal_aplica_a_margem_de_dez_por_cento_no_criterio_de_reignicao():
+    """Item 2: reignita com ``|V_CB| > V_wth·1,1``, e não com ``> V_wth``.
+
+    Dois polos idênticos são levados ao estado aberto e submetidos, no
+    MESMO instante desde o zero de corrente, a duas tensões: uma 5 % acima
+    da suportabilidade (que reignitaria sem a margem) e outra 15 % acima.
+    Só a segunda reignita.
+    """
+
+    def _ate_aberto_com_zero(polo):
+        c = polo.controller
+        c.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+        c.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+        c.step(v_cb=0.0, i_cb=-0.5, tnow=1.002e-3)
+        assert c.state == ATP_CB_OPEN and c.t_zero >= 0.0
+        return c
+
+    # V_wth em 0,1 ms após o zero: A·0,1 + B·0,01 = 92,36 V [CÁLCULO PRÓPRIO].
+    v_wth = (ATP_RRDS_A_KV_PER_MS * 0.1 + ATP_RRDS_B_KV_PER_MS2 * 0.01) * 1.0e3
+    assert v_wth == pytest.approx(92.36, rel=1e-6)
+
+    baixo = _ate_aberto_com_zero(_polo_literal())
+    baixo.step(v_cb=1.05 * v_wth, i_cb=-0.5, tnow=1.102e-3)
+    assert baixo.withstand_V() == pytest.approx(v_wth, rel=1e-9)
+    assert baixo.state == ATP_CB_OPEN, "reignitou dentro da margem de 10 %"
+    assert baixo.result.reignition_count == 0
+
+    alto = _ate_aberto_com_zero(_polo_literal())
+    alto.step(v_cb=1.15 * v_wth, i_cb=-0.5, tnow=1.102e-3)
+    assert alto.state == ATP_CB_ARCING_HF
+    assert alto.result.reignition_count == 1
+    assert alto.result.reignition_withstand_V[0] == pytest.approx(v_wth, rel=1e-9)
+    # O fator do arquivo é exatamente 1,1 e está parametrizado.
+    assert alto.parameters.reignition_margin == pytest.approx(ATP_REIGNITION_MARGIN)
+    assert ATP_REIGNITION_MARGIN == 1.1
+
+
+def test_literal_extingue_alta_frequencia_acima_do_didt_critico_e_declara_a_inversao():
+    """Item 3: ``|di/dt| > crítico`` extingue — convenção INVERTIDA.
+
+    A física usual é a oposta: o arco de alta frequência se extingue
+    quando a taxa de variação da corrente no zero é PEQUENA o bastante
+    para a câmara acompanhar. O arquivo escreve o contrário, e o modo
+    literal publica isso como saída (``DIDT_INVERTED``) em vez de
+    corrigir em silêncio.
+
+    O contador ``hf_extinction_count`` conta SÓ as extinções atribuídas
+    ao critério de di/dt. Com a taxa acima do crítico ele incrementa; com
+    a taxa abaixo do crítico o polo ainda assim abre, mas pela SEGUNDA
+    condição — o que mostra, de quebra, que o critério de di/dt é
+    redundante no arquivo (ver o teste do item 5).
+    """
+
+    def _ate_arco_af(polo):
+        c = polo.controller
+        c.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+        c.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+        c.step(v_cb=0.0, i_cb=-0.5, tnow=1.002e-3)
+        c.step(v_cb=2.0e3, i_cb=-0.5, tnow=1.102e-3)
+        assert c.state == ATP_CB_ARCING_HF
+        return c
+
+    # A saída adicional existe e é a do arquivo.
+    polo = _polo_literal()
+    assert polo.controller.didt_convention == DIDT_INTERRUPT_ABOVE
+    assert polo.controller.didt_convention_inverted is True
+    assert polo.controller.outputs["DIDT_INVERTED"] is True
+    assert polo.controller.result.didt_convention_inverted is True
+    assert polo.controller.result.didt_convention == DIDT_INTERRUPT_ABOVE
+
+    # ACIMA do crítico (Δi = 10,05 A em 1 µs ⇒ 10,05 A/µs > 5 A/µs).
+    acima = _ate_arco_af(_polo_literal())
+    acima.step(v_cb=0.0, i_cb=-10.0, tnow=1.103e-3)
+    assert acima.state == ATP_CB_ARCING_HF, "não extingue com |I| acima de 0,1 A"
+    acima.step(v_cb=0.0, i_cb=0.05, tnow=1.104e-3)
+    assert abs(acima.di_dt) > acima.parameters.didt_crit_A_per_us * 1.0e6
+    assert acima.state == ATP_CB_OPEN
+    assert acima.result.hf_extinction_count == 1
+
+    # ABAIXO do crítico (Δi = 0,55 A em 1 µs ⇒ 0,55 A/µs < 5 A/µs): o
+    # critério de di/dt NÃO atua; a abertura vem da segunda condição.
+    abaixo = _ate_arco_af(_polo_literal())
+    abaixo.step(v_cb=0.0, i_cb=0.05, tnow=1.103e-3)
+    assert abs(abaixo.di_dt) < abaixo.parameters.didt_crit_A_per_us * 1.0e6
+    assert abaixo.state == ATP_CB_OPEN
+    assert abaixo.result.hf_extinction_count == 0
+
+
+def test_literal_reinicia_o_temporizador_a_cada_zero_com_limiar_de_dez_miliamperes():
+    """Item 4: ``T_ZERO := TNOW`` a cada zero de corrente, se ``|I| > 0,01 A``.
+
+    Duas propriedades do arquivo, ambas diferentes de um modelo usual de
+    disjuntor:
+
+    1. o temporizador da recuperação dielétrica parte do último ZERO DE
+       CORRENTE, e não do instante de extinção do arco;
+    2. a passagem por zero só é VALIDADA se a corrente que a antecede
+       exceder 0,01 A em módulo — cruzamentos dentro do ruído numérico
+       são ignorados.
+    """
+    polo = _polo_literal()
+    c = polo.controller
+    c.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+    c.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+    assert c.state == ATP_CB_OPEN and c.t_zero == -1.0
+
+    # Cruzamento com corrente ABAIXO do limiar: não conta.
+    c.step(v_cb=0.0, i_cb=0.005, tnow=1.002e-3)
+    c.step(v_cb=0.0, i_cb=-0.005, tnow=1.003e-3)
+    assert c.t_zero == -1.0
+    assert c.result.zero_crossing_times_s == []
+    assert c.withstand_V() == 0.0
+
+    # Cruzamento com corrente ACIMA do limiar: arma o temporizador.
+    c.step(v_cb=0.0, i_cb=0.02, tnow=1.004e-3)
+    c.step(v_cb=0.0, i_cb=-0.02, tnow=1.005e-3)
+    assert c.t_zero == pytest.approx(1.005e-3)
+    assert c.result.zero_crossing_times_s == [pytest.approx(1.005e-3)]
+
+    # A suportabilidade cresce a partir DESSE zero.
+    c.step(v_cb=0.0, i_cb=-0.02, tnow=1.105e-3)
+    v_primeiro = c.withstand_V()
+    assert v_primeiro == pytest.approx(92.36, rel=1e-6)
+
+    # NOVA passagem por zero, sem qualquer extinção pelo meio: o
+    # temporizador REINICIA e a suportabilidade volta a zero.
+    c.step(v_cb=0.0, i_cb=0.02, tnow=1.106e-3)
+    assert c.t_zero == pytest.approx(1.106e-3)
+    assert c.t_azero == pytest.approx(0.0)
+    assert c.withstand_V() == pytest.approx(0.0)
+    assert len(c.result.zero_crossing_times_s) == 2
+    assert c.parameters.zero_crossing_threshold_A == pytest.approx(0.01)
+
+
+def test_literal_segunda_condicao_de_extincao_abaixo_de_cem_miliamperes():
+    """Item 5: ``|I_CB| < 0,1 A E T_ZERO >= 0`` também extingue, e zera CHOPPED.
+
+    A condição existe nos estados 1 e 3 e é INDEPENDENTE de ``I_CHOP``:
+    ela abre o polo por corrente pequena depois que houve pelo menos uma
+    passagem por zero, e repõe ``CHOPPED`` em 0, rearmando o corte por
+    ``I_CHOP``.
+
+    Verifica-se também a consequência estrutural: no estado 3 essa
+    condição SUBSUME o critério de di/dt (as duas usam o mesmo limiar de
+    0,1 A e, para se chegar ao estado 3, ``T_ZERO`` já é não negativo),
+    de modo que ``DIDT_CRIT`` não altera o instante de extinção.
+    """
+    # Corte por I_CHOP no estado 1 e, depois, extinção pela segunda
+    # condição — que devolve CHOPPED a zero.
+    polo = _polo_literal(parameters=_par_literal(i_chop_A=1.0))
+    c = polo.controller
+    c.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+    c.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+    assert c.state == ATP_CB_OPEN and c.chopped == 1
+    c.step(v_cb=0.0, i_cb=-0.5, tnow=1.002e-3)
+    c.step(v_cb=2.0e3, i_cb=-0.5, tnow=1.102e-3)
+    assert c.state == ATP_CB_ARCING_HF
+    # Corrente pequena com T_ZERO já armado: extingue e rearma o corte.
+    c.step(v_cb=0.0, i_cb=0.05, tnow=1.103e-3)
+    assert c.state == ATP_CB_OPEN
+    assert c.chopped == 0
+    assert c.parameters.extinction_current_A == pytest.approx(0.1)
+    assert c.result.hf_extinction_count == 0
+
+    # 0,1 A é limiar ESTRITO: em 0,1 A exatos a condição não atende.
+    borda = _polo_literal()
+    cb = borda.controller
+    cb.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+    cb.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+    cb.step(v_cb=0.0, i_cb=-0.5, tnow=1.002e-3)
+    cb.step(v_cb=2.0e3, i_cb=-0.5, tnow=1.102e-3)
+    cb.step(v_cb=0.0, i_cb=0.1, tnow=1.103e-3)
+    assert cb.state == ATP_CB_ARCING_HF
+
+    # Redundância: mudar DIDT_CRIT em quatro ordens de grandeza não move
+    # o instante de extinção do arco de alta frequência.
+    instantes = []
+    for didt in (5.0, 5.0e4):
+        p = _polo_literal(parameters=_par_literal(didt_crit_A_per_us=didt))
+        cc = p.controller
+        cc.step(v_cb=0.0, i_cb=100.0, tnow=1.0e-3)
+        cc.step(v_cb=0.0, i_cb=0.5, tnow=1.001e-3)
+        cc.step(v_cb=0.0, i_cb=-0.5, tnow=1.002e-3)
+        cc.step(v_cb=2.0e3, i_cb=-0.5, tnow=1.102e-3)
+        cc.step(v_cb=0.0, i_cb=-10.0, tnow=1.103e-3)
+        cc.step(v_cb=0.0, i_cb=0.05, tnow=1.104e-3)
+        assert cc.state == ATP_CB_OPEN
+        instantes.append(cc.result.extinction_times_s[-1])
+    assert instantes[0] == pytest.approx(instantes[1])
+
+
+def test_literal_monta_ramo_rlc_serie_comutado_em_paralelo_com_a_chave_ideal():
+    """Item 6: o polo é chave ideal ‖ (C série L série R), não chave isolada.
+
+    Confere a topologia montada, a comutação efetiva dos três valores ao
+    longo da manobra e — o que distingue o modo literal de uma chave
+    ideal — que o polo CONTINUA conduzindo depois de a chave abrir,
+    pelos 6 µF do estado aberto.
+    """
+    polo = build_atp_literal_pole(
+        "cb", "p", "n1", parameters=_par_literal(),
+        zero_crossing_order=ATP_ZERO_ORDER_DEFERRED,
+    )
+    # Quatro componentes: a chave e os três elementos do ramo série.
+    assert len(polo.components) == 4
+    assert isinstance(polo.resistor, SwitchedResistor)
+    assert isinstance(polo.inductor, SwitchedInductor)
+    assert isinstance(polo.capacitor, SwitchedCapacitor)
+    # Ramo série contíguo entre os MESMOS nós da chave.
+    assert polo.switch.nodes == ("p", "n1")
+    assert polo.capacitor.nodes[0] == "p"
+    assert polo.capacitor.nodes[1] == polo.inductor.nodes[0]
+    assert polo.inductor.nodes[1] == polo.resistor.nodes[0]
+    assert polo.resistor.nodes[1] == "n1"
+
+    ckt = Circuit("bancada_literal")
+    ckt.add(
+        VoltageSource(
+            "E", "src", "gnd",
+            amplitude_V=SOURCE_AMPLITUDE_V, frequency_Hz=60.0, phase_deg=90.0,
+        )
+    )
+    ckt.add(Inductor("Ls", "src", "p", L_SOURCE_H))
+    ckt.extend(polo.components)
+    ckt.add(Inductor("L", "n1", "gnd", L_LOAD_H))
+    ckt.add(Capacitor("C", "n1", "gnd", C_LOAD_F, initial_voltage_V=C_INITIAL_V))
+    solver = Solver(ckt, dt=1.0e-6)
+    i_ramo = solver.add_probe(BranchCurrentProbe("i_ramo", polo.resistor))
+    i_chave = solver.add_probe(BranchCurrentProbe("i_chave", polo.switch))
+    trv = solver.add_probe(DifferentialVoltageProbe("trv", "p", "n1"))
+    solver.run(t_end=3.0e-3, controllers=[polo.controller])
+
+    c = polo.controller
+    # A manobra ocorreu e os valores comutaram para os de aberto.
+    assert c.sw_state == 0.0 and not polo.switch.closed
+    assert polo.resistor.resistance_ohm == pytest.approx(ATP_R_OPEN_OHM)
+    assert polo.inductor.inductance_H == pytest.approx(ATP_L_OPEN_H)
+    assert polo.capacitor.capacitance_F == pytest.approx(ATP_C_OPEN_F)
+
+    # A comutação dos valores é vista pelo solver como mudança de
+    # topologia: refatora e dispara o CDA, como faz uma chave.
+    assert solver.stats.topology_changes >= 2
+
+    # Depois de a chave abrir a corrente do POLO não é nula: ela passa
+    # pelo ramo série. Uma chave ideal isolada daria ZERO — é essa a
+    # diferença que o item 6 exige. No estado aberto quem governa é o
+    # 1 MΩ em série: a 6 µF vale 26,5 Ω em 1 kHz e a 0,6 µH vale 3,8 mΩ,
+    # ambas desprezíveis ao lado dele [CÁLCULO PRÓPRIO], de modo que a
+    # corrente do ramo é a tensão do gap dividida por ROPEN.
+    t = np.asarray(i_ramo.time_s)
+    depois = t > 1.5e-3
+    i_depois = np.asarray(i_ramo.values)[depois]
+    v_depois = np.asarray(i_chave.values)[depois]
+    assert float(np.max(np.abs(i_depois))) > 1.0e-3
+    assert float(np.max(np.abs(v_depois))) < 1.0e-9
+    k = int(np.argmax(np.abs(i_depois)))
+    v_gap_pico = float(np.max(np.abs(np.asarray(trv.values)[depois])))
+    assert abs(i_depois[k]) == pytest.approx(v_gap_pico / ATP_R_OPEN_OHM, rel=0.05)
+
+    # É por isso que a leitura de I_CB importa: as duas fontes divergem.
+    assert c.current_source == ATP_CURRENT_FROM_SWITCH
+    assert c.measured_current_A() == pytest.approx(polo.switch.branch_current(0))
+    c.current_source = ATP_CURRENT_FROM_POLE
+    assert abs(c.measured_current_A()) > abs(polo.switch.branch_current(0))
+
+
+def test_ordem_literal_de_iprev_impede_qualquer_passagem_por_zero():
+    """O arquivo sobrescreve ``I_PREV`` ANTES do teste de zero — e isso paralisa.
+
+    No arquivo, ``I_PREV := I_CBr`` está dentro do bloco
+    ``IF TNOW > TIME_PREVr``, que é verdadeiro em todo passo e precede o
+    teste ``IF I_PREV * I_CBr <= 0.0``. O teste passa a comparar a
+    corrente com ela mesma: o produto é ``I_CB²``, nunca negativo, e o
+    caso em que se anula reprova a guarda ``ABS(I_PREV) > 0,01``.
+
+    Consequência EXECUTADA pelo arquivo: ``T_ZERO`` fica em −1,0,
+    ``V_WITH`` fica em zero e não há reignição nenhuma. O modo literal
+    reproduz isso por padrão; a ordem adiada é opção declarada.
+    """
+    literal = build_atp_literal_pole(
+        "cb_lit", "p", "n1", parameters=_par_literal(),
+        zero_crossing_order=ATP_ZERO_ORDER_LITERAL,
+    )
+    adiado = build_atp_literal_pole(
+        "cb_adi", "p", "n1", parameters=_par_literal(),
+        zero_crossing_order=ATP_ZERO_ORDER_DEFERRED,
+    )
+    sequencia = [
+        (1.0e-3, 100.0, 0.0),
+        (1.001e-3, 0.5, 0.0),
+        (1.002e-3, -0.5, 0.0),
+        (1.102e-3, -0.5, 5.0e3),
+    ]
+    for polo in (literal, adiado):
+        for tnow, i, v in sequencia:
+            polo.controller.step(v_cb=v, i_cb=i, tnow=tnow)
+
+    assert literal.controller.zero_crossing_order == ATP_ZERO_ORDER_LITERAL
+    assert literal.controller.t_zero == -1.0
+    assert literal.controller.withstand_V() == 0.0
+    assert literal.controller.result.reignition_count == 0
+    assert literal.controller.state == ATP_CB_OPEN
+
+    assert adiado.controller.t_zero == pytest.approx(1.002e-3)
+    assert adiado.controller.result.reignition_count == 1
+    assert adiado.controller.state == ATP_CB_ARCING_HF
+
+
+def test_modo_literal_e_selecionado_por_parametro_e_nao_muda_o_padrao():
+    """``build_vcb_pole`` escolhe o modo; o padrão continua a chave ideal."""
+    padrao = build_vcb_pole(
+        "cb", "p", "n1", separation_time_s=1.0e-3, chopping_current_A=2.0
+    )
+    assert isinstance(padrao, VcbPole)
+    assert isinstance(padrao.controller, VacuumCircuitBreakerModel)
+    assert padrao.components == (padrao.switch,)
+    assert padrao.controller.didt_convention == DIDT_INTERRUPT_WITHIN
+    assert padrao.switch.closed
+
+    literal = build_vcb_pole(
+        "cb2", "p", "n1", atp_model_compatibility=True, parameters=_par_literal()
+    )
+    assert isinstance(literal, AtpLiteralPole)
+    assert isinstance(literal.controller, AtpModelCompatibility)
+    assert len(literal.components) == 4
+
+    # ``parameters`` é do modo literal e não é aceito em silêncio no padrão.
+    with pytest.raises(ValueError, match="modo literal"):
+        build_vcb_pole("cb3", "p", "n1", parameters=_par_literal(), separation_time_s=1e-3)
+
+
+def test_parametros_literais_reproduzem_os_blocos_use_do_arquivo():
+    """Os três polos do arquivo diferem em T_OPEN, I_CHOP e DIDT_CRIT."""
+    polos = [AtpVcbParameters.for_pole(k) for k in range(3)]
+    assert tuple(p.t_open_s for p in polos) == ATP_T_OPEN_S
+    assert tuple(p.i_chop_A for p in polos) == ATP_I_CHOP_A
+    assert tuple(p.didt_crit_A_per_us for p in polos) == ATP_DIDT_CRIT_A_PER_US
+    # O resto é comum aos três.
+    assert {p.rrds_a_kV_per_ms for p in polos} == {ATP_RRDS_A_KV_PER_MS}
+    assert {p.r_arc_ohm for p in polos} == {ATP_R_ARC_OHM}
+    assert {p.c_open_F for p in polos} == {ATP_C_OPEN_F}
+    with pytest.raises(ValueError, match="index"):
+        AtpVcbParameters.for_pole(3)
+    with pytest.raises(ValueError, match="r_arc_ohm"):
+        AtpVcbParameters(r_arc_ohm=0.0)
+
+    trifasico = three_phase_atp_literal_poles(
+        "cb", ("pa", "pb", "pc"), ("na", "nb", "nc")
+    )
+    assert len(trifasico) == 3
+    assert [p.controller.parameters.t_open_s for p in trifasico] == list(ATP_T_OPEN_S)
+
+
+def test_elementos_comutaveis_publicam_o_valor_na_assinatura_de_topologia():
+    """Mudar R, L ou C é mudança de TOPOLOGIA — obriga refatoração e CDA."""
+    r = SwitchedResistor("r", "a", "b", 20.0)
+    l = SwitchedInductor("l", "b", "c", 50.0e-6)
+    c = SwitchedCapacitor("c", "c", "gnd", 0.0)
+    assert r.topology_signature() == ("R", 20.0)
+    assert l.topology_signature() == ("L", 50.0e-6)
+    assert c.topology_signature() == ("C", 0.0)
+    assert r.set_resistance(1.0e6) and not r.set_resistance(1.0e6)
+    assert r.topology_signature() == ("R", 1.0e6)
+    # C = 0 é o valor de CCLOSED no arquivo: ramo série ABERTO.
+    assert c.capacitance_F == 0.0
+    assert c.set_capacitance(6.0e-6)
+    with pytest.raises(ValueError, match="capacitance_F"):
+        c.set_capacitance(-1.0)
+    with pytest.raises(ValueError, match="resistance_ohm"):
+        r.set_resistance(0.0)
+    with pytest.raises(ValueError, match="inductance_H"):
+        l.set_inductance(0.0)
+
+
+def test_controlador_mestre_literal_arma_no_estado_dois_e_nunca_libera():
+    """``SNUB_CTRL``: trava comum às três fases, sem liberação.
+
+    O limiar do arquivo é ``STA > 1.9``: nos códigos do MODEL do
+    disjuntor a trava NÃO fecha no estado de arco (1), fecha no estado
+    aberto (2) — a primeira interrupção declarada — ou no de arco de alta
+    frequência (3).
+    """
+
+    class _PoloATP:
+        def __init__(self) -> None:
+            self.cb_state = ATP_CB_CLOSED
+
+    a, b, c = _PoloATP(), _PoloATP(), _PoloATP()
+    disparos: list[float] = []
+    mestre = SnubberMasterTrigger([a, b, c], [lambda t, solver: disparos.append(t)])
+    assert mestre.latch_threshold == pytest.approx(ATP_SNUBBER_LATCH_THRESHOLD)
+
+    mestre(1.0e-3, None)
+    assert not mestre.armed and mestre.fm == 0.0
+
+    # Estado de arco (1) NÃO arma: 1 não é maior que 1,9.
+    b.cb_state = ATP_CB_ARCING
+    mestre(2.0e-3, None)
+    assert not mestre.armed
+
+    # Estado aberto (2) arma, e arma pelas TRÊS fases de uma vez.
+    b.cb_state = ATP_CB_OPEN
+    mestre(3.0e-3, None)
+    assert mestre.armed and mestre.fm == 1.0
+    assert mestre.armed_time_s == pytest.approx(3.0e-3)
+    assert set(mestre.gates) == set(ATP_SNUBBER_GATE_NAMES)
+    assert all(v == 1.0 for v in mestre.gates.values())
+
+    # Volta ao estado fechado: a trava NÃO é liberada.
+    b.cb_state = ATP_CB_CLOSED
+    mestre(4.0e-3, None)
+    assert mestre.armed and mestre.gate() is True
+    assert disparos == [1.0e-3, 2.0e-3, 3.0e-3, 4.0e-3]
+
+    mestre.reset()
+    assert not mestre.armed and mestre.armed_time_s is None
+
+    # O mesmo limiar lê os polos do modo PADRÃO, por tradução de nome.
+    assert atp_state_code(_PoloATP()) == 0.0
+    padrao = build_vcb_pole("cbp", "p", "n1", separation_time_s=1.0e-3)
+    assert atp_state_code(padrao.controller) == 0.0
+    with pytest.raises(ValueError, match="cb_state"):
+        atp_state_code(object())
+
+
+def test_valvula_literal_so_dispara_depois_da_porta_do_controlador_mestre():
+    """A porta inibe o disparo; a tensão de disparo sozinha não basta."""
+    porta = {"on": False}
+    ckt = Circuit("porta_da_valvula")
+    ckt.add(
+        VoltageSource(
+            "E", "bus", "gnd", amplitude_V=3386.0, frequency_Hz=60.0, phase_deg=0.0
+        )
+    )
+    branch = build_atp_literal_snubber_branch(
+        "sn", "bus", "gnd", gate=lambda: porta["on"]
+    )
+    ckt.extend(branch.components)
+    assert branch.controller.breakover_voltage_V == pytest.approx(ATP_SNUBBER_BREAKOVER_V)
+    assert branch.controller.holding_current_A == pytest.approx(
+        ATP_SNUBBER_HOLDING_CURRENT_A
+    )
+    assert branch.resistor.resistance_ohm == pytest.approx(ATP_SNUBBER_RESISTANCE_OHM)
+    assert branch.controller.deionization_time_s == pytest.approx(
+        ATP_SNUBBER_DEIONIZATION_TIME_S
+    )
+
+    solver = Solver(ckt, dt=1.0e-6)
+    solver.run(t_end=8.0e-3, controllers=[branch.controller])
+    assert branch.controller.n_firings == 0, "disparou sem a porta"
+    assert branch.controller.state == SNUBBER_BLOCKED
+
+    porta["on"] = True
+    solver.run(t_end=8.0e-3, controllers=[branch.controller])
+    assert branch.controller.n_firings >= 1
+    assert branch.controller.energy_J > 0.0
+
+
+def test_valvula_literal_de_2404_V_conduz_em_regime_e_carrega_os_30_ohms():
+    """Consequência do item do amortecedor: 2404 V de disparo, 3386 V de pico.
+
+    Com a trava do ``SNUB_CTRL`` fechada, a válvula dispara em todo
+    semiciclo em que a tensão do barramento excede 2404 V e só bloqueia
+    quando a corrente cai à corrente de manutenção de 1 A, isto é,
+    praticamente no zero de tensão. O ramo deixa de ser um amortecedor de
+    transitório e passa a ser uma CARGA PERMANENTE.
+
+    Medida desta bancada, com fonte ideal de 3386 V de pico a 60 Hz sobre
+    o resistor de 30 Ω, dois ciclos após o armamento
+    [CÁLCULO PRÓPRIO, medido nesta sessão]::
+
+        disparos por período .......... 2
+        corrente de pico .............. 112,87 A
+        corrente eficaz ............... 74,96 A
+        potência média ................ 168,6 kW por fase
+        energia em 34,3 ms ............ 5,78 kJ por fase
+        fração do tempo em condução ... 72,5 %
+
+    O valor analítico da potência, integrando ``v²/R`` do ângulo de
+    disparo ``asin(2404/3386) = 45,2°`` ao zero de tensão, é 173,5 kW
+    [CÁLCULO PRÓPRIO]; a diferença de 3 % é o trecho final, em que a
+    válvula bloqueia em ``|i| = 1 A`` (isto é, ``|v| = 30 V``) e não em
+    zero, mais a janela parcial do primeiro semiciclo.
+    """
+
+    class _PoloATP:
+        def __init__(self) -> None:
+            self.cb_state = ATP_CB_CLOSED
+
+    pico_V = 3386.0
+    polo = _PoloATP()
+    mestre = SnubberMasterTrigger([polo], ())
+    ckt = Circuit("regime_com_valvula")
+    ckt.add(
+        VoltageSource(
+            "E", "bus", "gnd", amplitude_V=pico_V, frequency_Hz=60.0, phase_deg=0.0
+        )
+    )
+    ramo = build_atp_literal_snubber_branch("sn", "bus", "gnd", gate=mestre.gate)
+    ckt.extend(ramo.components)
+    mestre.controllers = (ramo.controller,)
+
+    solver = Solver(ckt, dt=1.0e-6)
+    sonda = solver.add_probe(BranchCurrentProbe("i_rs", ramo.resistor))
+
+    def _arma(t, _solver):
+        if t >= 1.0e-3:
+            polo.cb_state = ATP_CB_OPEN
+
+    # Antes da trava o ramo é transparente: nenhuma condução em regime.
+    solver.run(t_end=1.0e-3, controllers=[_arma, mestre])
+    assert not mestre.armed
+    assert ramo.controller.n_firings == 0
+    assert float(np.max(np.abs(np.asarray(sonda.values)))) < 1.0e-9
+    n0 = len(sonda.time_s)
+    energia_0 = ramo.controller.energy_J
+
+    # Dois períodos completos depois da trava.
+    solver.run(t_end=2.0 / 60.0 + 0.6e-3, controllers=[_arma, mestre], reset=False)
+    assert mestre.armed and mestre.fm == 1.0
+
+    t = np.asarray(sonda.time_s)[n0:]
+    i = np.asarray(sonda.values)[n0:]
+    janela_s = float(t[-1] - t[0])
+    energia_J = ramo.controller.energy_J - energia_0
+    pico_A = float(np.max(np.abs(i)))
+    eficaz_A = float(np.sqrt(np.mean(i**2)))
+    potencia_W = energia_J / janela_s
+    fracao = ramo.controller.conduction_time_s / janela_s
+
+    # Dois disparos por período: um em cada semiciclo.
+    assert ramo.controller.n_firings == pytest.approx(4, abs=1)
+    # O pico é o da tensão de pico sobre 30 Ω — a válvula está conduzindo
+    # quando a tensão passa pelo máximo.
+    assert pico_A == pytest.approx(pico_V / ATP_SNUBBER_RESISTANCE_OHM, rel=0.02)
+    assert pico_A == pytest.approx(112.87, rel=0.02)
+    assert eficaz_A == pytest.approx(74.96, rel=0.02)
+    assert potencia_W == pytest.approx(168.6e3, rel=0.03)
+    assert potencia_W == pytest.approx(
+        ATP_SNUBBER_RESISTANCE_OHM * eficaz_A**2, rel=1.0e-3
+    )
+    assert energia_J == pytest.approx(5.78e3, rel=0.03)
+    assert fracao > 0.70, "a válvula conduz em praticamente todo semiciclo"
+    # A trava explica o resultado: o comando nunca é liberado.
+    assert mestre.gate() is True
+    assert ATP_SNUBBER_BREAKOVER_V < pico_V
 
 
 def test_limitacoes_declaradas_seguem_o_padrao_do_projeto():

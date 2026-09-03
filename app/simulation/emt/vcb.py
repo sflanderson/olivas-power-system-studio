@@ -96,7 +96,7 @@ from typing import Protocol, Sequence
 import numpy as np
 
 from app.core.logging_config import get_logger
-from app.simulation.emt.components import Switch
+from app.simulation.emt.components import Capacitor, Inductor, Resistor, Switch
 
 log = get_logger(__name__)
 
@@ -994,6 +994,967 @@ def three_phase_vcb(
 
 
 # ---------------------------------------------------------------------------
+# Modo de compatibilidade LITERAL com o MODEL VCB_R*/S*/T* do arquivo ATP
+# ---------------------------------------------------------------------------
+#
+# Tudo o que segue reproduz, LINHA A LINHA, o bloco ``EXEC`` do MODEL
+# ``VCB_Rr`` de [REPO: tests/fixtures/atp/trt_all_motors_dt_ea.atp:110-199],
+# com os dados do bloco ``USE`` correspondente (linhas 526-604 do mesmo
+# arquivo). É um modo OPCIONAL, selecionado por parâmetro
+# (``atp_model_compatibility=True`` em :func:`build_vcb_pole`, ou o uso
+# direto de :class:`AtpModelCompatibility`): o comportamento padrão de
+# :class:`VacuumCircuitBreakerModel` NÃO é alterado por nada desta seção.
+#
+# A razão de existir do modo é metodológica: o caso de referência é o
+# ARQUIVO, não a idealização física dele. Onde a lógica escrita difere da
+# lógica que se esperaria de um disjuntor a vácuo, o modo literal segue o
+# arquivo e a divergência é declarada — em docstring e em
+# :data:`KNOWN_LIMITATIONS` — em vez de ser silenciosamente corrigida.
+
+
+#: Instantes de separação de contatos por polo [s]
+#: [FATO: arquivo, ``T_OPENr/s/t`` no bloco USE].
+ATP_T_OPEN_S: tuple[float, float, float] = (0.01455, 0.02475, 0.02481)
+
+#: Corrente de corte por polo [A] — valores FIXOS e distintos por polo,
+#: não faixa de amostragem [FATO: arquivo, ``I_CHOPr/s/t``].
+ATP_I_CHOP_A: tuple[float, float, float] = (1.0, 2.0, 2.0)
+
+#: Capacidade de extinção de alta frequência por polo [A/µs]
+#: [FATO: arquivo, ``DIDT_CRITr/s/t``].
+ATP_DIDT_CRIT_A_PER_US: tuple[float, float, float] = (5.0, 15.0, 15.0)
+
+#: Constantes da lei de recuperação dielétrica, iguais nos três polos
+#: [FATO: arquivo, ``RRDS_Ar/s/t`` e ``RRDS_Br/s/t``].
+ATP_RRDS_A_KV_PER_MS: float = 0.801
+ATP_RRDS_B_KV_PER_MS2: float = 1.226
+
+#: Margem do critério de reignição: o MODEL escreve
+#: ``IF ABS(V_CBr) > V_WITHr * 1.1`` [FATO: arquivo, MODEL VCB_Rr].
+ATP_REIGNITION_MARGIN: float = 1.1
+
+#: Limiar que VALIDA a passagem por zero da corrente: só reinicia o
+#: temporizador da recuperação se ``ABS(I_PREV) > 0.01``
+#: [FATO: arquivo, MODEL VCB_Rr].
+ATP_ZERO_CROSSING_THRESHOLD_A: float = 0.01
+
+#: Segunda condição de extinção: ``ABS(I_CB) < 0.1 AND T_ZERO >= 0``
+#: [FATO: arquivo, MODEL VCB_Rr, estados 1 e 3].
+ATP_EXTINCTION_CURRENT_A: float = 0.1
+
+#: Resistências do ramo série comutado [Ω] [FATO: arquivo, ``RCLOSED``,
+#: ``RARC`` e ``ROPEN`` do bloco USE].
+ATP_R_CLOSED_OHM: float = 0.001
+ATP_R_ARC_OHM: float = 20.0
+ATP_R_OPEN_OHM: float = 1.0e6
+
+#: Indutâncias do ramo série comutado [H] [FATO: arquivo, ``LCLOSED``,
+#: ``LARC`` e ``LOPEN``; ver ``emt_vcb_atp_lc_unit_convention``].
+ATP_L_CLOSED_H: float = 2.0e-3
+ATP_L_ARC_H: float = 50.0e-6
+ATP_L_OPEN_H: float = 0.6e-6
+
+#: Capacitâncias do ramo série comutado [F] [FATO: arquivo, ``CCLOSED``,
+#: ``CARC`` e ``COPEN``; ver ``emt_vcb_atp_lc_unit_convention``].
+ATP_C_CLOSED_F: float = 0.0
+ATP_C_ARC_F: float = 20.0e-9
+ATP_C_OPEN_F: float = 6.0e-6
+
+#: Estados do MODEL, com os MESMOS códigos inteiros do arquivo. Note que
+#: a numeração NÃO é a de :data:`VCB_STATES`: aqui 2 é o gap aberto e 3 é
+#: o arco de alta frequência.
+ATP_CB_CLOSED: int = 0
+ATP_CB_ARCING: int = 1
+ATP_CB_OPEN: int = 2
+ATP_CB_ARCING_HF: int = 3
+
+#: Estados do MODEL, na ordem dos códigos.
+ATP_CB_STATES: tuple[int, int, int, int] = (
+    ATP_CB_CLOSED,
+    ATP_CB_ARCING,
+    ATP_CB_OPEN,
+    ATP_CB_ARCING_HF,
+)
+
+#: Nomes dos estados do MODEL, para leitura humana.
+ATP_CB_STATE_NAMES: dict[int, str] = {
+    ATP_CB_CLOSED: "fechado",
+    ATP_CB_ARCING: "arco",
+    ATP_CB_OPEN: "aberto",
+    ATP_CB_ARCING_HF: "arco_alta_frequencia",
+}
+
+#: Ordem de atualização de ``I_PREV`` EXATAMENTE como escrita no arquivo:
+#: ``I_PREV := I_CBr`` ocorre DENTRO do bloco ``IF TNOW > TIME_PREVr``,
+#: isto é, ANTES do teste de passagem por zero ``IF I_PREV * I_CBr <= 0``.
+#: Como ``TNOW > TIME_PREVr`` é verdadeiro em todo passo, o teste compara
+#: a corrente com ELA MESMA e ``T_ZEROr`` nunca é atribuído — o
+#: temporizador da recuperação dielétrica nunca parte, ``V_WITHr``
+#: permanece nulo e nenhuma reignição é declarada. Ver
+#: ``emt_vcb_atp_iprev_overwritten_before_zero_test``.
+ATP_ZERO_ORDER_LITERAL: str = "literal"
+
+#: Ordem em que ``I_PREV`` é atualizado DEPOIS do teste de passagem por
+#: zero, de modo que o teste compare amostras CONSECUTIVAS. É a leitura
+#: que dá sentido ao limiar de 0,01 A e ao reinício do temporizador; é
+#: [INFERÊNCIA FÍSICA] sobre a intenção do autor do MODEL, não o que o
+#: arquivo executa.
+ATP_ZERO_ORDER_DEFERRED: str = "deferred"
+
+#: Ordens aceitas.
+ATP_ZERO_ORDERS: tuple[str, str] = (ATP_ZERO_ORDER_LITERAL, ATP_ZERO_ORDER_DEFERRED)
+
+#: ``I_CBr`` lido da CHAVE IDEAL, como no arquivo: a entrada do MODEL vem
+#: do par de chaves ``MEASURING`` que está em série com a chave tipo 13, e
+#: NÃO com o ramo R-L-C paralelo [FATO: arquivo, cartões
+#: ``X0001AXX0027 MEASURING`` / ``XX0027XX0022 MEASURING`` e
+#: ``13XX0022X0002A``].
+ATP_CURRENT_FROM_SWITCH: str = "switch"
+
+#: ``I_CBr`` lido do POLO INTEIRO (chave ideal + ramo R-L-C em paralelo).
+#: Não é o que o arquivo faz; existe para quantificar o efeito da escolha.
+ATP_CURRENT_FROM_POLE: str = "pole"
+
+#: Fontes de corrente aceitas.
+ATP_CURRENT_SOURCES: tuple[str, str] = (ATP_CURRENT_FROM_SWITCH, ATP_CURRENT_FROM_POLE)
+
+
+# -- elementos R, L e C de valor comutável ---------------------------------
+
+
+class SwitchedResistor(Resistor):
+    """Resistor cujo valor é comutado por um controlador durante a marcha.
+
+    É o equivalente do cartão tipo 91 com ``TACS CONTROL`` do arquivo
+    [FATO: arquivo, ``91XX0020X0001ATACS  XX0025``]: a resistência é uma
+    saída do MODEL, reavaliada a cada passo.
+
+    A mudança de valor é publicada em :meth:`topology_signature`, de modo
+    que o solver a trate como MUDANÇA DE TOPOLOGIA: refatora a matriz e
+    dispara o CDA de Lin e Martí, exatamente como faz na comutação de uma
+    chave. Sem isso a fatoração em cache ficaria obsoleta e o passo
+    seguinte seria resolvido com a matriz antiga.
+    """
+
+    def set_resistance(self, resistance_ohm: float) -> bool:
+        """Impõe ``R`` [Ω]; devolve ``True`` se o valor mudou."""
+        r = float(resistance_ohm)
+        if not math.isfinite(r) or r <= 0.0:
+            raise ValueError(f"resistance_ohm deve ser finito e > 0, obtido {resistance_ohm!r}")
+        if r == self.resistance_ohm:
+            return False
+        self.resistance_ohm = r
+        self._g = 1.0 / r
+        return True
+
+    def topology_signature(self) -> object:
+        return ("R", self.resistance_ohm)
+
+
+class SwitchedInductor(Inductor):
+    """Indutor cujo valor é comutado por um controlador durante a marcha.
+
+    Equivalente do cartão com ``TACS CONTROL`` no campo de indutância
+    [FATO: arquivo, ``TACS CONTROL                  XX0024``].
+
+    A corrente de histórico NÃO é reescalada na comutação: o fluxo
+    concatenado ``L·i`` salta quando ``L`` salta. É o que o ATP também
+    faz com um ramo controlado por TACS, e é a razão de o CDA ser
+    obrigatório aqui — ver ``emt_vcb_atp_lc_history_not_rescaled``.
+    """
+
+    def set_inductance(self, inductance_H: float) -> bool:
+        """Impõe ``L`` [H]; devolve ``True`` se o valor mudou."""
+        value = float(inductance_H)
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError(f"inductance_H deve ser finito e > 0, obtido {inductance_H!r}")
+        if value == self.inductance_H:
+            return False
+        self.inductance_H = value
+        if self._dt > 0.0:
+            self._g = self._dt / (2.0 * value)
+        return True
+
+    def topology_signature(self) -> object:
+        return ("L", self.inductance_H)
+
+
+class SwitchedCapacitor(Capacitor):
+    """Capacitor cujo valor é comutado por um controlador durante a marcha.
+
+    Admite ``C = 0`` — o valor de ``CCLOSED`` no arquivo [FATO: arquivo,
+    ``CCLOSEDr:= 0.0``] —, caso em que a condutância companheira e o
+    termo de histórico são nulos e o ramo série fica ABERTO, que é a
+    leitura física de uma capacitância nula. A validação de positividade
+    do :class:`~app.simulation.emt.components.Capacitor` é contornada na
+    construção justamente para admitir esse caso, e reposta em
+    :meth:`set_capacitance` na forma ``C >= 0``.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        node_p: str,
+        node_n: str,
+        capacitance_F: float,
+        *,
+        initial_voltage_V: float = 0.0,
+    ) -> None:
+        c0 = float(capacitance_F)
+        super().__init__(
+            name,
+            node_p,
+            node_n,
+            c0 if c0 > 0.0 else 1.0,
+            initial_voltage_V=initial_voltage_V,
+        )
+        self.set_capacitance(c0)
+
+    def set_capacitance(self, capacitance_F: float) -> bool:
+        """Impõe ``C`` [F], admitindo zero; devolve ``True`` se mudou."""
+        value = float(capacitance_F)
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError(f"capacitance_F deve ser finito e >= 0, obtido {capacitance_F!r}")
+        if value == self.capacitance_F:
+            return False
+        self.capacitance_F = value
+        if value == 0.0:
+            self._i = 0.0
+            self._v = 0.0
+        if self._dt > 0.0:
+            self._g = 2.0 * value / self._dt
+        return True
+
+    def topology_signature(self) -> object:
+        return ("C", self.capacitance_F)
+
+
+# -- bloco DATA do MODEL ----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AtpVcbParameters:
+    """Bloco ``DATA`` do MODEL ``VCB_R*``, com os valores do bloco ``USE``.
+
+    Os padrões são os do POLO R (fase A do arquivo). Use
+    :meth:`for_pole` para os polos S e T, cujos ``T_OPEN``, ``I_CHOP`` e
+    ``DIDT_CRIT`` diferem [FATO: arquivo, blocos USE].
+
+    Attributes
+    ----------
+    t_open_s:
+        ``T_OPENr`` [s] — instante de separação dos contatos.
+    rrds_a_kV_per_ms, rrds_b_kV_per_ms2:
+        ``RRDS_Ar`` e ``RRDS_Br`` da lei ``V_wth = A·t + B·t²`` (kV, ms).
+    i_chop_A:
+        ``I_CHOPr`` [A] — limiar de corte de corrente.
+    didt_crit_A_per_us:
+        ``DIDT_CRITr`` [A/µs] — di/dt crítico de alta frequência.
+    r_closed_ohm, r_arc_ohm, r_open_ohm:
+        ``RCLOSEDr``, ``RARCr`` e ``ROPENr`` [Ω].
+    l_closed_H, l_arc_H, l_open_H:
+        ``LCLOSEDr``, ``LARCr`` e ``LOPENr`` [H].
+    c_closed_F, c_arc_F, c_open_F:
+        ``CCLOSEDr``, ``CARCr`` e ``COPENr`` [F].
+    reignition_margin:
+        Fator do critério de reignição; 1,1 no arquivo.
+    zero_crossing_threshold_A:
+        Limiar que valida a passagem por zero; 0,01 A no arquivo.
+    extinction_current_A:
+        Limiar da segunda condição de extinção; 0,1 A no arquivo.
+    """
+
+    t_open_s: float = ATP_T_OPEN_S[0]
+    rrds_a_kV_per_ms: float = ATP_RRDS_A_KV_PER_MS
+    rrds_b_kV_per_ms2: float = ATP_RRDS_B_KV_PER_MS2
+    i_chop_A: float = ATP_I_CHOP_A[0]
+    didt_crit_A_per_us: float = ATP_DIDT_CRIT_A_PER_US[0]
+    r_closed_ohm: float = ATP_R_CLOSED_OHM
+    r_arc_ohm: float = ATP_R_ARC_OHM
+    r_open_ohm: float = ATP_R_OPEN_OHM
+    l_closed_H: float = ATP_L_CLOSED_H
+    l_arc_H: float = ATP_L_ARC_H
+    l_open_H: float = ATP_L_OPEN_H
+    c_closed_F: float = ATP_C_CLOSED_F
+    c_arc_F: float = ATP_C_ARC_F
+    c_open_F: float = ATP_C_OPEN_F
+    reignition_margin: float = ATP_REIGNITION_MARGIN
+    zero_crossing_threshold_A: float = ATP_ZERO_CROSSING_THRESHOLD_A
+    extinction_current_A: float = ATP_EXTINCTION_CURRENT_A
+
+    def __post_init__(self) -> None:
+        for campo in ("t_open_s", "zero_crossing_threshold_A"):
+            valor = float(getattr(self, campo))
+            if not math.isfinite(valor) or valor < 0.0:
+                raise ValueError(f"{campo} deve ser finito e >= 0, obtido {valor!r}")
+        for campo in (
+            "i_chop_A",
+            "didt_crit_A_per_us",
+            "r_closed_ohm",
+            "r_arc_ohm",
+            "r_open_ohm",
+            "l_closed_H",
+            "l_arc_H",
+            "l_open_H",
+            "reignition_margin",
+            "extinction_current_A",
+        ):
+            valor = float(getattr(self, campo))
+            if not math.isfinite(valor) or valor <= 0.0:
+                raise ValueError(f"{campo} deve ser finito e > 0, obtido {valor!r}")
+        for campo in ("c_closed_F", "c_arc_F", "c_open_F", "rrds_a_kV_per_ms", "rrds_b_kV_per_ms2"):
+            valor = float(getattr(self, campo))
+            if not math.isfinite(valor) or valor < 0.0:
+                raise ValueError(f"{campo} deve ser finito e >= 0, obtido {valor!r}")
+
+    @classmethod
+    def for_pole(cls, index: int, **overrides) -> AtpVcbParameters:
+        """Parâmetros do polo ``index`` (0 = R/A, 1 = S/B, 2 = T/C).
+
+        Reproduz os três blocos ``USE`` do arquivo: os polos diferem em
+        ``T_OPEN``, ``I_CHOP`` e ``DIDT_CRIT``; todo o resto é comum
+        [FATO: arquivo, linhas 526-604].
+        """
+        k = int(index)
+        if not 0 <= k < len(ATP_T_OPEN_S):
+            raise ValueError(f"index deve estar em 0..{len(ATP_T_OPEN_S) - 1}, obtido {index!r}")
+        base = {
+            "t_open_s": ATP_T_OPEN_S[k],
+            "i_chop_A": ATP_I_CHOP_A[k],
+            "didt_crit_A_per_us": ATP_DIDT_CRIT_A_PER_US[k],
+        }
+        base.update(overrides)
+        return cls(**base)
+
+
+@dataclass
+class AtpPoleResult:
+    """Registro de auditoria do polo em modo literal.
+
+    Nada aqui realimenta a máquina de estados: são OBSERVÁVEIS, incluídos
+    porque o MODEL do arquivo não publica contadores e o laudo precisa
+    deles.
+    """
+
+    name: str = ""
+    #: ``True`` — a extinção de alta frequência do arquivo usa
+    #: ``ABS(DI_DT) > crítico``, convenção INVERTIDA em relação à física
+    #: usual (extinguir quando o di/dt no zero é PEQUENO). É saída
+    #: declarada do modo literal, exigida para que a leitura do resultado
+    #: não confunda as duas convenções.
+    didt_convention_inverted: bool = True
+    didt_convention: str = DIDT_INTERRUPT_ABOVE
+    chopping_time_s: float | None = None
+    chopping_current_at_chop_A: float = 0.0
+    reignition_count: int = 0
+    reignition_times_s: list[float] = field(default_factory=list)
+    reignition_voltages_V: list[float] = field(default_factory=list)
+    reignition_withstand_V: list[float] = field(default_factory=list)
+    extinction_times_s: list[float] = field(default_factory=list)
+    hf_extinction_count: int = 0
+    zero_crossing_times_s: list[float] = field(default_factory=list)
+    state_changes: list[tuple[float, int]] = field(default_factory=list)
+    final_state: int = ATP_CB_CLOSED
+    peak_gap_voltage_V: float = 0.0
+
+
+class AtpModelCompatibility:
+    """Máquina de quatro estados do MODEL ``VCB_R*``, reproduzida ao pé da letra.
+
+    Modo de compatibilidade **opcional**, selecionado por parâmetro. Não
+    substitui :class:`VacuumCircuitBreakerModel` — reproduz o ARQUIVO,
+    com os seis pontos em que a lógica escrita se afasta da idealização
+    física, cada um deles verificável em
+    ``tests/test_emt_vcb_snubber.py``:
+
+    1. **Quatro estados** com os códigos do arquivo (0 fechado, 1 arco,
+       2 aberto, 3 arco de alta frequência) e as MESMAS atribuições de
+       ``R``, ``L`` e ``C`` em cada transição. Os quatro blocos ``IF`` do
+       ``EXEC`` são sequenciais e não excludentes: uma transição pode
+       CASCATEAR dentro do mesmo passo (0→1→2→3), e isso é reproduzido.
+    2. **Margem de 10 %** no critério de reignição:
+       ``ABS(V_CB) > V_WITH*1.1 AND V_WITH > 0``. O fator NÃO é uma
+       tolerância numérica — ele desloca a reignição para 10 % acima da
+       suportabilidade publicada.
+    3. **Convenção invertida** de extinção de alta frequência:
+       ``ABS(DI_DT) > DIDT_CRIT*1E6``, isto é, o arco se extingue quando
+       a taxa é GRANDE. A física usual é a oposta. O modo publica
+       :attr:`didt_convention_inverted` = ``True`` como saída explícita.
+    4. **Reinício do temporizador a cada passagem por zero da corrente**,
+       e não na extinção do arco: ``T_ZERO := TNOW`` sempre que
+       ``I_PREV*I_CB <= 0`` com ``ABS(I_PREV) > 0,01``. A suportabilidade
+       ``V_WITH`` é, portanto, medida desde o último zero de corrente.
+    5. **Segunda condição de extinção**, ``ABS(I_CB) < 0,1 AND
+       T_ZERO >= 0``, presente tanto no estado 1 quanto no estado 3, que
+       zera ``CHOPPED`` e rearma o corte.
+    6. **Ramo série R-L-C comutado em paralelo com a chave ideal** — não
+       uma chave ideal isolada. É a topologia do arquivo: a chave tipo 13
+       controlada por ``SW_STATE`` e, em paralelo, ``C``, ``L`` e ``R``
+       controlados por ``C_VAL``, ``L_VAL`` e ``R_VAL``.
+
+    O defeito de ordem em ``I_PREV``
+    ---------------------------------
+    No arquivo, ``I_PREV := I_CBr`` está DENTRO do bloco
+    ``IF TNOW > TIME_PREVr``, que precede o teste de passagem por zero.
+    Como esse ``IF`` é verdadeiro em todo passo, quando o teste
+    ``IF I_PREV * I_CBr <= 0.0`` é avaliado ``I_PREV`` JÁ VALE ``I_CBr``:
+    o produto é ``I_CB²``, não negativo por construção, e o único caso em
+    que ele é nulo (``I_CB = 0`` exato) reprova a guarda seguinte
+    ``ABS(I_PREV) > 0.01``. Consequência: ``T_ZERO`` permanece em −1,0
+    durante toda a simulação, ``V_WITH`` permanece nulo, a reignição
+    nunca é declarada e a segunda condição de extinção nunca é atendida.
+
+    Isso NÃO é interpretação: é o que o arquivo executa, e está coberto
+    por teste. O parâmetro ``zero_crossing_order`` permite escolher entre
+    :data:`ATP_ZERO_ORDER_LITERAL` (padrão — o arquivo, com o defeito) e
+    :data:`ATP_ZERO_ORDER_DEFERRED` (``I_PREV`` atualizado ao FIM do
+    passo, que é a leitura em que os itens 4 e 5 têm efeito).
+
+    Parameters
+    ----------
+    switch:
+        Chave ideal do polo, comandada por ``SW_STATE``. Deve começar
+        FECHADA.
+    resistor, inductor, capacitor:
+        Elementos do ramo série comutado, em paralelo com a chave.
+    parameters:
+        Bloco ``DATA``; padrão :class:`AtpVcbParameters` do polo R.
+    zero_crossing_order:
+        :data:`ATP_ZERO_ORDER_LITERAL` (padrão) ou
+        :data:`ATP_ZERO_ORDER_DEFERRED`.
+    current_source:
+        :data:`ATP_CURRENT_FROM_SWITCH` (padrão, o que o arquivo lê) ou
+        :data:`ATP_CURRENT_FROM_POLE`.
+    timestep_s:
+        Passo usado quando o controlador é acionado por :meth:`step`
+        fora de um solver. Padrão :data:`DOC_A_TIME_STEP_S`.
+    name:
+        Rótulo do polo.
+
+    Raises
+    ------
+    ValueError
+        Tipos errados de componente, seletores inválidos ou ramo série
+        mal formado.
+    """
+
+    def __init__(
+        self,
+        switch: Switch,
+        resistor: SwitchedResistor,
+        inductor: SwitchedInductor,
+        capacitor: SwitchedCapacitor,
+        *,
+        parameters: AtpVcbParameters | None = None,
+        zero_crossing_order: str = ATP_ZERO_ORDER_LITERAL,
+        current_source: str = ATP_CURRENT_FROM_SWITCH,
+        timestep_s: float = DOC_A_TIME_STEP_S,
+        name: str = "",
+    ) -> None:
+        if not isinstance(switch, Switch):
+            raise ValueError(
+                f"AtpModelCompatibility comanda um Switch do kernel, obtido "
+                f"{type(switch).__name__}"
+            )
+        if not isinstance(resistor, SwitchedResistor):
+            raise ValueError(
+                f"o ramo de arco exige um SwitchedResistor, obtido {type(resistor).__name__}"
+            )
+        if not isinstance(inductor, SwitchedInductor):
+            raise ValueError(
+                f"o ramo de arco exige um SwitchedInductor, obtido {type(inductor).__name__}"
+            )
+        if not isinstance(capacitor, SwitchedCapacitor):
+            raise ValueError(
+                f"o ramo de arco exige um SwitchedCapacitor, obtido {type(capacitor).__name__}"
+            )
+        if str(zero_crossing_order) not in ATP_ZERO_ORDERS:
+            raise ValueError(
+                f"zero_crossing_order deve ser um de {ATP_ZERO_ORDERS}, "
+                f"obtido {zero_crossing_order!r}"
+            )
+        if str(current_source) not in ATP_CURRENT_SOURCES:
+            raise ValueError(
+                f"current_source deve ser um de {ATP_CURRENT_SOURCES}, "
+                f"obtido {current_source!r}"
+            )
+        dt = float(timestep_s)
+        if not math.isfinite(dt) or dt <= 0.0:
+            raise ValueError(f"timestep_s deve ser finito e > 0, obtido {timestep_s!r}")
+        if not (set(capacitor.nodes) & set(inductor.nodes)) or not (
+            set(inductor.nodes) & set(resistor.nodes)
+        ):
+            raise ValueError(
+                f"C {capacitor.nodes}, L {inductor.nodes} e R {resistor.nodes} não "
+                f"formam um ramo série contíguo"
+            )
+        if not switch.closed:
+            log.warning(
+                "polo literal %r criado com a chave ABERTA: o MODEL do arquivo "
+                "parte de SW_STATE = 1.0 (fechada)",
+                name or switch.name,
+            )
+
+        self.switch = switch
+        self.resistor = resistor
+        self.inductor = inductor
+        self.capacitor = capacitor
+        self.parameters = parameters if parameters is not None else AtpVcbParameters()
+        self.zero_crossing_order = str(zero_crossing_order)
+        self.current_source = str(current_source)
+        self.timestep_s = dt
+        self.name = str(name) if name else str(switch.name)
+
+        # Bloco VAR do MODEL, com os mesmos nomes em minúsculas.
+        self.tnow: float = 0.0
+        self.sw_state: float = 1.0
+        self.r_val: float = self.parameters.r_closed_ohm
+        self.l_val: float = self.parameters.l_closed_H
+        self.c_val: float = self.parameters.c_closed_F
+        self.v_cb: float = 0.0
+        self.v_with: float = 0.0
+        self.t_azero: float = 0.0
+        self.t_zero: float = -1.0
+        self.i_prev: float = 0.0
+        self.cb_state: int = ATP_CB_CLOSED
+        self.di_dt: float = 0.0
+        self.chopped: int = 0
+        self.time_prev: float = 0.0
+        self.t_ms: float = 0.0
+        self.t_squared: float = 0.0
+        self.vwithstandkv: float = 0.0
+
+        self._t_solver_prev: float = -1.0
+        self._result = AtpPoleResult(name=self.name)
+        self.reset()
+
+    # -- ciclo de vida ------------------------------------------------------
+
+    def reset(self) -> None:
+        """Reproduz o bloco ``INIT`` do MODEL e repõe os componentes."""
+        p = self.parameters
+        self.tnow = 0.0
+        self.sw_state = 1.0
+        self.r_val = p.r_closed_ohm
+        self.l_val = p.l_closed_H
+        self.c_val = p.c_closed_F
+        self.v_cb = 0.0
+        self.v_with = 0.0
+        self.t_azero = 0.0
+        self.t_zero = -1.0
+        self.i_prev = 0.0
+        self.cb_state = ATP_CB_CLOSED
+        self.di_dt = 0.0
+        self.chopped = 0
+        self.time_prev = 0.0
+        self.t_ms = 0.0
+        self.t_squared = 0.0
+        self.vwithstandkv = 0.0
+        self._t_solver_prev = -1.0
+        self._result = AtpPoleResult(name=self.name)
+        self.switch.set_state(True)
+        self.apply()
+
+    # -- leitura ------------------------------------------------------------
+
+    @property
+    def state(self) -> int:
+        """``CB_STATE`` corrente, com o código inteiro do arquivo."""
+        return self.cb_state
+
+    @property
+    def state_name(self) -> str:
+        """Nome legível do estado corrente."""
+        return ATP_CB_STATE_NAMES[self.cb_state]
+
+    @property
+    def didt_convention(self) -> str:
+        """Sempre :data:`DIDT_INTERRUPT_ABOVE` — o critério do arquivo."""
+        return DIDT_INTERRUPT_ABOVE
+
+    @property
+    def didt_convention_inverted(self) -> bool:
+        """``True``: o arquivo extingue com ``|di/dt| > crítico``.
+
+        Saída ADICIONAL do modo literal, exigida para que quem lê o
+        resultado saiba que a convenção é a inversa da física usual —
+        a mesma ambiguidade registrada em
+        ``emt_vcb_didt_convention_ambiguous``.
+        """
+        return True
+
+    @property
+    def result(self) -> AtpPoleResult:
+        """Registro de auditoria do polo."""
+        self._result.final_state = self.cb_state
+        return self._result
+
+    @property
+    def outputs(self) -> dict[str, float | bool]:
+        """Bloco ``OUTPUT`` do MODEL, mais a saída de convenção invertida.
+
+        As cinco primeiras chaves são exatamente as saídas declaradas no
+        arquivo (``SW_STATEr``, ``R_VALr``, ``L_VALr``, ``C_VALr`` e
+        ``CB_STATEr``); ``DIDT_INVERTED`` é o acréscimo do item 3.
+        """
+        return {
+            "SW_STATE": self.sw_state,
+            "R_VAL": self.r_val,
+            "L_VAL": self.l_val,
+            "C_VAL": self.c_val,
+            "CB_STATE": float(self.cb_state),
+            "DIDT_INVERTED": True,
+        }
+
+    def withstand_V(self) -> float:
+        """``V_WITHr`` do último passo [V]."""
+        return self.v_with
+
+    # -- atribuições de R, L e C por estado ---------------------------------
+
+    def _assign_closed(self) -> None:
+        p = self.parameters
+        self.r_val, self.l_val, self.c_val = p.r_closed_ohm, p.l_closed_H, p.c_closed_F
+
+    def _assign_arc(self) -> None:
+        p = self.parameters
+        self.r_val, self.l_val, self.c_val = p.r_arc_ohm, p.l_arc_H, p.c_arc_F
+
+    def _assign_open(self) -> None:
+        p = self.parameters
+        self.r_val, self.l_val, self.c_val = p.r_open_ohm, p.l_open_H, p.c_open_F
+
+    # -- EXEC ---------------------------------------------------------------
+
+    def step(self, *, v_cb: float, i_cb: float, tnow: float) -> None:
+        """Um ``EXEC`` do MODEL, na ordem em que está escrito no arquivo.
+
+        Parameters
+        ----------
+        v_cb:
+            ``V_POSr − V_NEGr`` [V] no passo.
+        i_cb:
+            ``I_CBr`` [A] no passo.
+        tnow:
+            ``TNOW`` [s] — o relógio interno do MODEL, que vale
+            ``k·timestep`` no k-ésimo ``EXEC``.
+        """
+        p = self.parameters
+        i = float(i_cb)
+        self.tnow = float(tnow)
+        self.v_cb = float(v_cb)
+        self._result.peak_gap_voltage_V = max(
+            self._result.peak_gap_voltage_V, abs(self.v_cb)
+        )
+
+        # IF TNOW > TIME_PREVr THEN ... ENDIF
+        if self.tnow > self.time_prev:
+            self.di_dt = (i - self.i_prev) / (self.tnow - self.time_prev)
+            self.time_prev = self.tnow
+            if self.zero_crossing_order == ATP_ZERO_ORDER_LITERAL:
+                # Ordem do ARQUIVO: I_PREV é sobrescrito ANTES do teste
+                # de passagem por zero que vem a seguir.
+                self.i_prev = i
+
+        # IF I_PREV * I_CBr <= 0.0 THEN IF ABS(I_PREV) > 0.01 THEN ...
+        if self.i_prev * i <= 0.0:
+            if abs(self.i_prev) > p.zero_crossing_threshold_A:
+                self.t_zero = self.tnow
+                self.t_azero = 0.0
+                self._result.zero_crossing_times_s.append(self.tnow)
+
+        if self.zero_crossing_order == ATP_ZERO_ORDER_DEFERRED:
+            self.i_prev = i
+
+        # IF T_ZEROr >= 0.0 THEN T_AZEROr := TNOW - T_ZEROr ENDIF
+        if self.t_zero >= 0.0:
+            self.t_azero = self.tnow - self.t_zero
+
+        self.t_ms = self.t_azero * 1000.0
+        self.t_squared = self.t_ms * self.t_ms
+        self.vwithstandkv = p.rrds_a_kV_per_ms * self.t_ms + p.rrds_b_kV_per_ms2 * self.t_squared
+
+        if self.tnow > p.t_open_s and self.cb_state > 0:
+            self.v_with = self.vwithstandkv * 1000.0
+        else:
+            self.v_with = 0.0
+
+        # Os quatro blocos são SEQUENCIAIS no arquivo (IF, não ELSIF): uma
+        # transição pode cascatear dentro do mesmo EXEC.
+        if self.cb_state == ATP_CB_CLOSED:
+            if self.tnow >= p.t_open_s:
+                self._enter(ATP_CB_ARCING)
+                self.sw_state = 0.0
+                self._assign_arc()
+            else:
+                self._assign_closed()
+
+        if self.cb_state == ATP_CB_ARCING:
+            if abs(i) <= p.i_chop_A and self.chopped == 0:
+                self.chopped = 1
+                self._enter(ATP_CB_OPEN)
+                self._assign_open()
+                if self._result.chopping_time_s is None:
+                    self._result.chopping_time_s = self.tnow
+                    self._result.chopping_current_at_chop_A = i
+                self._result.extinction_times_s.append(self.tnow)
+            if abs(i) < p.extinction_current_A and self.t_zero >= 0.0:
+                self._enter(ATP_CB_OPEN)
+                self._assign_open()
+                self.chopped = 0
+                self._result.extinction_times_s.append(self.tnow)
+
+        if self.cb_state == ATP_CB_OPEN:
+            if abs(self.v_cb) > self.v_with * p.reignition_margin and self.v_with > 0.0:
+                self._enter(ATP_CB_ARCING_HF)
+                self._assign_arc()
+                self._result.reignition_count += 1
+                self._result.reignition_times_s.append(self.tnow)
+                self._result.reignition_voltages_V.append(self.v_cb)
+                self._result.reignition_withstand_V.append(self.v_with)
+
+        if self.cb_state == ATP_CB_ARCING_HF:
+            if (
+                abs(self.di_dt) > p.didt_crit_A_per_us * 1.0e6
+                and abs(i) < p.extinction_current_A
+            ):
+                self._enter(ATP_CB_OPEN)
+                self._assign_open()
+                self.chopped = 0
+                self._result.hf_extinction_count += 1
+                self._result.extinction_times_s.append(self.tnow)
+            if abs(i) < p.extinction_current_A and self.t_zero >= 0.0:
+                self._enter(ATP_CB_OPEN)
+                self._assign_open()
+                self.chopped = 0
+                self._result.extinction_times_s.append(self.tnow)
+
+    def _enter(self, state: int) -> None:
+        """Registra a mudança de ``CB_STATE`` e a efetiva."""
+        if state != self.cb_state:
+            self._result.state_changes.append((self.tnow, int(state)))
+        self.cb_state = int(state)
+
+    # -- acoplamento com o kernel -------------------------------------------
+
+    def apply(self) -> None:
+        """Escreve ``SW_STATE``, ``R_VAL``, ``L_VAL`` e ``C_VAL`` nos ramos."""
+        self.switch.set_state(self.sw_state > 0.5)
+        self.resistor.set_resistance(self.r_val)
+        self.inductor.set_inductance(self.l_val)
+        self.capacitor.set_capacitance(self.c_val)
+
+    def measured_current_A(self) -> float:
+        """``I_CBr`` conforme :attr:`current_source` [A]."""
+        i_switch = float(self.switch.branch_current(0))
+        if self.current_source == ATP_CURRENT_FROM_SWITCH:
+            return i_switch
+        return i_switch + float(self.resistor.branch_current(0))
+
+    def __call__(self, t: float, solver) -> None:
+        """Controlador do kernel: um ``EXEC`` por passo, no relógio do MODEL."""
+        t_f = float(t)
+        if self._t_solver_prev >= 0.0 and t_f < self._t_solver_prev:
+            self.reset()
+        dt = float(getattr(solver, "dt", 0.0)) or self.timestep_s
+        # O k-ésimo EXEC do MODEL ocorre em TNOW = k·timestep, enquanto o
+        # controlador do kernel é chamado com o instante JÁ resolvido,
+        # (k−1)·Δt. O deslocamento de um passo é o que faz o instante de
+        # separação cair no MESMO passo dos dois programas.
+        self.step(
+            v_cb=float(self.switch.branch_voltage(0)),
+            i_cb=self.measured_current_A(),
+            tnow=t_f + dt,
+        )
+        self.apply()
+        self._t_solver_prev = t_f
+
+
+# -- montagem do polo -------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AtpLiteralPole:
+    """Polo em modo literal: chave ideal + ramo série R-L-C + controlador."""
+
+    switch: Switch
+    resistor: SwitchedResistor
+    inductor: SwitchedInductor
+    capacitor: SwitchedCapacitor
+    controller: AtpModelCompatibility
+
+    @property
+    def components(self) -> tuple:
+        """Componentes a inserir no circuito, na ordem de montagem."""
+        return (self.switch, self.capacitor, self.inductor, self.resistor)
+
+    @property
+    def name(self) -> str:
+        """Rótulo do polo."""
+        return self.controller.name
+
+
+@dataclass(frozen=True)
+class VcbPole:
+    """Polo no modo PADRÃO: chave ideal comandada por :class:`VacuumCircuitBreakerModel`."""
+
+    switch: Switch
+    controller: VacuumCircuitBreakerModel
+
+    @property
+    def components(self) -> tuple:
+        """Componentes a inserir no circuito."""
+        return (self.switch,)
+
+    @property
+    def name(self) -> str:
+        """Rótulo do polo."""
+        return self.controller.name
+
+
+def build_atp_literal_pole(
+    name: str,
+    node_p: str,
+    node_n: str,
+    *,
+    parameters: AtpVcbParameters | None = None,
+    node_mid_c: str | None = None,
+    node_mid_l: str | None = None,
+    switch: Switch | None = None,
+    **kwargs,
+) -> AtpLiteralPole:
+    """Monta o polo do arquivo: chave ideal ‖ (C série L série R).
+
+    A ordem dos elementos é a dos cartões de ramo do arquivo — do nó de
+    fonte para o nó de carga, ``C``, depois ``L``, depois ``R``
+    [FATO: arquivo, ``X0002AXX0021`` (C), ``XX0021XX0020`` (L),
+    ``91XX0020X0001A`` (R)]. A ordem não altera a resposta do ramo série,
+    mas mantém os nós internos rastreáveis contra o arquivo.
+
+    Parameters
+    ----------
+    name:
+        Prefixo dos componentes: gera ``<name>``, ``<name>_c``,
+        ``<name>_l`` e ``<name>_r``.
+    node_p, node_n:
+        Nós do polo (lado da fonte e lado da carga).
+    parameters:
+        Bloco ``DATA``; padrão o do polo R.
+    node_mid_c, node_mid_l:
+        Nós internos do ramo série; padrão ``<name>_mc`` e ``<name>_ml``.
+    switch:
+        Chave já existente a reaproveitar; padrão cria uma fechada.
+    **kwargs:
+        Repassados a :class:`AtpModelCompatibility`.
+
+    Returns
+    -------
+    AtpLiteralPole
+        Componentes e controlador prontos para ``Circuit.extend`` e
+        ``Solver.run(controllers=...)``.
+    """
+    label = str(name)
+    if not label:
+        raise ValueError("build_atp_literal_pole exige um nome não vazio")
+    par = parameters if parameters is not None else AtpVcbParameters()
+    mid_c = str(node_mid_c) if node_mid_c else f"{label}_mc"
+    mid_l = str(node_mid_l) if node_mid_l else f"{label}_ml"
+    sw = switch if switch is not None else Switch(label, str(node_p), str(node_n), closed=True)
+    cap = SwitchedCapacitor(f"{label}_c", str(node_p), mid_c, par.c_closed_F)
+    ind = SwitchedInductor(f"{label}_l", mid_c, mid_l, par.l_closed_H)
+    res = SwitchedResistor(f"{label}_r", mid_l, str(node_n), par.r_closed_ohm)
+    ctrl = AtpModelCompatibility(sw, res, ind, cap, parameters=par, name=label, **kwargs)
+    return AtpLiteralPole(switch=sw, resistor=res, inductor=ind, capacitor=cap, controller=ctrl)
+
+
+def build_vcb_pole(
+    name: str,
+    node_p: str,
+    node_n: str,
+    *,
+    atp_model_compatibility: bool = False,
+    parameters: AtpVcbParameters | None = None,
+    **kwargs,
+):
+    """Monta um polo de disjuntor no modo PADRÃO ou no modo LITERAL.
+
+    É o ponto de entrada em que o modo de compatibilidade é
+    **selecionado por parâmetro**:
+
+    * ``atp_model_compatibility=False`` (padrão) devolve um
+      :class:`VcbPole` — uma chave ideal comandada por
+      :class:`VacuumCircuitBreakerModel`, com o comportamento de sempre;
+    * ``atp_model_compatibility=True`` devolve um :class:`AtpLiteralPole`
+      — a máquina de quatro estados do arquivo e o ramo série R-L-C
+      comutado em paralelo com a chave.
+
+    Os dois expõem ``switch``, ``controller``, ``components`` e ``name``,
+    de modo que o chamador monta o circuito da mesma forma nos dois modos.
+
+    Parameters
+    ----------
+    name, node_p, node_n:
+        Rótulo e nós do polo.
+    atp_model_compatibility:
+        Seletor do modo. Padrão ``False``.
+    parameters:
+        Bloco ``DATA`` do modo literal; ignorado no modo padrão.
+    **kwargs:
+        Repassados ao controlador do modo escolhido.
+    """
+    if atp_model_compatibility:
+        return build_atp_literal_pole(
+            name, node_p, node_n, parameters=parameters, **kwargs
+        )
+    if parameters is not None:
+        raise ValueError(
+            "parameters só se aplica ao modo literal; use "
+            "atp_model_compatibility=True ou remova o argumento"
+        )
+    sw = Switch(str(name), str(node_p), str(node_n), closed=True)
+    kwargs.setdefault("name", str(name))
+    return VcbPole(switch=sw, controller=VacuumCircuitBreakerModel(sw, **kwargs))
+
+
+def three_phase_atp_literal_poles(
+    prefix: str,
+    nodes_p: Sequence[str],
+    nodes_n: Sequence[str],
+    **kwargs,
+) -> tuple[AtpLiteralPole, ...]:
+    """Três polos literais com os dados ``USE`` de cada fase do arquivo.
+
+    Parameters
+    ----------
+    prefix:
+        Prefixo comum; gera ``<prefix>_a``, ``<prefix>_b``, ``<prefix>_c``.
+    nodes_p, nodes_n:
+        Nós de fonte e de carga por fase, na ordem A, B, C.
+    **kwargs:
+        Repassados a :func:`build_atp_literal_pole`.
+    """
+    ps = tuple(str(n) for n in nodes_p)
+    ns = tuple(str(n) for n in nodes_n)
+    if len(ps) != len(ns) or not ps:
+        raise ValueError(
+            f"nodes_p ({len(ps)}) e nodes_n ({len(ns)}) devem ter o mesmo "
+            f"comprimento, não nulo"
+        )
+    rotulos = ("a", "b", "c") if len(ps) == 3 else tuple(str(k) for k in range(len(ps)))
+    return tuple(
+        build_atp_literal_pole(
+            f"{prefix}_{lbl}",
+            p,
+            n,
+            parameters=AtpVcbParameters.for_pole(k),
+            **kwargs,
+        )
+        for k, (lbl, p, n) in enumerate(zip(rotulos, ps, ns))
+    )
+
+
+
+# ---------------------------------------------------------------------------
 # Limitações declaradas do módulo — padrão do projeto
 # (cf. app/postprocessor/audit_trail.py:338 e
 # app/postprocessor/prognosis/__init__.py:168). Prefixo ``emt_`` para não
@@ -1070,6 +2031,65 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "declare o passo usado e verifique a convergência antes de usar n_r "
         "no vetor de estresse."
     ),
+    "emt_vcb_atp_iprev_overwritten_before_zero_test": (
+        "MODO LITERAL. No MODEL VCB_R* do arquivo, a atribuição I_PREV := I_CBr "
+        "está DENTRO do bloco IF TNOW > TIME_PREVr, que precede o teste de "
+        "passagem por zero IF I_PREV * I_CBr <= 0.0. Como esse IF é verdadeiro "
+        "em todo passo, o teste compara a corrente com ela mesma: o produto é "
+        "I_CB², nunca negativo, e o único caso em que se anula (I_CB = 0 exato) "
+        "reprova a guarda ABS(I_PREV) > 0,01 que vem logo abaixo. Consequência "
+        "executada pelo arquivo: T_ZERO permanece em −1,0, T_AZERO em zero, "
+        "V_WITH em zero, e portanto NÃO HÁ REIGNIÇÃO nem segunda condição de "
+        "extinção durante toda a simulação. O modo literal reproduz isso por "
+        "padrão (ATP_ZERO_ORDER_LITERAL) e oferece a ordem adiada "
+        "(ATP_ZERO_ORDER_DEFERRED) como leitura da INTENÇÃO do autor. Toda "
+        "reignição relatada a partir deste caso depende de qual das duas "
+        "ordens foi usada, e isso precisa constar do laudo."
+    ),
+    "emt_vcb_atp_current_read_from_ideal_switch_only": (
+        "MODO LITERAL. A entrada I_CBr do MODEL vem do par de chaves MEASURING "
+        "que está em série com a CHAVE IDEAL tipo 13, e não com o ramo R-L-C "
+        "paralelo. Como SW_STATE é posto em 0,0 na transição fechado→arco e "
+        "NUNCA volta a 1,0, a corrente medida cai a zero um passo depois da "
+        "separação de contatos: o critério de corte ABS(I_CB) <= I_CHOP é "
+        "atendido de imediato, e o corte que o modelo declara não é o colapso "
+        "do arco a vácuo, é a abertura da própria chave ideal. A corrente "
+        "física do polo continua pelo ramo R-L-C — em particular pelos 6 µF do "
+        "estado aberto. O seletor current_source='pole' quantifica a diferença."
+    ),
+    "emt_vcb_atp_lc_unit_convention": (
+        "MODO LITERAL. Os campos de indutância e capacitância do arquivo "
+        "(LARC = 5.E-5, LOPEN = 6.E-7, CARC = 2.E-5, COPEN = 6.) NÃO admitem "
+        "uma única convenção de unidade consistente: com o cartão de dados "
+        "diversos sem XOPT/COPT, a leitura padrão do ATP é mH e µF, que dá "
+        "COPEN = 6 µF (compatível com a especificação do caso) mas CARC = 20 pF "
+        "(a especificação registra 20 nF). Os valores adotados como padrão "
+        "deste módulo são os da especificação — 50 µH, 0,6 µH, 20 nF e 6 µF — e "
+        "estão inteiramente parametrizados em AtpVcbParameters. No estado ABERTO "
+        "a sensibilidade é baixa, porque o 1 MΩ em série domina os três "
+        "elementos (a 6 µF vale 26,5 Ω em 1 kHz e a 0,6 µH vale 3,8 mΩ) "
+        "[CÁLCULO PRÓPRIO]; no estado de ARCO, ao contrário, o 20 Ω é da "
+        "mesma ordem das reatâncias e a leitura escolhida muda a frequência "
+        "natural da malha de reignição por ordens de grandeza."
+    ),
+    "emt_vcb_atp_lc_history_not_rescaled": (
+        "MODO LITERAL. Na comutação dos valores de R, L e C do ramo série, o "
+        "histórico trapezoidal do indutor e do capacitor NÃO é reescalado: o "
+        "fluxo concatenado L·i e a carga C·v saltam junto com o parâmetro. É o "
+        "mesmo que um ramo controlado por TACS faz no ATP, e é a razão de a "
+        "mudança de valor ser publicada como mudança de TOPOLOGIA neste kernel "
+        "— para que o CDA de Lin e Martí seja disparado e a oscilação numérica "
+        "de período 2·Δt seja removida. Ainda assim o salto é uma "
+        "descontinuidade energética não física do modelo de origem."
+    ),
+    "emt_vcb_atp_state_codes_differ": (
+        "MODO LITERAL. Os códigos de estado do arquivo (0 fechado, 1 arco, "
+        "2 aberto, 3 arco de alta frequência) NÃO coincidem com a ordem de "
+        "VCB_STATES deste módulo, em que o arco de alta frequência precede o "
+        "aberto. Qualquer confronto entre as duas máquinas — inclusive o "
+        "limiar STA > 1.9 do controlador do ramo amortecedor, que arma nos "
+        "estados 2 e 3 — deve ser feito pelo código do arquivo, não pelo nome."
+    ),
     "emt_vcb_single_gap_per_pole": (
         "Cada polo é UM gap. Câmaras em série, capacitâncias de equalização e "
         "a distribuição de tensão entre gaps não são representadas, o que "
@@ -1108,6 +2128,47 @@ __all__ = [
     "VCBPoleResult",
     "VacuumCircuitBreakerModel",
     "vcb_from_mod_parameters",
+    # modo de compatibilidade literal com o MODEL do arquivo ATP
+    "ATP_T_OPEN_S",
+    "ATP_I_CHOP_A",
+    "ATP_DIDT_CRIT_A_PER_US",
+    "ATP_RRDS_A_KV_PER_MS",
+    "ATP_RRDS_B_KV_PER_MS2",
+    "ATP_REIGNITION_MARGIN",
+    "ATP_ZERO_CROSSING_THRESHOLD_A",
+    "ATP_EXTINCTION_CURRENT_A",
+    "ATP_R_CLOSED_OHM",
+    "ATP_R_ARC_OHM",
+    "ATP_R_OPEN_OHM",
+    "ATP_L_CLOSED_H",
+    "ATP_L_ARC_H",
+    "ATP_L_OPEN_H",
+    "ATP_C_CLOSED_F",
+    "ATP_C_ARC_F",
+    "ATP_C_OPEN_F",
+    "ATP_CB_CLOSED",
+    "ATP_CB_ARCING",
+    "ATP_CB_OPEN",
+    "ATP_CB_ARCING_HF",
+    "ATP_CB_STATES",
+    "ATP_CB_STATE_NAMES",
+    "ATP_ZERO_ORDER_LITERAL",
+    "ATP_ZERO_ORDER_DEFERRED",
+    "ATP_ZERO_ORDERS",
+    "ATP_CURRENT_FROM_SWITCH",
+    "ATP_CURRENT_FROM_POLE",
+    "ATP_CURRENT_SOURCES",
+    "SwitchedResistor",
+    "SwitchedInductor",
+    "SwitchedCapacitor",
+    "AtpVcbParameters",
+    "AtpPoleResult",
+    "AtpModelCompatibility",
+    "AtpLiteralPole",
+    "VcbPole",
+    "build_atp_literal_pole",
+    "build_vcb_pole",
+    "three_phase_atp_literal_poles",
     "stagger_times",
     "three_phase_vcb",
     # auditoria

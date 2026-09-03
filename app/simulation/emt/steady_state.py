@@ -619,6 +619,15 @@ def _branch_phasors(
     out: dict[str, tuple[tuple[complex, complex], ...]] = {}
     for comp in circuit.components:
         idx = comp._idx  # noqa: SLF001
+        hook = getattr(comp, "phasor_branches", None)
+        if callable(hook):
+            # Gancho simétrico ao de ``stamp_phasor``: o ramo que sabe se
+            # estampar no sistema complexo também sabe ler os próprios
+            # pares (V̂, Î) a partir da solução nodal. Deve devolver uma
+            # sequência com ``n_branches()`` pares, na mesma ordem de
+            # ``branch_voltage``/``branch_current``.
+            out[comp.name] = tuple(hook(x, omega))
+            continue
         if isinstance(comp, Resistor):
             v = _node_phasor_by_index(x, idx[0]) - _node_phasor_by_index(x, idx[1])
             out[comp.name] = ((v, v / comp.resistance_ohm),)
@@ -700,6 +709,14 @@ def seed_from_phasor(
         pairs = solution.branch_phasors.get(comp.name)
         if pairs is None:  # pragma: no cover - defensivo
             raise SteadyStateError(f"ramo {comp.name!r} ausente da solução fasorial")
+        hook = getattr(comp, "seed_phasor", None)
+        if callable(hook):
+            # Gancho de semeadura para ramos com histórico próprio que não
+            # são dos tipos do kernel — o ramo recebe os pares (V̂, Î) da
+            # solução, ``ω`` e ``Δt``, e devolve os valores instantâneos
+            # semeados em t = 0 para o relatório de auditoria.
+            report[comp.name] = tuple(hook(pairs, omega, dt_f))
+            continue
         if isinstance(comp, Inductor):
             v0 = instantaneous(pairs[0][0], omega, 0.0)
             i0 = instantaneous(pairs[0][1], omega, 0.0)
