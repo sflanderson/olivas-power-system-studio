@@ -401,3 +401,90 @@ def test_limitacoes_declaradas_e_sem_colisao():
     # A fachada agrega as chaves novas sem colisão.
     for chave in KNOWN_LIMITATIONS:
         assert chave in FACHADA
+
+
+# ---------------------------------------------------------------------------
+# 6. A conversão de falha em envelhecimento
+# ---------------------------------------------------------------------------
+
+
+class TestConversaoDeFalhaEmEnvelhecimento:
+    """Por que comparar dano entre configurações pode inverter a conclusão.
+
+    Medido na campanha de 60 manobras: o para-raios aumenta o dano
+    acumulado em 4,3 vezes, e o número lido isoladamente recomendaria não
+    instalá-lo. A causa é uma única realização — a que atravessa o
+    envelope sem para-raios e sobrevive com ele:
+
+    * sem para-raios: pico de 10,67 pu, ATRAVESSA, contribui **zero**
+      excursões de estresse (não há mais o que envelhecer);
+    * com para-raios: pico de 3,31 pu, não atravessa, contribui **138**
+      excursões.
+
+    Excluindo essa realização os dois conjuntos ficam idênticos, com 389
+    excursões cada [REPO: ``10_CAMPANHA_DOIS_CAMINHOS_DE_FIM_DE_VIDA.md``,
+    §3.1].
+
+    A regra que daí decorre e que estes testes fixam: **dano acumulado só
+    é comparável entre configurações que produzem o mesmo conjunto de
+    sobreviventes**; entre as que mudam quem sobrevive, a comparação é
+    sobre ``min(N_env, N_term)``.
+    """
+
+    @staticmethod
+    def _par_de_campanhas():
+        """Duas campanhas idênticas, salvo por uma manobra decisiva."""
+        comuns = [
+            ManeuverOutcome(index=i, peak_pu=2.0, profile=_perfil(7.0))
+            for i in range(9)
+        ]
+        sem = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV, label="sem")
+        sem.extend(comuns)
+        # Sem mitigação a décima manobra ATRAVESSA: evento terminal, sem
+        # estresse a integrar.
+        sem.add(
+            ManeuverOutcome(index=9, peak_pu=10.7, crossed_withstand=True)
+        )
+
+        com = SwitchingCampaign(withstand_level_kV=ENVELOPE_KV, label="com")
+        com.extend(comuns)
+        # Com mitigação a mesma manobra sobrevive, grampeada — e paga
+        # estresse por sobreviver.
+        com.add(
+            ManeuverOutcome(index=9, peak_pu=3.3, profile=_perfil(11.2, n=6))
+        )
+        return sem, com
+
+    def test_a_mitigacao_aumenta_o_dano_acumulado(self):
+        sem, com = self._par_de_campanhas()
+        d_sem = sem.accumulate().D_total
+        d_com = com.accumulate().D_total
+        assert d_com > d_sem, "sobreviver custa dano; falhar não custa nenhum"
+
+    def test_e_mesmo_assim_a_mitigacao_prolonga_a_vida(self):
+        """O critério correto inverte a conclusão do dano isolado."""
+        sem, com = self._par_de_campanhas()
+        vida_sem = sem.life_summary(sem.accumulate())
+        vida_com = com.life_summary(com.accumulate())
+        assert vida_sem["caminho_dominante"] == "travessia_do_envelope"
+        assert vida_com["caminho_dominante"] == "envelhecimento"
+        assert vida_com["manobras_ate_o_fim"] > vida_sem["manobras_ate_o_fim"]
+
+    def test_as_manobras_comuns_contribuem_o_mesmo_nos_dois(self):
+        """A mitigação não toca o que fica abaixo do seu limiar de atuação."""
+        sem, com = self._par_de_campanhas()
+        comuns_sem = [o for o in sem.aging if o.index < 9]
+        comuns_com = [o for o in com.aging if o.index < 9]
+        assert len(comuns_sem) == len(comuns_com) == 9
+        a = CombinedDamageAccumulator(params=DamageModelParams())
+        b = CombinedDamageAccumulator(params=DamageModelParams())
+        for o in comuns_sem:
+            a.add_profile(o.profile)
+        for o in comuns_com:
+            b.add_profile(o.profile)
+        assert a.D_total == pytest.approx(b.D_total, rel=1e-12)
+
+    def test_a_manobra_terminal_nao_contribui_estresse(self):
+        sem, _com = self._par_de_campanhas()
+        acc = sem.accumulate()
+        assert acc.n_operations == 9, "a décima manobra é terminal, não entra"
