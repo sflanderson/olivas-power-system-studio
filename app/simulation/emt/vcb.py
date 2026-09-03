@@ -153,6 +153,30 @@ DIDT_INTERRUPT_ABOVE: str = "interrupt_above"
 #: Convenções aceitas.
 DIDT_CONVENTIONS: tuple[str, ...] = (DIDT_INTERRUPT_WITHIN, DIDT_INTERRUPT_ABOVE)
 
+#: Instante a partir do qual a suportabilidade do *gap* cresce.
+#:
+#: ``RECOVERY_FROM_SEPARATION`` — a partir da SEPARAÇÃO DOS CONTATOS. É a
+#: referência da literatura primária: ``U = A(t − t_open) + B``, com
+#: ``t_open`` o instante de separação [LITERATURA: Wong, Snider e Lo,
+#: IPST 2003, modelo estocástico sobre 48 disjuntores]. A razão é
+#: física: quem sustenta a tensão é a DISTÂNCIA entre os contatos, que
+#: cresce monotonicamente enquanto eles se afastam, e não é reposta a
+#: zero a cada extinção de arco.
+#:
+#: ``RECOVERY_FROM_EXTINCTION`` — a partir de cada extinção de arco.
+#: Reinicia o relógio a cada interrupção, de modo que o *gap* nunca
+#: acumula rigidez: uma vez iniciada a sequência, o polo reignite a cada
+#: meio ciclo indefinidamente e a manobra nunca se completa
+#: [CÁLCULO PRÓPRIO: medição — reignições espaçadas de 8,33 ms a 60 Hz,
+#: chave fechada ao fim da janela em 100 % das realizações]. Preservado
+#: para reprodutibilidade de casos legados, não para uso físico.
+RECOVERY_FROM_SEPARATION: str = "separation"
+RECOVERY_FROM_EXTINCTION: str = "extinction"
+RECOVERY_REFERENCES: tuple[str, ...] = (
+    RECOVERY_FROM_SEPARATION,
+    RECOVERY_FROM_EXTINCTION,
+)
+
 
 # ---------------------------------------------------------------------------
 # Estados da máquina do polo
@@ -449,6 +473,7 @@ class VacuumCircuitBreakerModel:
         recovery: DielectricRecovery | None = None,
         didt_capability_A_per_us: float = DOC_A_DIDT_RANGE_A_PER_US[1],
         didt_convention: str = DIDT_INTERRUPT_WITHIN,
+        recovery_reference: str = RECOVERY_FROM_SEPARATION,
         require_zero_crossing: bool = True,
         max_reignitions: int = DEFAULT_MAX_REIGNITIONS,
         name: str = "",
@@ -539,6 +564,12 @@ class VacuumCircuitBreakerModel:
         self.recovery: DielectricRecovery = recovery if recovery is not None else ParabolicRecovery()
         self.didt_capability_A_per_us = didt
         self.didt_convention = str(didt_convention)
+        if str(recovery_reference) not in RECOVERY_REFERENCES:
+            raise ValueError(
+                f"recovery_reference deve ser um de {RECOVERY_REFERENCES}, "
+                f"obtido {recovery_reference!r}"
+            )
+        self.recovery_reference = str(recovery_reference)
         self.require_zero_crossing = bool(require_zero_crossing)
         self.max_reignitions = int(max_reignitions)
         self._initially_closed = bool(switch.closed)
@@ -683,7 +714,7 @@ class VacuumCircuitBreakerModel:
             STATE_ARCING_HF,
         ):
             return 0.0
-        return float(self.recovery.withstand_V(t - self._t_extinction))
+        return float(self.recovery.withstand_V(t - self._recovery_origin()))
 
     # -- controlador --------------------------------------------------------
 
@@ -792,7 +823,7 @@ class VacuumCircuitBreakerModel:
             self._state = STATE_CLEARED
             return
         assert self._t_extinction is not None
-        v_wth = float(self.recovery.withstand_V(t - self._t_extinction))
+        v_wth = float(self.recovery.withstand_V(t - self._recovery_origin()))
         if abs(v_gap) > v_wth:
             self.switch.close()
             self._state = STATE_ARCING_HF
@@ -801,6 +832,20 @@ class VacuumCircuitBreakerModel:
             self._result.reignition_times_s.append(t)
             self._result.reignition_voltages_V.append(v_gap)
             self._result.reignition_withstand_V.append(v_wth)
+
+    def _recovery_origin(self) -> float:
+        """Instante de origem do relógio da recuperação dielétrica [s].
+
+        Na referência física (padrão) é a SEPARAÇÃO DOS CONTATOS: a
+        rigidez do *gap* acompanha a distância entre contatos, que cresce
+        enquanto eles se afastam e não volta a zero quando o arco se
+        extingue [LITERATURA: Wong, Snider e Lo, IPST 2003,
+        ``U = A(t − t_open) + B``].
+        """
+        if self.recovery_reference == RECOVERY_FROM_SEPARATION:
+            return self.separation_time_s
+        assert self._t_extinction is not None
+        return self._t_extinction
 
     def _interrupt(self, t: float, i_now: float, *, first_chop: bool) -> None:
         """Abre a chave e inicia (ou reinicia) a recuperação dielétrica."""

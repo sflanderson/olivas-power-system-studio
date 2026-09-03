@@ -83,6 +83,8 @@ from app.simulation.emt.snubber import (
 )
 from app.simulation.emt.snubber import KNOWN_LIMITATIONS as SNUBBER_LIMITATIONS
 from app.simulation.emt.vcb import (
+    RECOVERY_FROM_EXTINCTION,
+    RECOVERY_FROM_SEPARATION,
     ATP_C_ARC_F,
     ATP_C_CLOSED_F,
     ATP_C_OPEN_F,
@@ -220,6 +222,16 @@ def _run_bench(
         probes["i_snub"] = solver.add_probe(
             BranchCurrentProbe("i_snub", branch.switch)
         )
+    # Estas bancadas exercitam o MECANISMO de reignição em janela curta
+    # (separação em 5 ms, fim em 9 ms). Na referência FÍSICA o relógio da
+    # suportabilidade corre desde a separação dos contatos, de modo que em
+    # 4 ms o gap já suporta dezenas de quilovolts e nenhuma reignição
+    # ocorre — que é precisamente o comportamento correto, verificado em
+    # test_referencia_de_separacao_impede_reignicao_perpetua. Para que a
+    # bancada continue exercitando a máquina de estados, ela adota a
+    # referência legada, salvo quando o teste pedir explicitamente outra.
+    kwargs_vcb = {"recovery_reference": RECOVERY_FROM_EXTINCTION}
+    kwargs_vcb.update(vcb_kwargs or {})
     vcb = VacuumCircuitBreakerModel(
         switch,
         separation_time_s=separation_time_s,
@@ -228,7 +240,7 @@ def _run_bench(
         didt_capability_A_per_us=didt_capability_A_per_us,
         didt_convention=didt_convention,
         max_reignitions=max_reignitions,
-        **(vcb_kwargs or {}),
+        **kwargs_vcb,
     )
     controllers = [vcb] + ([branch.controller] if branch is not None else [])
     stats = solver.run(t_end=t_end, controllers=controllers)
@@ -1791,3 +1803,69 @@ class TestPoloLiteralAberturaNaPassagemPorZero:
         assert p.switch_current_margin_A == 2.0
         with __import__("pytest").raises(ValueError):
             AtpVcbParameters(switch_current_margin_A=-1.0)
+
+
+# ---------------------------------------------------------------------------
+# Regressão: a suportabilidade cresce desde a SEPARAÇÃO DOS CONTATOS
+# ---------------------------------------------------------------------------
+
+
+class TestReferenciaDoRelogioDaRecuperacao:
+    """``U = A(t − t_open) + B``, com ``t_open`` a separação dos contatos.
+
+    É a referência da literatura primária [LITERATURA: Wong, Snider e Lo,
+    IPST 2003, modelo estocástico sobre 48 disjuntores], e a razão é
+    física: quem sustenta a tensão é a DISTÂNCIA entre os contatos, que
+    cresce enquanto eles se afastam e não volta a zero quando o arco se
+    extingue.
+
+    Referenciar o relógio a cada extinção — como o modelo fazia — impede
+    o *gap* de acumular rigidez: uma vez iniciada a sequência, o polo
+    reignite a cada meio ciclo indefinidamente e a manobra NUNCA se
+    completa. O defeito foi encontrado numa varredura de parâmetros, em
+    que 100 % das realizações terminavam a janela com a chave fechada.
+    """
+
+    def test_referencia_invalida_levanta(self):
+        switch = Switch("cb", "p", "n1", closed=True)
+        with pytest.raises(ValueError, match="recovery_reference"):
+            VacuumCircuitBreakerModel(
+                switch, separation_time_s=1.0e-3, recovery_reference="talvez"
+            )
+
+    def test_padrao_e_a_referencia_fisica(self):
+        switch = Switch("cb", "p", "n1", closed=True)
+        vcb = VacuumCircuitBreakerModel(switch, separation_time_s=1.0e-3)
+        assert vcb.recovery_reference == RECOVERY_FROM_SEPARATION
+
+    def test_suportabilidade_cresce_desde_a_separacao_e_nao_desde_a_extincao(self):
+        """Duas realizações idênticas; só a referência do relógio muda."""
+        out_fis = _run_bench(
+            recovery=ParabolicRecovery(a_kV_per_ms=200.0, b_kV_per_ms2=0.0),
+            vcb_kwargs={"recovery_reference": RECOVERY_FROM_SEPARATION},
+        )
+        out_leg = _run_bench(
+            recovery=ParabolicRecovery(a_kV_per_ms=200.0, b_kV_per_ms2=0.0),
+        )
+        # Na referência física o gap já acumulou rigidez desde a separação
+        # e a manobra se completa; na legada, reignite.
+        assert out_fis["vcb"].reignition_count < out_leg["vcb"].reignition_count
+        assert not out_fis["switch"].closed
+
+    def test_referencia_de_separacao_impede_reignicao_perpetua(self):
+        """O defeito que a varredura expôs: chave fechada ao fim da janela.
+
+        Na referência legada o polo reignite a cada meio ciclo (8,33 ms a
+        60 Hz) e termina a janela conduzindo. Na física, interrompe.
+        """
+        longo = dict(
+            separation_time_s=5.0e-3,
+            t_end=45.0e-3,
+            recovery=ParabolicRecovery(a_kV_per_ms=200.0, b_kV_per_ms2=0.0),
+        )
+        fis = _run_bench(
+            **longo, vcb_kwargs={"recovery_reference": RECOVERY_FROM_SEPARATION}
+        )
+        leg = _run_bench(**longo)
+        assert not fis["switch"].closed, "a manobra deve se completar"
+        assert leg["vcb"].reignition_count > fis["vcb"].reignition_count
