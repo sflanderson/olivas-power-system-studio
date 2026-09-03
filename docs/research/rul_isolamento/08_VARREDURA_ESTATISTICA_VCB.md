@@ -138,11 +138,12 @@ Diagnóstico do polo A da pior realização (RRDS sorteada 44,3 kV/ms, capacidad
 | Tensão do *gap* na 1ª reignição / suportabilidade no mesmo instante | 6,47 kV / **6,438 kV** |
 | Tensão do *gap* na última reignição / suportabilidade | 155,32 kV / **137,44 kV** |
 | Suportabilidade prevista por $\mathrm{RRDS}\cdot(t-t_{sep})$ na última | $44{,}3 \times 3{,}1055 = 137{,}6$ kV |
-| Intervalo mediano entre reignições | 82 µs → $f \approx 6$ kHz |
-| $|di/dt|$ medido no último zero | 57,6 A/µs |
-| Capacidade de extinção sorteada | 460 A/µs |
+| Duração mediana do arco de reignição (reignição → extinção) | 15–35 µs → $f = 14$ a 33 kHz |
+| $|di/dt|$ nos zeros detectados, ao longo da sequência | de 1,3 a ≈ 180 A/µs, com saturação |
+| Capacidade de extinção sorteada | 460, 457 e 199 A/µs |
+| Suportabilidade / $|v_{gap}|$ **após** a última reignição | ≥ 1,67 nos três polos |
 
-Três fatos encadeados:
+Quatro fatos encadeados:
 
 1. **A tensão de reignição acompanha a curva de suportabilidade.** Em cada evento,
    $|v_{gap}| \approx V_{wth}(t - t_{sep})$. O pico atingido é, portanto,
@@ -153,12 +154,33 @@ Três fatos encadeados:
    mostram o oposto: escalada máxima na faixa **intermediária** de 20 a 30 kV/ms, porque
    recuperação rápida demais impede a reignição [F10]. O motor reproduz a dependência ao
    contrário.
-3. **O freio físico nunca engata.** A corrente de reignição do motor oscila a 6–26 kHz — é a LC
-   do lado da carga —, e não os 100–200 kHz da corrente de reignição publicada
-   [Vollet 2007, p. 2]. Com essa frequência o $di/dt$ no zero fica quase uma década abaixo da
-   capacidade sorteada, o disjuntor interrompe **todas** as vezes, e nada termina a sequência.
-   O mecanismo que a literatura descreve — o arco persistir quando o $di/dt$ excede a capacidade
-   — exige o caminho de alta frequência que o caso não representa.
+3. **A frequência da corrente de reignição é a do cabo do caso, e está correta.** O arco de
+   reignição dura 15 a 35 µs, o que dá 14 a 33 kHz — exatamente $1/(4\tau)$ do cabo a jusante,
+   cujos tempos de trânsito modais são 10,704, 6,751 e 6,281 µs, isto é, 23,4, 37,0 e 39,8 kHz
+   [CÁLCULO PRÓPRIO: medição contra `downstream_cable_modal_data`]. Os 100–200 kHz de Vollet
+   correspondem ao cabo de **216 m** do caso dele [F6] e **não são termo de comparação** para um
+   cabo de tempo de trânsito uma ordem de grandeza maior.
+4. **O freio de $di/dt$ não engata, e a sequência termina pela rampa.** Nessa frequência, o
+   $|di/dt|$ nos zeros detectados cresce de 1,3 até cerca de 180 A/µs e satura aí — abaixo da
+   faixa de 100 a 600 A/µs amostrada. O critério de extinção só chega perto de operar quando a
+   amostra está no fundo da faixa (polo C, capacidade 199 A/µs, máximo medido 188,6 A/µs). O que
+   de fato encerra a sequência é a **rampa de recuperação alcançando a TRV**: depois da última
+   reignição a suportabilidade excede $|v_{gap}|$ por fator de 1,67 a 2,25 nos três polos
+   [CÁLCULO PRÓPRIO: medição]. A escalada é, portanto, limitada — mas em 137 a 155 kV.
+
+### 3.2.1 O que de fato falta: o limite dielétrico da carga
+
+O motor não representa a falha dielétrica de nada a jusante. Para $U_N = 4{,}16$ kV, a
+IEC 60034-15:2009 dá $U_P = 4U_N + 5 = 21{,}64$ kV para a isolação principal (**6,37 pu**) e
+$U'_P = 0{,}65\,U_P = 14{,}07$ kV entre espiras (**4,14 pu**); a edição 2025 reduz o segundo a
+≈ 11,9 kV (3,5 pu) [NORMA; ver `01_ETAPA1…md`, §3]. A cauda calcula até 263 kV — **doze vezes**
+a suportabilidade a onda plena da máquina.
+
+Numa instalação real, a máquina, a terminação do cabo ou um para-raios disruptam e grampeiam a
+escalada muito antes disso; é o que Vollet mede, com dois para-raios, ao ficar em 32 kV num motor
+de 11 kV [F6]. Sem esse elemento o motor integra um transitório que **não pode existir**. É esta
+a razão pela qual a cauda está fora do domínio físico — não a frequência do anel, que está
+correta.
 
 ### 3.3 A capacitância de câmara amortece, mas não é o freio que falta
 
@@ -172,7 +194,8 @@ Reexecutando as oito realizações em escalada com capacitância em paralelo com
 | Reignições máx. | 128 | 110 | 106 | 49 |
 
 Redução monotônica de 3,5 vezes na mediana, mas ainda três vezes acima do teto publicado de
-4,6 pu. A capacitância de câmara é parte da resposta, não a resposta.
+4,6 pu. A capacitância de câmara reduz o $dv/dt$ e amortece a sequência, mas não é o elemento
+que falta.
 
 ---
 
@@ -180,20 +203,25 @@ Redução monotônica de 3,5 vezes na mediana, mas ainda três vezes acima do te
 
 Em ordem de precedência, para tornar a cauda utilizável:
 
-1. **Representar o caminho capacitivo nos terminais do disjuntor** — capacitância de câmara em
-   paralelo com o polo (pF a nF) e a capacitância terminal do cabo. É o que fixa a frequência da
-   corrente de reignição em 100–200 kHz e o que faz o critério de $di/dt$ — o freio da escalada
-   — operar na faixa em que foi caracterizado. Sem ele, a capacidade de extinção amostrada é
-   irrelevante e a sequência não termina.
-2. **Verificar a dependência com a RRDS contra Wong [F10]** depois da correção: a escalada deve
-   ser máxima em 20–30 kV/ms e decrescer nos dois extremos. Enquanto o máximo estiver no topo da
-   faixa, o mecanismo implementado não é o publicado. Este é o critério de aceitação do modelo de
-   escalada.
+1. **Representar o limite dielétrico da carga.** É o elemento ausente. Em ordem de preferência:
+   (a) para-raios ZnO no terminal do motor — a mitigação padrão, que Vollet e Xemard modelam e
+   que grampeia a escalada em 2,64 a 3,6 pu [F6, F24]; ou, no mínimo, (b) um limiar de disrupção
+   no envelope da IEC 60034-15 ($U_P = 21{,}64$ kV = 6,37 pu; $U'_P = 14{,}07$ kV = 4,14 pu para
+   4,16 kV), com registro do evento. Enquanto não existir, **todo resultado de escalada acima de
+   6,37 pu está fora do domínio físico**, porque descreve tensão que a máquina não suportaria.
+2. **Verificar a dependência com a RRDS contra Wong [F10]** depois de (1) — e só depois, porque o
+   grampeamento muda o mecanismo: a escalada deve ser máxima em 20–30 kV/ms e decrescer nos dois
+   extremos. Enquanto o máximo estiver no topo da faixa, o mecanismo implementado não é o
+   publicado. Este é o critério de aceitação do modelo de escalada.
 3. **Impor um teto de sanidade** ao consumidor do resultado: realizações acima de
    `FIELD_PEAK_CEILING_PU` (4,6 pu) devem ser marcadas e excluídas do acumulador de dano, com
    registro, até que (1) e (2) estejam fechados.
 4. **Só então** alimentar o modelo de dano com a cauda. Até lá, o modelo de dano usa o corpo da
    distribuição (p50 a p90), que é o que está comprovado.
+
+O que **não** entra nesta lista, por já estar correto: a frequência da corrente de reignição
+(§3.2, fato 3) e o referencial do relógio de recuperação (corrigido para a separação dos
+contatos, conforme Wong 2003).
 
 ## 5. O que este experimento fecha e o que não fecha
 
@@ -202,10 +230,11 @@ da distribuição com Xemard; a supressão da escalada pelo ramo amortecedor, co
 permanente quantificado; a demonstração de que a severidade do Documento A vem da convenção de
 extinção invertida, e não do circuito.
 
-**Não fecha.** A cauda de escalada. O motor a produz de forma robusta ao passo, mas por um
-mecanismo que não é o publicado, com dependência invertida na RRDS e amplitude uma ordem de
-grandeza acima do teto de campo. Não deve alimentar o Asset Health Index até os itens 1 e 2 da
-seção 4 estarem fechados.
+**Não fecha.** A cauda de escalada. O motor a produz de forma robusta ao passo e a limita por um
+mecanismo interno consistente — a rampa de recuperação alcança a TRV —, mas em 137 a 155 kV, uma
+ordem de grandeza acima do que a isolação da máquina suporta, porque nada no modelo representa a
+disrupção da carga. A dependência com a RRDS sai invertida em relação a Wong. Não deve alimentar
+o Asset Health Index até os itens 1 e 2 da seção 4 estarem fechados.
 
 ## Referências
 

@@ -286,6 +286,7 @@ from app.simulation.emt.probes import (
     DifferentialVoltageProbe,
     NodeVoltageProbe,
 )
+from app.simulation.emt.arrester import three_phase_arrester
 from app.simulation.emt.snubber import (
     SnubberBranch,
     SnubberMasterTrigger,
@@ -1473,6 +1474,14 @@ class AtpReferenceCase:
     #: em que os parâmetros do disjuntor entram como FAIXAS da literatura
     #: e não como constantes de um caso.
     vcb_samples: tuple | None = None
+    #: Para-raios de óxido metálico no TERMINAL DO MOTOR. ``None`` (padrão)
+    #: não os representa, que é a configuração do arquivo. Um valor de
+    #: tensão de sistema [V] instala um para-raios por fase, escalado da
+    #: curva publicada por Vollet e de Metz-Noblat para essa tensão — ver
+    #: :mod:`app.simulation.emt.arrester`. É o elemento cuja ausência põe
+    #: a cauda de escalada fora do domínio físico
+    #: [REPO: docs/research/rul_isolamento/08_VARREDURA_ESTATISTICA_VCB.md].
+    motor_arrester_system_voltage_V: float | None = None
 
     def __post_init__(self) -> None:
         for label, value in (("dt_s", self.dt_s), ("t_end_s", self.t_end_s)):
@@ -1487,6 +1496,13 @@ class AtpReferenceCase:
             )
         if self.gap_capacitance_F is not None and float(self.gap_capacitance_F) <= 0.0:
             raise ValueError("gap_capacitance_F deve ser > 0 quando informada")
+        if self.motor_arrester_system_voltage_V is not None:
+            u = float(self.motor_arrester_system_voltage_V)
+            if not math.isfinite(u) or u <= 0.0:
+                raise ValueError(
+                    "motor_arrester_system_voltage_V deve ser finita e > 0, "
+                    f"obtida {self.motor_arrester_system_voltage_V!r}"
+                )
         if str(self.cable_phasor_reading) not in CABLE_PHASOR_READINGS:
             raise ValueError(
                 f"cable_phasor_reading deve ser um de {CABLE_PHASOR_READINGS}, "
@@ -1647,6 +1663,18 @@ class AtpReferenceCase:
             ckt.add(Resistor(f"mot_r_{ph}", node_mot, f"mot_m_{ph}", MOTOR_RESISTANCE_OHM))
             ckt.add(Inductor(f"mot_l_{ph}", f"mot_m_{ph}", NODE_GROUND, MOTOR_INDUCTANCE_H))
 
+        # -- para-raios no terminal do motor ---------------------------------
+        arresters: tuple = ()
+        if self.motor_arrester_system_voltage_V is not None:
+            arresters = three_phase_arrester(
+                "moa_motor",
+                NODES_MOTOR,
+                NODE_GROUND,
+                system_voltage_V=float(self.motor_arrester_system_voltage_V),
+            )
+            for moa in arresters:
+                ckt.add(moa)
+
         # -- polos do disjuntor ----------------------------------------------
         recovery = self.recovery()
         if self.vcb_samples is not None:
@@ -1763,6 +1791,7 @@ class AtpReferenceCase:
             snubbers=snubbers,
             snubber_gate=gate,
             literal_poles=literal_poles,
+            arresters=arresters,
             controllers=controllers,
             trv_probes=trv_probes,
             bus_probes=bus_probes,
@@ -1859,7 +1888,8 @@ class AtpReferenceModel:
     snubbers: tuple[SnubberBranch, ...]
     snubber_gate: "SnubberArmingGate | SnubberMasterTrigger | None"
     literal_poles: tuple[AtpLiteralPole, ...]
-    controllers: tuple
+    arresters: tuple = ()
+    controllers: tuple = ()
     trv_probes: dict = field(default_factory=dict)
     bus_probes: dict = field(default_factory=dict)
     motor_probes: dict = field(default_factory=dict)

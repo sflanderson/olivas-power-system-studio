@@ -872,6 +872,17 @@ class Solver:
         self._pending_cda: int = 0
         self._warned_no_cda: bool = False
         self._steady_state: "PhasorSolution | None" = None
+        # Ramos não lineares tratados por COMPENSAÇÃO: ficam fora de [Y] e
+        # entram por superposição depois da solução linear do passo
+        # [FONTE: Dommel 1971, §V]. A descoberta é automática — o ramo se
+        # declara por ``is_compensated()`` — para que a assinatura de
+        # ``run`` não mude e circuitos sem não linearidade paguem apenas
+        # um teste de lista vazia.
+        from .nonlinear import CompensationNetwork, collect_compensated
+
+        self._compensation = CompensationNetwork(
+            collect_compensated(self.circuit.components)
+        )
 
         self.stats = SolverResult()
 
@@ -998,6 +1009,11 @@ class Solver:
             return False
         first = self._signature is None
         self._factorize(signature)
+        # z_T e os vetores de superposição valem apenas para a topologia
+        # em que foram computados: "the slope z_T remains unchanged as long
+        # as no switchings take place in the network" [FONTE: Dommel 1971,
+        # §V, p. 2563].
+        self._compensation.invalidate()
         if not first:
             self.stats.topology_changes += 1
         return not first
@@ -1008,6 +1024,14 @@ class Solver:
         """Resolve um passo cujo instante de chegada é ``t_target``."""
         b = self.circuit.assemble_rhs(t_target, mode)
         x = self._solve(b)
+        if len(self._compensation):
+            # x é a solução SEM os ramos não lineares — o ``e⁽⁰⁾`` do
+            # passo 1 de Dommel. A correção resolve as duas equações
+            # escalares por ramo e superpõe [FONTE: Dommel 1971, eqs.
+            # (4)-(6)].
+            if not self._compensation.prepared:
+                self._compensation.prepare(self.circuit.dimension, self._solve)
+            x = self._compensation.correct(x, t_target)
         for comp in self.circuit.components:
             comp.commit(x, t_target, mode)
         self._x = x

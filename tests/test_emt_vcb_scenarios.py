@@ -571,11 +571,12 @@ class TestEscaladaComandadaPelaRampaDeRecuperacao:
     limitá-lo. O diagnóstico completo, com as medições, está em
     ``docs/research/rul_isolamento/08_VARREDURA_ESTATISTICA_VCB.md``.
 
-    Estes testes existem para que a correção — representar o caminho
-    capacitivo nos terminais do disjuntor — seja DETECTÁVEL: quando ela
-    entrar, eles falham e devem ser reescritos com o comportamento
-    publicado (escalada máxima em RRDS de 20 a 30 kV/ms, pico abaixo de
-    ``FIELD_PEAK_CEILING_PU``).
+    Estes testes existem para que a correção — representar o LIMITE
+    DIELÉTRICO DA CARGA (para-raios no terminal do motor ou, no mínimo, um
+    limiar de disrupção no envelope da IEC 60034-15) — seja DETECTÁVEL:
+    quando ela entrar, eles falham e devem ser reescritos com o
+    comportamento publicado (escalada máxima em RRDS de 20 a 30 kV/ms,
+    pico abaixo de ``FIELD_PEAK_CEILING_PU``).
     """
 
     def test_limitacao_esta_declarada(self):
@@ -628,13 +629,18 @@ class TestEscaladaComandadaPelaRampaDeRecuperacao:
         # Consequência: o pico escala com a rampa, e não com o teto de campo.
         assert v.max() > FIELD_PEAK_CEILING_PU * 3396.6
 
-    def test_o_freio_de_didt_nunca_engata_na_escalada(self):
-        """O ``di/dt`` no zero fica muito abaixo da capacidade sorteada.
+    def test_o_freio_de_didt_nao_engata_e_quem_encerra_e_a_rampa(self):
+        """O ``di/dt`` nos zeros satura abaixo da capacidade sorteada.
 
-        É por isso que o polo interrompe todas as vezes e a sequência não
-        termina: o mecanismo publicado — o arco persistir quando o
-        ``di/dt`` excede a capacidade — exige o caminho de alta frequência
-        que o caso não representa.
+        O mecanismo publicado — o arco persistir quando o ``di/dt`` excede
+        a capacidade de extinção — não chega a operar. Quem encerra a
+        sequência é a própria rampa de recuperação, que ultrapassa a TRV:
+        depois da última reignição a suportabilidade fica com folga sobre
+        ``|v_gap|``.
+
+        A frequência do anel de reignição não é o defeito: ela é
+        ``1/(4τ)`` do cabo do caso. O que falta é o limite dielétrico da
+        carga, ausente do modelo.
         """
         from app.simulation.emt.cases.atp_reference import AtpReferenceCase
         from app.simulation.emt.vcb_scenarios import VcbSample
@@ -647,5 +653,16 @@ class TestEscaladaComandadaPelaRampaDeRecuperacao:
         modelo = AtpReferenceCase(with_snubber=False, vcb_samples=amostras).build()
         modelo.run()
         polo = modelo.poles[0]
-        assert polo.result.reignition_count > 10
+        r = polo.result
+        assert r.reignition_count > 10
         assert polo.last_didt_A_per_us < 0.5 * capacidade
+
+        # Quem encerra a sequência é a rampa: na última reignição a
+        # suportabilidade já é da ordem da tensão do gap, e depois dela a
+        # rampa segue subindo sem que a TRV a alcance.
+        t_ultima = r.reignition_times_s[-1]
+        v_ultima = abs(r.reignition_voltages_V[-1])
+        w_ultima = r.reignition_withstand_V[-1]
+        assert w_ultima > 0.5 * v_ultima
+        # A rampa continua depois da última reignição — a folga só cresce.
+        assert polo.withstand_V(t_ultima + 1.0e-3) > w_ultima
