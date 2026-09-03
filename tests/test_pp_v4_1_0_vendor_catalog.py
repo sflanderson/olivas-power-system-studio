@@ -247,6 +247,32 @@ class TestTripUnits:
         assert tipo_p.G_delay_tg.min == 0.05 and tipo_p.G_delay_tg.max == 3.0
         assert "0.89" not in tipo_a.notes   # valor espúrio da digitalização antiga
 
+    def test_weg_dwb_dwa_et_lsi_dials_confirmed_visually(self):
+        """DWB1000/DWA1600 (disparador ET-C/ETA-C) — valores dos 5 dials
+        confirmados por inspeção visual das figuras do catálogo (o texto
+        extraído do PDF embaralhava os rótulos do gráfico vetorial)."""
+        t = library.get_trip_unit("WEG-DWB-DWA-ET-LSI")
+        assert t is not None
+        assert t.category == "MCCB"
+        assert t.L_pickup_Ir.discrete == (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0)
+        assert t.L_delay_tr.discrete == (1.6, 3.0, 6.0, 12.0, 18.0)
+        assert t.tr_reference_multiple == 6.0
+        assert t.S_pickup_Isd.discrete == (2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0)
+        assert 9.0 not in t.S_pickup_Isd.discrete
+        assert t.S_delay_tsd.discrete == (0.1, 0.2, 0.3, 0.4)
+        assert t.S_i2t_selectable
+        assert t.I_pickup_Ii.discrete == (2.0, 4.0, 6.0, 8.0, 10.0, 12.0)
+        assert not t.has_ground_fault      # LSI apenas, sem G
+        assert t.rated_voltage_V == 690.0
+
+    def test_weg_agw_not_added_thermomagnetic_only(self):
+        """WEG AGW é inteiramente termomagnético (sem disparador eletrônico)
+        — investigado nesta sessão, nenhuma entrada criada. Confirma que
+        nenhum model_id 'WEG-AGW*' foi indevidamente adicionado."""
+        assert library.get_trip_unit("WEG-AGW") is None
+        assert not any(t.model_id.startswith("WEG-AGW")
+                       for t in library.list_trip_units())
+
     def test_all_have_source_doc(self):
         for t in library.list_trip_units():
             assert t.source_doc

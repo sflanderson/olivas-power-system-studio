@@ -1291,6 +1291,69 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "ACW630H-ETS630-3 (252-630 A), ACW800U-ETS800-3 (320-800 A)."
         ),
     ),
+    # WEG — DWB1000/DWA1600, disparador eletrônico LSI 2ª geração ET-C/
+    # ETA-C (MCCB) — Catálogo "Disjuntores em Caixa Moldada DWB e DWA",
+    # cód. 50009825 Rev. 52 (06/2025). Valores dos 5 dials (Ir/tr/Isd/
+    # tsd/Ii) confirmados por INSPEÇÃO VISUAL direta das figuras
+    # "DWB1000-ET"/"DWA1600-ET" (pág. 13) — a extração de texto do PDF
+    # embaralhava os rótulos dos dials rotativos (gráfico vetorial); os
+    # dois disjuntores têm dials idênticos, diferindo apenas na faixa de
+    # corrente nominal e na calibração absoluta de Im por referência.
+    TripUnitModel(
+        model_id="WEG-DWB-DWA-ET-LSI",
+        manufacturer="WEG",
+        full_name="DWB1000/DWA1600 — disparador eletrônico LSI (ET-C/ETA-C, 2ª geração)",
+        breaker_family="DWB1000 (200-1.000 A) / DWA1600 (500/640-1.600 A)",
+        category="MCCB",
+        market_standard="IEC 60947-2",
+        source_doc="WEG Catálogo Disjuntores em Caixa Moldada DWB e DWA, cód. 50009825 Rev. 52 (06/2025)",
+        adjustment_mode="discrete_dial",
+        functions_available=("L", "S", "I"),
+        L_pickup_Ir=_dial((0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0)),
+        L_delay_tr=_dial((1.6, 3.0, 6.0, 12.0, 18.0), unit="s"),
+        tr_reference_multiple=6.0,
+        S_pickup_Isd=_dial((2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0),
+                           unit="xIr"),
+        S_delay_tsd=_dial((0.1, 0.2, 0.3, 0.4), unit="s"),
+        S_i2t_selectable=True,
+        I_pickup_Ii=_dial((2.0, 4.0, 6.0, 8.0, 10.0, 12.0)),
+        rated_voltage_V=690.0,
+        notes=(
+            "Único disparador eletrônico da linha DWB/DWA (frames "
+            "DWB160/250/400/650/800 usam proteção termomagnética fixa ou "
+            "ajustável, sem eletrônica — não modelados). Linha WEG AGW "
+            "(catálogo à parte, doc. 50011456-AGW) investigada nesta sessão "
+            "e é INTEIRAMENTE termomagnética (disparador de faixa fixa "
+            "12×In/10×In, sem qualquer unidade eletrônica) — descartada, "
+            "sem entrada criada. G (falha à terra) ausente nesta unidade — "
+            "apenas LSI. tr referenciado a 6×Ir(s); tsd referenciado a "
+            "8×Ir(s) (bases diferentes, mantidas conforme fonte). Ue=690 "
+            "Vca; diferente dos frames DWB400/650/800 (que também aceitam "
+            "500 Vcc), DWB1000/DWA1600 não têm classificação Vcc "
+            "('não se aplica' na tabela de características gerais). "
+            "Comunicação RS485 Modbus-RTU + NFC integrada (2ª geração "
+            "ET-C/ETA-C, sucessora dos disparadores ET/ETA de 1ª geração "
+            "não digitalizados por falta de fonte). Variante 'ETA' "
+            "acrescenta proteção de NEUTRO AJUSTÁVEL: N a 100%×(Ir/Isd/Ii "
+            "de fase), 50%×(Ir/Isd de fase) com Ii do neutro fixo igual ao "
+            "de fase (não escala), ou OFF — não modelada por ausência de "
+            "campo dedicado no dataclass; dials L/S/I/tr/tsd idênticos à "
+            "variante ET. Aplicação Distribuição (referência comercial SEM "
+            "'S', ex. DWB1000_500-3ET-C) calibra Im/Ii fixo em 12×In "
+            "(dial de I travado nessa aplicação); aplicação Gerador "
+            "(referência COM 'S', ex. DWB1000S500-_ET-C) calibra Im/Ii "
+            "ajustável na faixa 2-12×In mostrada acima — mesma faixa "
+            "física do dial em ambas, mas travada em 12× na Distribuição. "
+            "Nota específica do catálogo, aplicável apenas à carcaça "
+            "DWB1000 no seu maior In (1.000 A): 'Is máx.=8' e 'Ii máx.=10' "
+            "— mesmo o dial permitindo fisicamente até 10×Ir (Isd) e "
+            "12×In (Ii), no maior In dessa carcaça o ajuste prático é "
+            "limitado a 8×Ir e 10×In (provável limite de coordenação/"
+            "capacidade de interrupção); nenhuma nota equivalente foi "
+            "publicada para DWA1600 — não extrapolado, [REQUIRES MANUAL "
+            "DIGITIZATION] se aplicável."
+        ),
+    ),
     # Siemens — SENTRON 3WA, disparador eletrônico ETU600 (sucessor do
     # 3WL) — Equipment Manual MAN_92310000002-04, ed. 08/2021, IEC 60947-2
     TripUnitModel(
