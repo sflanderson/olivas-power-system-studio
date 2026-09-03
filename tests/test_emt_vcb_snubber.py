@@ -1378,7 +1378,11 @@ def test_literal_monta_ramo_rlc_serie_comutado_em_paralelo_com_a_chave_ideal():
     i_ramo = solver.add_probe(BranchCurrentProbe("i_ramo", polo.resistor))
     i_chave = solver.add_probe(BranchCurrentProbe("i_chave", polo.switch))
     trv = solver.add_probe(DifferentialVoltageProbe("trv", "p", "n1"))
-    solver.run(t_end=3.0e-3, controllers=[polo.controller])
+    solver.run(t_end=12.0e-3, controllers=[polo.controller])
+    # Semântica tipo 13: a chave só abre no zero de corrente seguinte ao
+    # comando (t_open = 1 ms); observa-se o pólo a partir desse instante.
+    t_abre = polo.controller.result.switch_opening_time_s
+    assert t_abre is not None and t_abre >= 1.0e-3
 
     c = polo.controller
     # A manobra ocorreu e os valores comutaram para os de aberto.
@@ -1398,7 +1402,7 @@ def test_literal_monta_ramo_rlc_serie_comutado_em_paralelo_com_a_chave_ideal():
     # ambas desprezíveis ao lado dele [CÁLCULO PRÓPRIO], de modo que a
     # corrente do ramo é a tensão do gap dividida por ROPEN.
     t = np.asarray(i_ramo.time_s)
-    depois = t > 1.5e-3
+    depois = t > t_abre + 0.5e-3
     i_depois = np.asarray(i_ramo.values)[depois]
     v_depois = np.asarray(i_chave.values)[depois]
     assert float(np.max(np.abs(i_depois))) > 1.0e-3
@@ -1733,3 +1737,57 @@ def test_limitacoes_dos_modulos_novos_nao_colidem_com_as_do_kernel():
         | set(case_mod.KNOWN_LIMITATIONS)
     )
     assert not (novas & set(KERNEL_LIMITATIONS))
+
+
+# ---------------------------------------------------------------------------
+# Regressão: a chave ideal do polo literal obedece à semântica tipo 13
+# ---------------------------------------------------------------------------
+
+
+class TestPoloLiteralAberturaNaPassagemPorZero:
+    """``SW_STATE = 0`` é comando; a abertura só se efetiva no zero de corrente.
+
+    Antes desta correção a chave abria no instante de ``T_OPEN`` carregando
+    a corrente de carga (74 A no polo R do caso de referência), que era
+    descarregada no ramo série de arco de 20 Ω / 50 nH / 20 pF e produzia
+    um degrau de dezenas a centenas de quilovolts em um único passo
+    [CÁLCULO PRÓPRIO: ``i·Δt/C``]. A chave tipo 13 do ATP abre no primeiro
+    instante em que ``|i| <= Imar``; com ``Imar`` em branco, na passagem
+    natural por zero [LISTA: 02, §1.3 e §3.6].
+    """
+
+    def _modelo(self, t_end_s: float = 0.016):
+        from app.simulation.emt.cases.atp_reference import AtpReferenceCase
+
+        m = AtpReferenceCase(
+            with_snubber=False, atp_model_compatibility=True, t_end_s=t_end_s
+        ).build()
+        m.run()
+        return m
+
+    def test_chave_abre_depois_do_comando_e_com_corrente_no_zero(self):
+        m = self._modelo()
+        res = m.poles[0].result
+        assert res.switch_opening_time_s is not None
+        assert res.switch_opening_time_s >= 0.01455
+        # 60 Hz, ~911 A de pico: |di/dt| <= 0,35 A/µs -> no passo do zero,
+        # |i| fica abaixo de 0,5 A; antes da correção era 74 A.
+        assert abs(res.switch_opening_current_A) < 0.5
+
+    def test_sem_degrau_espurio_na_abertura_do_polo_r(self):
+        import numpy as np
+
+        m = self._modelo()
+        v_kV = m.trv_probes["a"].values * 1e-3
+        pu = np.sqrt(2.0) * 4160.0 / np.sqrt(3.0) * 1e-3
+        # Sem o artefato o pico fica na ordem da TRV do caso (Tabela III do
+        # trabalho: 30,24 kV), nunca nos 688 kV do estado anterior.
+        assert np.max(np.abs(v_kV)) < 15.0 * pu
+
+    def test_margem_numerica_abre_dentro_da_margem(self):
+        from app.simulation.emt.vcb import AtpVcbParameters
+
+        p = AtpVcbParameters(switch_current_margin_A=2.0)
+        assert p.switch_current_margin_A == 2.0
+        with __import__("pytest").raises(ValueError):
+            AtpVcbParameters(switch_current_margin_A=-1.0)

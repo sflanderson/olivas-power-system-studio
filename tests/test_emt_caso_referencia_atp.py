@@ -865,16 +865,20 @@ def test_modelo_pronto_para_simular_expoe_a_auditoria(modelo):
 #: Por fase: (pico da TRV [kV], instante do pico [ms], dv/dt máxima em
 #: janela de 1 µs [kV/µs], reignições, instante do corte [ms], pico da
 #: tensão no terminal do motor [kV]).
+# Valores gerados APÓS a correção da semântica da chave tipo 13 (a chave
+# ideal abre na passagem por zero seguinte ao comando, não no instante do
+# comando). Os valores anteriores (688 kV, 631 kV, 703 kV) eram o artefato
+# da abertura forçada com corrente — ver docs/research/rul_isolamento/07.
 CARACT_LITERAL_1US_SEM_AMORTECEDOR: dict[str, tuple] = {
-    "a": (688.2305, 24.824, 240.8221, 0, 14.552, 504.3848),
-    "b": (-631.3355, 24.853, 264.9194, 0, 24.751, 541.4999),
-    "c": (703.3198, 24.824, 287.5703, 0, 24.811, 490.6169),
+    "a": (7.904467, 15.4050, 0.260273, 0, 14.7630, 3.149354),
+    "b": (6.241387, 27.5440, 0.269641, 0, 27.1250, 3.195565),
+    "c": (-6.101577, 28.6720, 0.231790, 0, 27.3320, 3.134366),
 }
 
 CARACT_LITERAL_1US_COM_AMORTECEDOR: dict[str, tuple] = {
-    "a": (-20.8935, 24.750, 16.0288, 0, 14.552, 32.4603),
-    "b": (-98.1937, 24.751, 69.3143, 0, 24.751, 34.7156),
-    "c": (81.6689, 24.811, 55.5693, 0, 24.811, 28.7898),
+    "a": (-5.935574, 25.9680, 3.247036, 0, 14.7630, 3.149354),
+    "b": (-3.757383, 34.5520, 0.427425, 0, 26.8160, 5.145592),
+    "c": (-4.197628, 28.9550, 0.411542, 0, 27.1190, 4.936056),
 }
 
 #: Tabela III do trabalho de referência [FATO: doc A, p. 3]: por fase,
@@ -964,42 +968,71 @@ def test_caracterizacao_literal_com_amortecedor_1us(manobra_literal_com):
     # O controlador mestre do arquivo arma no estado 2 (aberto), que o
     # polo literal alcança no passo seguinte à separação do polo R.
     assert manobra_literal_com.snubber_gate.armed
+    # O ramo arma no primeiro estado de arco, que ocorre no COMANDO de
+    # abertura do polo R (14,55 ms) mais o passo do MODEL — 14,762 ms.
     assert manobra_literal_com.snubber_gate.armed_time_s * 1.0e3 == pytest.approx(
-        14.551, rel=TOL_CARACT
+        14.762, rel=TOL_CARACT
     )
+    # Energia dissipada nos 30 Ω. Não é energia de surto: com o disparo em
+    # 2404 V (1,0009 × a tensão nominal fase-terra eficaz) e o comando
+    # travado, o ramo conduz em todo semiciclo acima desse valor — os
+    # quilojoules são de REGIME, não de manobra [ver docs 07, §5].
     energia = manobra_literal_com.snubber_energy_J
-    assert energia["a"] == pytest.approx(26.44, rel=1.0e-3)
-    assert energia["b"] == pytest.approx(2326.37, rel=1.0e-3)
-    assert energia["c"] == pytest.approx(3506.03, rel=1.0e-3)
+    assert energia["a"] == pytest.approx(0.394, rel=1.0e-2)
+    assert energia["b"] == pytest.approx(1217.797, rel=1.0e-3)
+    assert energia["c"] == pytest.approx(1562.290, rel=1.0e-3)
 
 
-def test_amortecedor_reduz_o_pico_em_todas_as_fases(
+def test_amortecedor_reduz_a_TRV_mas_eleva_a_tensao_no_motor(
     manobra_literal_sem, manobra_literal_com
 ):
-    """Efeito qualitativo que sobrevive à divergência: o ramo mitiga.
+    """O ramo mitiga a TRV no disjuntor e PIORA a tensão no terminal do motor.
 
-    Os valores absolutos divergem da Tabela III por mais de uma ordem de
-    grandeza, mas o SINAL do efeito do ramo amortecedor é o mesmo do
-    trabalho — e é a única conclusão que esta caracterização sustenta.
+    A redução da tensão através do gap é o efeito que o trabalho reporta e
+    se confirma nas três fases. Mas o ramo de 30 Ω liga o barramento à
+    terra, e a tensão no terminal do MOTOR — a grandeza que interessa ao
+    modelo de dano do isolamento — sobe de 3,20 para 5,15 kV na fase B e de
+    3,13 para 4,94 kV na fase C [CÁLCULO PRÓPRIO: medição]. Só a fase A,
+    que separa isolada, fica inalterada.
+
+    O trabalho não reporta a tensão no terminal do motor, de modo que este
+    efeito não contradiz a Tabela III — ele mostra que a grandeza reportada
+    não é a que governa o dano.
     """
     for ph in PHASES:
         sem = float(np.max(np.abs(manobra_literal_sem.trv_probes[ph].values)))
         com = float(np.max(np.abs(manobra_literal_com.trv_probes[ph].values)))
-        assert com < sem
-        v_sem = float(np.max(np.abs(manobra_literal_sem.motor_probes[ph].values)))
-        v_com = float(np.max(np.abs(manobra_literal_com.motor_probes[ph].values)))
-        assert v_com < v_sem
+        assert com < sem, f"fase {ph}: o ramo deveria reduzir a TRV"
+
+    v_sem = {
+        ph: float(np.max(np.abs(manobra_literal_sem.motor_probes[ph].values))) * 1e-3
+        for ph in PHASES
+    }
+    v_com = {
+        ph: float(np.max(np.abs(manobra_literal_com.motor_probes[ph].values))) * 1e-3
+        for ph in PHASES
+    }
+    assert v_com["a"] == pytest.approx(v_sem["a"], rel=1.0e-6)
+    assert v_com["b"] > 1.5 * v_sem["b"]
+    assert v_com["c"] > 1.5 * v_sem["c"]
 
 
 def test_divergencia_contra_a_tabela_III_e_registrada_e_nao_mascarada(
     manobra_literal_sem, manobra_literal_com
 ):
-    """REGISTRA a divergência: nenhuma fase chega perto da Tabela III.
+    """REGISTRA a divergência: o motor produz uma FRAÇÃO da Tabela III.
+
+    Sem amortecedor o motor dá 6,1 a 7,9 kV contra 30 a 41 kV publicados —
+    entre 15 % e 26 % do valor. A causa está documentada em
+    ``docs/research/rul_isolamento/07_AUDITORIA_DO_CASO_ATP.md`` §3: o
+    ``MODEL`` do arquivo não pode produzir reignições (o temporizador da
+    recuperação dielétrica nunca é armado, e a reignição não religa a
+    chave), de modo que a escalada que explicaria aqueles picos não ocorre.
 
     Este teste falha se alguém, no futuro, "consertar" a divergência
     ajustando parâmetros sem registrar o ajuste: a discordância é o
-    resultado honesto do caso como está no arquivo, e mudá-la exige
-    mudar este teste e dizer por quê.
+    resultado honesto do caso como está no arquivo, e mudá-la exige mudar
+    este teste e dizer por quê.
     """
     for modelo, tabela in (
         (manobra_literal_sem, TABELA_III_SEM_AMORTECEDOR),
@@ -1007,9 +1040,9 @@ def test_divergencia_contra_a_tabela_III_e_registrada_e_nao_mascarada(
     ):
         for ph, (pico_ref, _rrrv) in tabela.items():
             obtido = float(np.max(np.abs(modelo.trv_probes[ph].values))) * 1.0e-3
-            assert obtido > 3.0 * abs(pico_ref), (
+            assert obtido < abs(pico_ref), (
                 f"fase {ph}: obtido {obtido:.2f} kV contra {pico_ref:.2f} kV da "
-                f"Tabela III — se a razão caiu, a causa precisa ser explicada"
+                f"Tabela III — se a razão subiu, a causa precisa ser explicada"
             )
         # E nenhuma reignição, contra as "successive reignitions" do texto.
         assert set(modelo.reignition_counts.values()) == {0}
@@ -1034,109 +1067,75 @@ def test_causa_da_divergencia_e_a_corrente_no_instante_da_separacao():
     assert fracoes[2] == pytest.approx(0.990, abs=0.002)
 
 
-def test_caracterizacao_polo_R_isolado_1us():
-    """Polo R sozinho: 29,91 kV contra 30,24 kV da Tabela III.
-
-    Mantidos FECHADOS os polos S e T, o polo R interrompe a 0,21 ms do
-    zero natural de sua corrente e o pico obtido fica a 1,1 % do valor
-    publicado, sem ajuste nenhum. É o contraexemplo que separa a causa:
-    o circuito e o equivalente estão certos; o que diverge é a lógica de
-    abertura do MODEL nos polos que separam longe do zero.
-
-    O número segue sendo CARACTERIZAÇÃO — a concordância vale para o
-    passo de 1 µs do arquivo e não sobrevive ao refino do passo, como
-    :func:`test_influencia_do_passo_no_polo_R_sem_amortecedor` mostra.
-    """
+def _polo_R_isolado(*, with_snubber: bool, dt_s: float):
+    """Polos S e T mantidos fechados (separação além da janela); só o R abre."""
     m = build_reference_model(
-        with_snubber=False,
+        with_snubber=with_snubber,
         atp_model_compatibility=True,
         separation_times_s=(0.01455, 10.0, 10.0),
-        t_end_s=14.7e-3,
+        dt_s=dt_s,
+        t_end_s=16.0e-3,
     )
     m.run()
     sonda = m.trv_probes["a"]
     v = np.asarray(sonda.values)
     t = np.asarray(sonda.time_s)
     k = int(np.argmax(np.abs(v)))
-    assert v[k] * 1.0e-3 == pytest.approx(29.9106, rel=TOL_CARACT)
-    assert t[k] * 1.0e3 == pytest.approx(14.690, rel=TOL_CARACT)
-    assert _taxa_kV_por_us(t, v) == pytest.approx(19.5309, rel=TOL_CARACT)
     v_mot = float(np.max(np.abs(m.motor_probes["a"].values))) * 1.0e-3
-    assert v_mot == pytest.approx(26.9744, rel=TOL_CARACT)
-    # Distância ao valor publicado, registrada como número e não como
-    # aprovação: 1,1 % no pico, 41 % na taxa.
-    assert abs(abs(v[k]) * 1.0e-3 - 30.24) / 30.24 < 0.02
-    assert _taxa_kV_por_us(t, v) / 13.90 > 1.35
+    return m, v, t, k, v_mot
+
+
+def test_caracterizacao_polo_R_isolado_1us():
+    """Polo R sozinho, Δt = 1 µs: corte a 0,94 A em 14,763 ms, chave aberta em 14,766 ms.
+
+    Com a semântica correta da chave tipo 13 a corrente é interrompida na
+    passagem por zero: a energia magnética aprisionada é ½·L·I² ≈ 4 mJ e a
+    TRV é a de primeiro polo a abrir com carga indutiva, ≈ 2,3 pu. O valor
+    de 29,91 kV registrado antes da correção — "a 1,1 % da Tabela III" —
+    era o artefato da chave aberta em T_OPEN carregando 74 A: coincidia com
+    o trabalho pelo mesmo mecanismo, não pela física. Segue CARACTERIZAÇÃO.
+    """
+    m, v, t, k, v_mot = _polo_R_isolado(with_snubber=False, dt_s=1.0e-6)
+    assert v[k] * 1.0e-3 == pytest.approx(7.904467, rel=TOL_CARACT)
+    assert t[k] * 1.0e3 == pytest.approx(15.405, rel=1.0e-3)
+    assert _taxa_kV_por_us(t, v) == pytest.approx(0.260273, rel=TOL_CARACT)
+    assert v_mot == pytest.approx(3.149354, rel=TOL_CARACT)
+    res = m.poles[0].result
+    assert res.chopping_time_s * 1.0e3 == pytest.approx(14.763, rel=TOL_CARACT)
+    assert res.switch_opening_time_s * 1.0e3 == pytest.approx(14.766, rel=TOL_CARACT)
+    assert abs(res.switch_opening_current_A) < 0.5
+    assert res.reignition_count == 0
+    # Distância ao valor publicado, registrada e não mascarada.
+    assert abs(v[k]) * 1.0e-3 / 30.24 < 0.30
 
 
 def test_caracterizacao_polo_R_isolado_com_amortecedor_1us():
-    """O mesmo polo R isolado, com o ramo amortecedor armado."""
-    m = build_reference_model(
-        with_snubber=True,
-        atp_model_compatibility=True,
-        separation_times_s=(0.01455, 10.0, 10.0),
-        t_end_s=14.7e-3,
-    )
-    m.run()
-    sonda = m.trv_probes["a"]
-    v = np.asarray(sonda.values)
-    t = np.asarray(sonda.time_s)
-    k = int(np.argmax(np.abs(v)))
-    assert v[k] * 1.0e-3 == pytest.approx(-9.9123, rel=TOL_CARACT)
-    assert _taxa_kV_por_us(t, v) == pytest.approx(8.6921, rel=TOL_CARACT)
-    v_mot = float(np.max(np.abs(m.motor_probes["a"].values))) * 1.0e-3
-    assert v_mot == pytest.approx(6.3229, rel=TOL_CARACT)
+    m, v, t, k, v_mot = _polo_R_isolado(with_snubber=True, dt_s=1.0e-6)
+    assert v[k] * 1.0e-3 == pytest.approx(5.826520, rel=TOL_CARACT)
+    assert _taxa_kV_por_us(t, v) == pytest.approx(3.247036, rel=TOL_CARACT)
+    assert v_mot == pytest.approx(3.149354, rel=TOL_CARACT)
+    assert m.poles[0].result.reignition_count == 0
 
 
 def test_influencia_do_passo_no_polo_R_sem_amortecedor():
-    """Passo de 50 ns no lugar de 1 µs: o pico do polo R triplica.
+    """Refinar o passo de 1 µs para 50 ns muda o pico em 0,4 %: resultado convergido.
 
-    Segundo cenário pedido pelo protocolo. A mesma montagem, a mesma
-    janela e o mesmo estimador de taxa (janela fixa de 1 µs) — só o
-    passo muda. O resultado NÃO está convergido no passo, e é por isso
-    que o pico do caso original não pode ser lido como grandeza física
-    independente da discretização.
+    Antes da correção o mesmo ensaio dava 29,9 kV a 1 µs e 95,8 kV a 50 ns
+    (razão 3,2) — a assinatura de um degrau numérico de i·Δt/C, não de
+    física. A insensibilidade ao passo é o critério que separa os dois.
     """
-    m = build_reference_model(
-        with_snubber=False,
-        atp_model_compatibility=True,
-        separation_times_s=(0.01455, 10.0, 10.0),
-        dt_s=50.0e-9,
-        t_end_s=14.7e-3,
-    )
-    m.run()
-    sonda = m.trv_probes["a"]
-    v = np.asarray(sonda.values)
-    t = np.asarray(sonda.time_s)
-    k = int(np.argmax(np.abs(v)))
-    assert v[k] * 1.0e-3 == pytest.approx(-95.8441, rel=TOL_CARACT)
-    assert t[k] * 1.0e3 == pytest.approx(14.5501, rel=TOL_CARACT)
-    assert _taxa_kV_por_us(t, v) == pytest.approx(95.8441, rel=TOL_CARACT)
-    v_mot = float(np.max(np.abs(m.motor_probes["a"].values))) * 1.0e-3
-    assert v_mot == pytest.approx(38.5218, rel=TOL_CARACT)
-    # Contra os 29,9106 kV do mesmo ensaio a 1 µs: 3,2 vezes.
-    assert abs(v[k]) * 1.0e-3 / 29.9106 == pytest.approx(3.204, rel=2.0e-3)
+    _, v, t, k, v_mot = _polo_R_isolado(with_snubber=False, dt_s=50.0e-9)
+    assert v[k] * 1.0e-3 == pytest.approx(7.934335, rel=TOL_CARACT)
+    assert t[k] * 1.0e3 == pytest.approx(15.405, rel=1.0e-3)
+    assert v_mot == pytest.approx(3.149354, rel=TOL_CARACT)
+    assert abs(v[k]) * 1.0e-3 / 7.904467 == pytest.approx(1.0, abs=0.01)
 
 
 def test_influencia_do_passo_no_polo_R_com_amortecedor():
-    """O mesmo refino de passo com o ramo amortecedor armado: 7,2 vezes."""
-    m = build_reference_model(
-        with_snubber=True,
-        atp_model_compatibility=True,
-        separation_times_s=(0.01455, 10.0, 10.0),
-        dt_s=50.0e-9,
-        t_end_s=14.7e-3,
-    )
-    m.run()
-    sonda = m.trv_probes["a"]
-    v = np.asarray(sonda.values)
-    t = np.asarray(sonda.time_s)
-    k = int(np.argmax(np.abs(v)))
-    assert v[k] * 1.0e-3 == pytest.approx(-71.6687, rel=TOL_CARACT)
-    assert _taxa_kV_por_us(t, v) == pytest.approx(71.6687, rel=TOL_CARACT)
-    v_mot = float(np.max(np.abs(m.motor_probes["a"].values))) * 1.0e-3
-    assert v_mot == pytest.approx(9.8652, rel=TOL_CARACT)
-    assert abs(v[k]) * 1.0e-3 / 9.9123 == pytest.approx(7.230, rel=2.0e-3)
+    _, v, t, k, v_mot = _polo_R_isolado(with_snubber=True, dt_s=50.0e-9)
+    assert v[k] * 1.0e-3 == pytest.approx(5.851829, rel=TOL_CARACT)
+    assert v_mot == pytest.approx(3.237224, rel=TOL_CARACT)
+    assert abs(v[k]) * 1.0e-3 / 5.826520 == pytest.approx(1.0, abs=0.01)
 
 
 def test_modo_literal_e_selecionado_por_parametro_e_nao_muda_o_padrao():

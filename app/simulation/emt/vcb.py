@@ -1281,8 +1281,21 @@ class AtpVcbParameters:
     reignition_margin: float = ATP_REIGNITION_MARGIN
     zero_crossing_threshold_A: float = ATP_ZERO_CROSSING_THRESHOLD_A
     extinction_current_A: float = ATP_EXTINCTION_CURRENT_A
+    #: Campo ``Imar`` (colunas 35-44) do cartão de chave tipo 13 que o
+    #: MODEL comanda [LISTA: 02, §1.3 e §3.6]. No arquivo o campo está EM
+    #: BRANCO: a chave abre na primeira passagem natural por zero da
+    #: corrente após ``SW_STATE = 0`` — ``None`` reproduz isso (detecção
+    #: por mudança de sinal entre passos). Um valor numérico [A] passa a
+    #: abrir em ``|i| <= Imar``.
+    switch_current_margin_A: float | None = None
 
     def __post_init__(self) -> None:
+        if self.switch_current_margin_A is not None:
+            margem = float(self.switch_current_margin_A)
+            if not math.isfinite(margem) or margem < 0.0:
+                raise ValueError(
+                    f"switch_current_margin_A deve ser None (Imar em branco) ou finito e >= 0, obtido {margem!r}"
+                )
         for campo in ("t_open_s", "zero_crossing_threshold_A"):
             valor = float(getattr(self, campo))
             if not math.isfinite(valor) or valor < 0.0:
@@ -1356,6 +1369,13 @@ class AtpPoleResult:
     state_changes: list[tuple[float, int]] = field(default_factory=list)
     final_state: int = ATP_CB_CLOSED
     peak_gap_voltage_V: float = 0.0
+    #: Instante em que a chave IDEAL efetivamente abriu (primeiro passo,
+    #: após ``SW_STATE = 0``, em que ``|i| <= Imar``) e a corrente nesse
+    #: passo [A]. ``None`` se a chave não chegou a abrir. Distingue o
+    #: COMANDO (``T_OPEN``) da ABERTURA (passagem por zero), como no
+    #: cartão de chave tipo 13 do ATP [LISTA: 02, §1.3].
+    switch_opening_time_s: float | None = None
+    switch_opening_current_A: float = 0.0
 
 
 class AtpModelCompatibility:
@@ -1508,6 +1528,11 @@ class AtpModelCompatibility:
         # Bloco VAR do MODEL, com os mesmos nomes em minúsculas.
         self.tnow: float = 0.0
         self.sw_state: float = 1.0
+        # Semântica tipo 13: o comando de abertura só se efetiva na
+        # passagem por zero seguinte; guarda-se a corrente da chave no
+        # passo anterior e se o comando já foi visto com a chave fechada.
+        self._i_sw_prev: float = 0.0
+        self._sw_open_commanded: bool = False
         self.r_val: float = self.parameters.r_closed_ohm
         self.l_val: float = self.parameters.l_closed_H
         self.c_val: float = self.parameters.c_closed_F
@@ -1535,6 +1560,8 @@ class AtpModelCompatibility:
         p = self.parameters
         self.tnow = 0.0
         self.sw_state = 1.0
+        self._i_sw_prev = 0.0
+        self._sw_open_commanded = False
         self.r_val = p.r_closed_ohm
         self.l_val = p.l_closed_H
         self.c_val = p.c_closed_F
@@ -1738,8 +1765,40 @@ class AtpModelCompatibility:
     # -- acoplamento com o kernel -------------------------------------------
 
     def apply(self) -> None:
-        """Escreve ``SW_STATE``, ``R_VAL``, ``L_VAL`` e ``C_VAL`` nos ramos."""
-        self.switch.set_state(self.sw_state > 0.5)
+        """Escreve ``SW_STATE``, ``R_VAL``, ``L_VAL`` e ``C_VAL`` nos ramos.
+
+        Semântica da chave tipo 13 do ATP. ``SW_STATE = 0`` é um COMANDO
+        de abertura, não a abertura em si: a chave controlada por TACS só
+        abre no primeiro instante em que ``|i| <= Imar`` (campo *current
+        margin*; em branco, a passagem natural por zero) [LISTA: 02, §1.3
+        e §3.6]. Forçar a abertura no instante do comando — como este
+        método fazia — descarrega a corrente de carga (74 A no polo R,
+        centenas de ampères nos polos S e T) no ramo série de arco de
+        20 Ω / 50 nH / 20 pF e produz um degrau de centenas de quilovolts
+        em um passo, artefato que cresce com a redução do passo
+        [CÁLCULO PRÓPRIO: ``Δv ≈ i·Δt/C_arc`` = 74 A × 1 µs / 20 pF =
+        3,7 MV antes do amortecimento da rede]. A própria lógica do
+        MODEL pressupõe a chave ainda conduzindo no estado de arco: o
+        corte (``|I_CB| <= I_CHOP``) é testado sobre a corrente TOTAL do
+        polo enquanto a chave a carrega.
+        """
+        i_now = float(self.switch.branch_current(0))
+        if self.sw_state > 0.5:
+            self.switch.set_state(True)
+        elif self.switch.closed:
+            margem = self.parameters.switch_current_margin_A
+            if margem is None:
+                # Imar em branco: abre na primeira mudança de sinal da
+                # corrente da chave após o comando (zero natural).
+                pode_abrir = self._i_sw_prev * i_now <= 0.0 and self._sw_open_commanded
+            else:
+                pode_abrir = abs(i_now) <= float(margem)
+            if pode_abrir:
+                self.switch.set_state(False)
+                self._result.switch_opening_time_s = self.tnow
+                self._result.switch_opening_current_A = i_now
+            self._sw_open_commanded = True
+        self._i_sw_prev = i_now
         self.resistor.set_resistance(self.r_val)
         self.inductor.set_inductance(self.l_val)
         self.capacitor.set_capacitance(self.c_val)
