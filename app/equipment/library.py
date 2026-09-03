@@ -1168,17 +1168,18 @@ _TRIP_UNITS: list[TripUnitModel] = [
         ),
     ),
     # WEG — ACW ETS (MCCB — NÃO disjuntor aberto), disparador eletrônico
-    # LSI — Catálogo "Disjuntor em Caixa Moldada de Alta Capacidade ACW"
-    # 50022907. Confirmado: WEG não possui segunda linha de disjuntor
-    # aberto além do ABW/ABWC — ACW é caixa moldada, categoria à parte.
+    # LSI — Catálogo "Disjuntor em Caixa Moldada ACW", doc. 50022907
+    # (Rev. 08, 10/2014). Confirmado: WEG não possui segunda linha de
+    # disjuntor aberto além do ABW/ABWC — ACW é caixa moldada, categoria
+    # à parte.
     TripUnitModel(
         model_id="WEG-ACW-ETS-LSI",
         manufacturer="WEG",
         full_name="ACW ETS400/ETS630/ETS800 — disparador eletrônico LSI",
-        breaker_family="ACW400/ACW630/ACW800 (MCCB alta capacidade, 400-800 A)",
+        breaker_family="ACW400/ACW630/ACW800 (MCCB, 400-800 A)",
         category="MCCB",
-        market_standard="IEC 60947-2 (norma não declarada explicitamente no catálogo)",
-        source_doc="WEG Catálogo Disjuntor em Caixa Moldada de Alta Capacidade ACW, doc. 50022907",
+        market_standard="IEC 60947-2",
+        source_doc="WEG Catálogo Disjuntor em Caixa Moldada ACW, doc. 50022907 (Rev. 08, 10/2014)",
         adjustment_mode="discrete_dial",
         functions_available=("L", "S", "I"),
         L_pickup_Ir=_dial((0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8,
@@ -1237,7 +1238,7 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "S: I0t (tempo fixo) ou I²t",
             "G: I0t/I²t/I4t/I6t (LSIG); I0t/I2t/I4t/I6t (LSIG Hi-Z, zonas UREF/REF)",
         ),
-        rated_voltage_V=1000.0,
+        rated_voltage_V=1150.0,
         notes=(
             "Ir/tr/Ii acima em faixa contínua 'e.SET' (xIn), unidade padrão "
             "deste dataclass. S_pickup_Isd modelado em xIr (base da chave "
@@ -1263,8 +1264,10 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "o de fábrica para size 1/2, size 3 usa 400A). tg: "
             "I²t/I⁴t/I⁶t OFF 0-5s, ON (a 3×Ig) 0-30s. Alarme Ig "
             "(não-disparo) com teto mais alto (5000A), não modelado. "
-            "Tensão nominal até 1000 V CA (1150 V citado em material "
-            "comercial, não confirmado no manual técnico)."
+            "Tensão nominal ≤1000 V CA (Size 1) ou ≤1150 V CA (Size 2/3), "
+            "conforme §6.3.2.1/6.3.3.1 e §2.4.2.5 (módulo de tensão do "
+            "ETU600) do manual técnico — rated_voltage_V acima usa o teto "
+            "geral (1150 V)."
         ),
     ),
     # Eaton — NZM PXR25 (EMEA) — MN012005EN, Tabela 4

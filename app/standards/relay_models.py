@@ -692,7 +692,7 @@ EATON_DIGITRIP_3000 = RelayModel(
     ),
     iec_curves_supported=(
         IecCurveType.STANDARD_INVERSE, IecCurveType.VERY_INVERSE,
-        IecCurveType.EXTREMELY_INVERSE, IecCurveType.LONG_TIME_INVERSE,
+        IecCurveType.EXTREMELY_INVERSE,
     ),
     ieee_curves_supported=(
         IeeeCurveType.MODERATELY_INVERSE, IeeeCurveType.VERY_INVERSE,
@@ -716,19 +716,27 @@ EATON_DIGITRIP_3000 = RelayModel(
         "(usado em tms_range). Curto retardo (fase): 1.00-11.0×In ou "
         "OFF; terra: 0.100-11.0×In ou OFF; tempo 0.05-1.50 s (ambos). "
         "Instantâneo: fase 1.00-25.0×In ou OFF (discriminador fixo em "
-        "11×In se OFF); terra 0.50-11.0×In ou OFF. Curvas IEC A/B/C/D "
-        "mapeadas por convenção BS142 (A=SI, B=VI, C=EI, D=LTI, mesma "
-        "convenção usada em vendor_curve_constants.py para a GE). "
-        "Certificação UL 1053 / ANSI C37.90. Alimentação DT3000: "
+        "11×In se OFF); terra 0.50-11.0×In ou OFF. Curvas IEC A/B/C "
+        "mapeadas por convenção BS142 (A=SI, B=VI, C=EI — mesmos k/α do "
+        "IEC_CURVE_COEFFICIENTS, mesma convenção usada em "
+        "vendor_curve_constants.py para a GE). IEC-D é TEMPO DEFINIDO "
+        "(flat, sem expoente de corrente, ajuste direto em segundos "
+        "0.20-2.00 s — confirmado na Seção 7-2 'Curve Equations' do "
+        "manual: A=0, B=4), NÃO Long Time Inverse — por isso omitida de "
+        "iec_curves_supported (já coberta por CurveStandard.DEFINITE_TIME "
+        "acima). Certificação UL 1053 / ANSI C37.90. Alimentação DT3000: "
         "48-250 Vdc ou 120-240 Vac; DT3030: 24-48 Vdc."
     ),
 )
 
 
-# SEL-487E — relé DIFERENCIAL DE TRANSFORMADOR (87T/87Q/REF), distinto
-# do SEL-487B (diferencial de barra, não digitalizado). Reutiliza a
-# mesma família de curvas U1-U5 (US)/C1-C5 (IEC) do SEL-751 — mesma
-# base IEEE C37.112-1996.
+# SEL-487E — relé DIFERENCIAL DE TRANSFORMADOR (87T/87Q/REF). O modelo
+# de barra da SEL é o SEL-487B (conhecimento geral de catálogo — não
+# confirmado nas fontes do 487E digitalizadas aqui, que não o
+# mencionam). As equações das curvas U1-U5/C1-C5 do 487E conferem
+# coeficiente a coeficiente com as do SEL-751 (mesma família de curva);
+# a atribuição a IEEE C37.112-1996 é citada explicitamente no manual do
+# SEL-751, mas NÃO no do 487E — inferida por transitividade.
 # Fonte: SEL-487E Data Sheet (487E_DS_20120810.pdf) e Instruction
 # Manual (Date Code 20090626), Tabelas 1, 3, 4.3, 4.4.
 SEL_487E = RelayModel(
@@ -772,8 +780,10 @@ SEL_487E = RelayModel(
     time_dial_range=(0.50, 15.00),
     description=(
         "Relé diferencial de transformador (não de barra — o modelo de "
-        "barra da SEL é o SEL-487B, produto distinto, não digitalizado). "
-        "Até 5 enrolamentos, 1 zona de proteção. TAP pickup: 0.1-32.0×INOM "
+        "barra da SEL é o SEL-487B, produto distinto; essa distinção é "
+        "conhecimento geral de catálogo SEL, não confirmada nas fontes "
+        "do 487E aqui digitalizadas, que não mencionam o 487B). Até 5 "
+        "enrolamentos, 1 zona de proteção. TAP pickup: 0.1-32.0×INOM "
         "A secundário (TAPMAX/TAPMIN≤35). Diferencial restrita: pickup "
         "0.1-4.0 pu, inclinação (slope) 1 e 2 ajustáveis 5-100 %. "
         "Diferencial sem restrição: 1.0-20.0×TAP. Diferencial de "
@@ -783,8 +793,11 @@ SEL_487E = RelayModel(
         "0.05-5 pu. Sobrecorrente instantânea (50): 5 A nom. "
         "0.25-100.00 A sec.; 1 A nom. 0.05-20.00 A sec. Sobrecorrente de "
         "tempo adaptativa (51S), 10 curvas selecionáveis por elemento "
-        "(5 US + 5 IEC — mesmas U1-U5/C1-C5 do SEL-751, mesma base IEEE "
-        "C37.112-1996): pickup 5 A nom. 0.25-16.00 A sec. (=0.05-3.20×In, "
+        "(5 US + 5 IEC — coeficientes idênticos, elemento a elemento, "
+        "aos U1-U5/C1-C5 do SEL-751; a atribuição a IEEE C37.112-1996 "
+        "está no manual do SEL-751, não no do 487E — inferência por "
+        "transitividade, não citação direta): pickup 5 A nom. "
+        "0.25-16.00 A sec. (=0.05-3.20×In, "
         "usado em pickup_range_per_in), 1 A nom. 0.05-3.20 A sec.; Time "
         "Dial US 0.50-15.00 (usado em time_dial_range), IEC 0.05-1.00 "
         "(usado em tms_range) — nota: constantes de curva U1-U5/C1-C5 "
