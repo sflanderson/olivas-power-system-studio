@@ -219,6 +219,28 @@ class TestTripUnits:
         weg = library.get_trip_unit("WEG-ABW-OCR-TIPO-P")
         assert weg.rated_voltage_V == 690.0
 
+    def test_weg_abw_tipo_p_isd_dial_corrected_against_newer_revision(self):
+        """Revisão mais nova do catálogo (Rev. 23, 07/2026) não tem as
+        posições 7 e 9 xIr presentes na digitalização original (Rev. 5,
+        06/2010) — corrigido para 8 posições."""
+        weg = library.get_trip_unit("WEG-ABW-OCR-TIPO-P")
+        assert weg.S_pickup_Isd.discrete == (1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+        assert 7.0 not in weg.S_pickup_Isd.discrete
+        assert 9.0 not in weg.S_pickup_Isd.discrete
+
+    def test_weg_abw_tipo_a_two_stage_L_adjustment(self):
+        """Tipo A usa ajuste em dois estágios (Iu grosso × Ir fino),
+        diferente do Tipo P (Ir direto); S/I/G idênticos entre os dois."""
+        tipo_a = library.get_trip_unit("WEG-ABW-OCR-TIPO-A")
+        tipo_p = library.get_trip_unit("WEG-ABW-OCR-TIPO-P")
+        assert tipo_a is not None
+        assert tipo_a.L_pickup_Ir.discrete == (0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+        assert tipo_a.L_pickup_Ir.min != tipo_p.L_pickup_Ir.min  # 0.5 vs 0.4
+        assert tipo_a.S_pickup_Isd.discrete == tipo_p.S_pickup_Isd.discrete
+        assert tipo_a.I_pickup_Ii.discrete == tipo_p.I_pickup_Ii.discrete
+        assert tipo_a.G_pickup_Ig.discrete == tipo_p.G_pickup_Ig.discrete
+        assert "0.89" not in tipo_a.notes   # valor espúrio da digitalização antiga
+
     def test_all_have_source_doc(self):
         for t in library.list_trip_units():
             assert t.source_doc

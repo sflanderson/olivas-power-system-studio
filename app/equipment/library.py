@@ -1133,22 +1133,26 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "equipamento: 1200 A."
         ),
     ),
-    # WEG — ABW-OCR Tipo P (ACB) — Manual Disjuntor Aberto ABW, págs. 13-14
+    # WEG — ABW-OCR Tipo P (ACB, medição de corrente e tensão: PC1/PC6/
+    # PS1/PS6...) — Catálogo Disjuntor Aberto ABW, cód. 50011456.
+    # Revisão consultada: Rev. 23 (07/2026) — corrige S_pickup_Isd em
+    # relação à digitalização original (Rev. 5, 06/2010), cujos valores
+    # 7 e 9 xIr não aparecem nesta revisão mais recente.
     TripUnitModel(
         model_id="WEG-ABW-OCR-TIPO-P",
         manufacturer="WEG",
-        full_name="ABW-OCR Tipo P (PC1/PC6) — unidade de proteção ACB",
-        breaker_family="ABW16...63",
+        full_name="ABW-OCR Tipo P (PC1/PC6/PS1/PS6...) — unidade de proteção ACB",
+        breaker_family="ABW16...63 / ABWC08...16",
         category="ACB",
         market_standard="IEC (norma não citada no catálogo digitalizado)",
-        source_doc="WEG Catálogo Disjuntor Aberto ABW 50011456.05/062010, págs. 13-14",
+        source_doc="WEG Catálogo Disjuntor Aberto ABW, cód. 50011456 Rev. 23 (07/2026)",
         adjustment_mode="discrete_dial",
         functions_available=("L", "S", "I", "G"),
         L_pickup_Ir=_dial((0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)),
         L_delay_tr=_dial((0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0),
                          unit="s", off=True),
         tr_reference_multiple=6.0,
-        S_pickup_Isd=_dial((1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0),
+        S_pickup_Isd=_dial((1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0),
                            unit="xIr", off=True),
         S_delay_tsd=_dial((0.05, 0.1, 0.2, 0.3, 0.4), unit="s"),
         S_i2t_selectable=True,
@@ -1161,10 +1165,59 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "tsd impresso no catálogo como '(0,05-0,1-0,2-0,3-0,4) x Ir' e tg "
             "sem unidade — erro tipográfico da fonte; a única unidade "
             "fisicamente coerente para retardo é segundos. I2t ON: "
-            "{0.1,0.2,0.3,0.4} s. Tipo A (AZ1/AC1) usa ajuste em dois "
-            "estágios: Iu {0.5..1.0} xIn × Ir {0.8,0.83,0.85,0.88,0.89,0.9,"
-            "0.93,0.95,0.98,1.0} xIu. Interlock Ir<Is<Ii não explicitado no "
-            "manual."
+            "{0.1,0.2,0.3,0.4} s (tsd e tg). Tempo de abertura mínimo/máximo "
+            "(I2t OFF, ms): 20/80 (posição 1), 80/140, 160/240, 260/340, "
+            "360/440 (mesma tabela para tsd e tg). tr também tabelado a "
+            "1.5×Ir {12.5,25,50,100,200,300,400,500} s e a 7.2×Ir "
+            "{0.34,0.69,1.38,2.7,5.5,8.3,11,13.8} s (mesmas 8 posições do "
+            "dial, precisão ±15%). Tipo A (AZ1/AH1/AC1/AF1...) usa ajuste "
+            "de L em dois estágios (Iu×Ir) — ver WEG-ABW-OCR-TIPO-A; S/I/G "
+            "idênticos entre Tipo A e Tipo P. Fuga à terra (I∆n, opcional, "
+            "requer TC externo): 0.5/1/2/3/5/10/20/30 A ou OFF, tempo de "
+            "alarme 140/230/350/800/950 ms — não modelada (função "
+            "independente de G, sem campo dedicado no dataclass). "
+            "Interlock Ir<Isd<Ii não explicitado no manual."
+        ),
+    ),
+    # WEG — ABW-OCR Tipo A (ACB, medição de corrente apenas: AZ1/AH1/
+    # AC1/AF1...) — mesmo catálogo, ajuste de L em dois estágios
+    # (Iu grosso × Ir fino), diferente do Tipo P (Ir direto).
+    TripUnitModel(
+        model_id="WEG-ABW-OCR-TIPO-A",
+        manufacturer="WEG",
+        full_name="ABW-OCR Tipo A (AZ1/AH1/AC1/AF1...) — unidade de proteção ACB",
+        breaker_family="ABW16...63 / ABWC08...16",
+        category="ACB",
+        market_standard="IEC (norma não citada no catálogo digitalizado)",
+        source_doc="WEG Catálogo Disjuntor Aberto ABW, cód. 50011456 Rev. 23 (07/2026)",
+        adjustment_mode="discrete_dial",
+        functions_available=("L", "S", "I", "G"),
+        L_pickup_Ir=_dial((0.5, 0.6, 0.7, 0.8, 0.9, 1.0)),
+        L_delay_tr=_dial((0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0),
+                         unit="s", off=True),
+        tr_reference_multiple=6.0,
+        S_pickup_Isd=_dial((1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0),
+                           unit="xIr", off=True),
+        S_delay_tsd=_dial((0.05, 0.1, 0.2, 0.3, 0.4), unit="s"),
+        S_i2t_selectable=True,
+        I_pickup_Ii=_dial((2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0), off=True),
+        G_pickup_Ig=_dial((0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0), off=True),
+        G_delay_tg=_dial((0.05, 0.1, 0.2, 0.3, 0.4), unit="s"),
+        G_i2t_selectable=True,
+        rated_voltage_V=690.0,
+        notes=(
+            "Ajuste de L em DOIS estágios (único entre os disparadores "
+            "deste catálogo): seletor grosso Iu = In×{0.5,0.6,0.7,0.8,0.9,"
+            "1.0} (sem OFF), seletor fino Ir = Iu×{0.8,0.83,0.85,0.88,0.9,"
+            "0.93,0.95,0.98,1.0} (9 posições — a corrente de ajuste final é "
+            "Iu×Ir_fino, não modelável em L_pickup_Ir sem um segundo campo; "
+            "acima representa apenas o estágio grosso Iu; o produto "
+            "Iu×Ir_fino cobre efetivamente ~0.40-1.0×In). tr@6×Ir idêntico "
+            "ao Tipo P; também tabelado a 1.5×Ir e 7.2×Ir (mesmos valores "
+            "do Tipo P), precisão ±15%. S/I/G IDÊNTICOS ao Tipo P (mesma "
+            "fonte, mesma revisão) — ver WEG-ABW-OCR-TIPO-P para as notas "
+            "de tempo de abertura min/máx e a função opcional de fuga à "
+            "terra I∆n, ambas aplicáveis aqui também."
         ),
     ),
     # WEG — ACW ETS (MCCB — NÃO disjuntor aberto), disparador eletrônico
