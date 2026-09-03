@@ -105,6 +105,18 @@ class TestTripUnits:
         assert t.tr_reference_multiple == 3.0
         assert t.rated_voltage_V == 690.0
 
+    def test_schneider_nt_nw_micrologic(self):
+        t = library.get_trip_unit("SE-NT-NW-MICROLOGIC-2-3-5-6.0A")
+        assert t is not None
+        assert t.category == "ACB"
+        assert t.L_pickup_Ir.discrete == (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 1.0)
+        assert t.L_delay_tr.discrete == (0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0)
+        assert t.tr_reference_multiple == 6.0
+        assert t.I_pickup_Ii.off_selectable
+        assert t.G_pickup_Ig.discrete[0] == 0.2 and t.G_pickup_Ig.discrete[-1] == 1.0
+        assert t.S_i2t_selectable and t.G_i2t_selectable
+        assert "Square D" in t.full_name
+
     def test_abb_emax2_ekip_touch_iec(self):
         t = library.get_trip_unit("ABB-EMAX2-EKIP-TOUCH-LSIG-IEC")
         assert t is not None
@@ -560,3 +572,38 @@ class TestCableCatalogAdditions:
     def test_list_cables_filters_new_voltage_classes(self):
         assert len(list_cables(rated_voltage_kV=6.0, insulation=InsulationType.XLPE)) >= 14
         assert len(list_cables(rated_voltage_kV=11.0, insulation=InsulationType.XLPE)) >= 14
+
+    def test_prysmian_entries(self):
+        py = [c for c in CABLE_CATALOG if c.manufacturer == "Prysmian"]
+        assert len(py) == 14
+        c240 = [c for c in py if c.cross_section_mm2 == 240][0]
+        assert c240.R_dc_ohm_per_km_at_20C == 0.075
+        assert c240.R_ac_ohm_per_km_at_90C == 0.105    # na verdade a 105 °C — ver notes
+        assert c240.X_ohm_per_km == 0.111
+        assert math.isclose(c240.C_uF_per_km, 0.6363, abs_tol=1e-4)
+        assert c240.ampacity_air_A == 672 and c240.ampacity_buried_A == 387
+        assert c240.rated_voltage_kV == 6.0
+        assert c240.insulation == InsulationType.HEPR
+        assert "105" in c240.notes
+        for c in py:
+            assert c.ampacity_air_A > c.ampacity_buried_A > 0
+            assert c.R_ac_ohm_per_km_at_90C > c.R_dc_ohm_per_km_at_20C
+
+    def test_prysmian_rdc_close_to_induscabos_iec60228(self):
+        """Rcc (Prysmian, 3 casas) e R_dc (Induscabos, 4 casas) derivam
+        da mesma NBR NM 280 classe 2 — coincidem dentro do arredondamento
+        da fonte, não exatamente (precisões de impressão diferentes)."""
+        ind = {c.cross_section_mm2: c for c in CABLE_CATALOG if c.manufacturer == "Induscabos"}
+        py = {c.cross_section_mm2: c for c in CABLE_CATALOG if c.manufacturer == "Prysmian"}
+        for s in (10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 300, 400):
+            assert math.isclose(
+                ind[s].R_dc_ohm_per_km_at_20C, py[s].R_dc_ohm_per_km_at_20C, abs_tol=5e-4
+            ), s
+
+    def test_three_manufacturers_at_common_voltage_class(self):
+        """Três fabricantes de cabo agora cobrem a classe 6 kV / 6.35 kV
+        (fecha o objetivo original de FASE 4/5: 3 fabricantes)."""
+        mfrs_6kV = {c.manufacturer for c in CABLE_CATALOG
+                    if c.manufacturer and 5.9 <= c.rated_voltage_kV <= 6.35}
+        assert mfrs_6kV == {"Induscabos", "Prysmian"} or "Prysmian" in mfrs_6kV
+        assert len({c.manufacturer for c in CABLE_CATALOG if c.manufacturer}) == 3

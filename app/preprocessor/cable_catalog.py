@@ -448,10 +448,69 @@ _NEXANS_TRXLPE_11kV: tuple[CatalogCable, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Catálogo: Prysmian Eprotenax Compact 105 3,6/6 kV unipolar Cu, HEPR 105 °C
+# Fonte: Prysmian "Média Tensão — Uso Geral", capítulos "Parâmetros
+# Elétricos" (Rcc 20 °C IEC/NBR NM 280 cl. 2; Rca e X_L a 105 °C/60 Hz,
+# arranjo trifólio; Xc condutor-blindagem) e "Capacidade de Condução de
+# Corrente" (NBR 14039 Tab. 30 — ar livre 30 °C / diretamente enterrado
+# 20 °C, ρ_solo=2,5 K·m/W, 3 cabos unipolares em trifólio). C_uF_per_km
+# derivado de Xc (Ω·km) por C=1/(2π·60·Xc) — não impresso diretamente.
+# Isolação HEPR 105 °C (Eprotenax): Rca/ampacidade em referência de
+# temperatura MAIS ALTA que as demais entradas do catálogo (XLPE 90 °C).
+# ---------------------------------------------------------------------------
+
+_PRYSMIAN_SRC = "Prysmian — Média Tensão Uso Geral, EPROTENAX COMPACT 105 3,6/6 kV"
+
+
+def _prysmian(s: float, rcc20: float, rac105: float, x_tri: float,
+              c_uf_km: float, i_air: float, i_bur: float) -> CatalogCable:
+    return CatalogCable(
+        name=f"Prysmian Eprotenax Compact 105 Cu {s:g}mm² 3.6/6kV",
+        conductor_material=ConductorMaterial.COPPER,
+        insulation=InsulationType.HEPR,
+        rated_voltage_kV=6.0, cross_section_mm2=s,
+        R_dc_ohm_per_km_at_20C=rcc20, R_ac_ohm_per_km_at_90C=rac105,
+        X_ohm_per_km=x_tri, C_uF_per_km=round(c_uf_km, 4),
+        ampacity_air_A=i_air, ampacity_buried_A=i_bur,
+        icw_kA_1s=round(0.143 * s, 3),
+        notes=(
+            "R_ac e ampacidade referenciados a 105 °C (isolação HEPR "
+            "Eprotenax Compact 105), não 90 °C como as demais entradas do "
+            "catálogo — não comparar R_ac diretamente entre fabricantes "
+            "sem ajustar a temperatura de referência. Arranjo trifólio "
+            "(3 cabos unipolares). Ampacidade ao ar: 30 °C ambiente, "
+            "bandeja. Ampacidade enterrada: NBR 14039 Tab. 30, 20 °C "
+            "ambiente, ρ_solo=2,5 K·m/W (coluna a, a mais conservadora). "
+            "C_uF_per_km calculado de Xc (não impresso na fonte)."
+        ),
+        manufacturer="Prysmian", source=_PRYSMIAN_SRC,
+    )
+
+
+_PRYSMIAN_EPROTENAX_6kV: tuple[CatalogCable, ...] = (
+    _prysmian(10, 1.830, 2.443, 0.178, 0.2335, 97, 70),
+    _prysmian(16, 1.150, 1.536, 0.165, 0.2646, 127, 90),
+    _prysmian(25, 0.727, 0.971, 0.154, 0.3024, 167, 115),
+    _prysmian(35, 0.524, 0.701, 0.145, 0.3399, 204, 137),
+    _prysmian(50, 0.387, 0.518, 0.137, 0.3840, 246, 162),
+    _prysmian(70, 0.268, 0.359, 0.130, 0.4313, 307, 197),
+    _prysmian(95, 0.193, 0.260, 0.125, 0.4852, 376, 235),
+    _prysmian(120, 0.153, 0.207, 0.120, 0.5323, 435, 266),
+    _prysmian(150, 0.124, 0.168, 0.117, 0.5793, 496, 298),
+    _prysmian(185, 0.099, 0.135, 0.114, 0.6296, 568, 335),
+    _prysmian(240, 0.075, 0.105, 0.111, 0.6363, 672, 387),
+    _prysmian(300, 0.060, 0.085, 0.109, 0.6960, 767, 434),
+    _prysmian(400, 0.047, 0.069, 0.105, 0.7888, 890, 490),
+    _prysmian(500, 0.037, 0.056, 0.102, 0.8663, 1015, 548),
+)
+
+
 # Catálogo total
 CABLE_CATALOG: tuple[CatalogCable, ...] = (
     _CU_PVC_LV + _CU_EPR_15kV + _CU_XLPE_20kV + _CU_BARE
     + _INDUSCABOS_INDULINK_6kV + _NEXANS_TRXLPE_11kV
+    + _PRYSMIAN_EPROTENAX_6kV
 )
 
 

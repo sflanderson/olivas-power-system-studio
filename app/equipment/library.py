@@ -1091,6 +1091,48 @@ _TRIP_UNITS: list[TripUnitModel] = [
             "a 0.1 s). tr tabela 1.5×Ir {12.5,25,50,100,200,300,400,500,600} s."
         ),
     ),
+    # Schneider (Square D) — MasterPact NT/NW Micrologic 2.0A/3.0A/5.0A/6.0A
+    # (mercado UL) — Instruction Bulletin 48049-136-05 Rev. 03, 06/2020
+    TripUnitModel(
+        model_id="SE-NT-NW-MICROLOGIC-2-3-5-6.0A",
+        manufacturer="Schneider Electric",
+        full_name="MasterPact NT/NW MicroLogic 2.0A / 3.0A / 5.0A / 6.0A (Square D)",
+        breaker_family="MasterPact NT/NW",
+        category="ACB",
+        market_standard="UL/ANSI (Square D; Ii=UL/ANSI instantâneo, Isd=IEC instantâneo)",
+        source_doc="Schneider (Square D) 48049-136-05 Rev. 03, 06/2020",
+        adjustment_mode="discrete_dial",
+        functions_available=("L", "S", "I", "G"),
+        L_pickup_Ir=_dial((0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 1.0)),
+        L_delay_tr=_dial((0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0), unit="s"),
+        tr_reference_multiple=6.0,
+        S_pickup_Isd=_dial((1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0), unit="xIr"),
+        S_delay_tsd=_dial((0.0, 0.1, 0.2, 0.3, 0.4), unit="s"),
+        S_i2t_selectable=True,
+        I_pickup_Ii=_dial((2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0), off=True),
+        G_pickup_Ig=_dial((0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0), off=False),
+        G_delay_tg=_dial((0.0, 0.1, 0.2, 0.3, 0.4), unit="s"),
+        G_i2t_selectable=True,
+        curve_options=("S/G: I²t ON (inverso até 10×Ir/In) ou I²t OFF (tempo fixo)",),
+        notes=(
+            "Família com 4 variantes de funções: 2.0A (só L; I via Isd com "
+            "tsd=0 de fábrica, base Ir — dial Isd 1.5-10×Ir); 3.0A (L+I, sem "
+            "S; Ii base In, dial 1.5-12×In); 5.0A (L+S+I, sem G); 6.0A "
+            "(L+S+I+G, completa — modelada aqui). tr também tabelado a "
+            "1.5×Ir {12.5,25,50,100,200,300,400,500,600} s e a 7.2×Ir "
+            "{0.343,0.69,1.38,2.7,5.5,8.3,11,13.8,16.6} s (mesmos 9 dials); "
+            "com tsd=0.4-on ou 4.0-off, tr=0.5 em vez de 0.34 (5.0A/6.0A). "
+            "Trip threshold Ir real: 1.05-1.20×Ir. tsd/tg: dial rotula o "
+            "tempo a 10×Ir/In com I²t OFF; tolerância min/max real 20-80/"
+            "80-140/140-200/230-320/350-500 ms (S) e igual para G. Ig por "
+            "faixa de In: {0.3,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0}×In se "
+            "In≤400 A (posição A=0.3, não 0.2 — dial acima é para "
+            "400<In≤1200 A); para In>1200 A, Ig em A absoluto: "
+            "{500,640,720,800,880,960,1040,1120,1200}. Ii possui posição "
+            "Off (5.0A/6.0A). Corrente de defeito de terra nominal do "
+            "equipamento: 1200 A."
+        ),
+    ),
     # WEG — ABW-OCR Tipo P (ACB) — Manual Disjuntor Aberto ABW, págs. 13-14
     TripUnitModel(
         model_id="WEG-ABW-OCR-TIPO-P",
