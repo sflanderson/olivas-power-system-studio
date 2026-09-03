@@ -20,8 +20,9 @@ Topologia montada (uma célula por fase)::
   ``phase_deg`` — **o parâmetro do Monte Carlo de instante de abertura**;
 * transformador abaixador representado pela impedância de dispersão
   referida ao lado de 4,16 kV (ramo R–L série por fase);
-* dois cabos a parâmetros distribuídos (Bergeron), a montante e a
-  jusante do disjuntor;
+* dois cabos a parâmetros distribuídos, a montante e a jusante do
+  disjuntor, no modelo de Bergeron (padrão) ou JMarti dependente da
+  frequência (``CableParameters(model="jmarti")``);
 * um polo de :class:`~app.simulation.emt.vcb.VacuumCircuitBreakerModel`
   por fase, com escalonamento dos instantes de separação;
 * *snubber* ativo opcional
@@ -89,6 +90,12 @@ from app.simulation.emt.components import (
     Resistor,
     Switch,
     three_phase_voltage_sources,
+)
+from app.simulation.emt.jmarti import (
+    JMartiLine,
+    LineFrequencyData,
+    ModalLineModel,
+    frequency_grid_for_delay,
 )
 from app.simulation.emt.line import BergeronLine
 from app.simulation.emt.probes import (
@@ -260,6 +267,17 @@ class TransformerParameters:
         return r, x / (2.0 * math.pi * f)
 
 
+#: Modelo de cabo a parâmetros CONSTANTES (Bergeron) — padrão do caso.
+CABLE_MODEL_BERGERON: str = "bergeron"
+
+#: Modelo de cabo com DEPENDÊNCIA DE FREQUÊNCIA (JMarti), o que o
+#: Documento A declara ter usado ("LCC/JMARTI") [FATO: doc A, p. 3].
+CABLE_MODEL_JMARTI: str = "jmarti"
+
+#: Modelos de cabo aceitos por :attr:`CableParameters.model`.
+CABLE_MODELS: tuple[str, ...] = (CABLE_MODEL_BERGERON, CABLE_MODEL_JMARTI)
+
+
 @dataclass(frozen=True)
 class CableParameters:
     """Cabo de média tensão a parâmetros distribuídos constantes.
@@ -283,12 +301,34 @@ class CableParameters:
         Comprimento [m], > 0.
     inductance_H_per_m, capacitance_F_per_m, resistance_ohm_per_m:
         Parâmetros distribuídos.
+    model:
+        ``"bergeron"`` (padrão, parâmetros constantes) ou ``"jmarti"``
+        (dependente da frequência). A Fig. 2 de A declara cabos
+        ``LCC/JMARTI`` [FATO: doc A, p. 3], de modo que ``"jmarti"`` é o
+        que se aproxima do modelo do artigo; o padrão continua sendo o
+        Bergeron para preservar a comparabilidade com os resultados já
+        publicados deste módulo.
+    fit_f_min_Hz, fit_f_max_Hz:
+        Faixa de frequência das tabelas geradas para o ajuste racional
+        [Hz]. O teto de 2 MHz cobre uma frente de ~0,2 µs
+        [INFERÊNCIA FÍSICA: ``f ≈ 0,35/t_f``].
+    fit_poles_zc, fit_poles_a:
+        Ordem do ajuste de ``Z_c`` e de ``A_min``.
+    fit_tolerance:
+        Erro RMS relativo máximo tolerado no ajuste; acima dele a
+        montagem levanta ``RationalFitError``.
     """
 
     length_m: float = 500.0
     inductance_H_per_m: float = 0.35e-6
     capacitance_F_per_m: float = 0.25e-9
     resistance_ohm_per_m: float = 0.10e-3
+    model: str = CABLE_MODEL_BERGERON
+    fit_f_min_Hz: float = 1.0
+    fit_f_max_Hz: float = 2.0e6
+    fit_poles_zc: int = 6
+    fit_poles_a: int = 10
+    fit_tolerance: float = 2.0e-2
 
     def __post_init__(self) -> None:
         _require_positive(self.length_m, "length_m")
@@ -298,6 +338,20 @@ class CableParameters:
             raise ValueError(
                 f"resistance_ohm_per_m deve ser >= 0, obtido {self.resistance_ohm_per_m!r}"
             )
+        if str(self.model) not in CABLE_MODELS:
+            raise ValueError(
+                f"model deve ser um de {CABLE_MODELS}, obtido {self.model!r}"
+            )
+        _require_positive(self.fit_f_min_Hz, "fit_f_min_Hz")
+        _require_positive(self.fit_f_max_Hz, "fit_f_max_Hz")
+        if float(self.fit_f_max_Hz) <= float(self.fit_f_min_Hz):
+            raise ValueError(
+                f"fit_f_max_Hz ({self.fit_f_max_Hz!r}) deve ser > fit_f_min_Hz "
+                f"({self.fit_f_min_Hz!r})"
+            )
+        if int(self.fit_poles_zc) < 0 or int(self.fit_poles_a) < 0:
+            raise ValueError("fit_poles_zc e fit_poles_a devem ser >= 0")
+        _require_positive(self.fit_tolerance, "fit_tolerance")
 
     @property
     def surge_impedance_ohm(self) -> float:
@@ -311,8 +365,58 @@ class CableParameters:
             self.inductance_H_per_m * self.capacitance_F_per_m
         )
 
-    def build(self, name: str, node_k: str, node_m: str) -> BergeronLine:
-        """Instancia a linha de Bergeron correspondente."""
+    def frequency_data(self, label: str = "cabo") -> LineFrequencyData:
+        """Tabelas ``Z_c(ω)``/``A(ω)`` deste cabo, para o ajuste JMarti.
+
+        A malha é dimensionada por
+        :func:`~app.simulation.emt.jmarti.frequency_grid_for_delay` a
+        partir do ``τ`` nominal, de modo que a extração do atraso não
+        sofra *aliasing* de fase.
+
+        **[HIPÓTESE]** As tabelas são geradas do modelo ``R'L'C'`` com
+        ``R'`` CONSTANTE — não há efeito pelicular nem retorno pela
+        terra. A dependência de frequência resultante é a de uma linha
+        com perdas ôhmicas puras, que é MENOS acentuada que a real. Para
+        o estudo definitivo, substitua por tabelas do cálculo de
+        parâmetros do próprio caso ATP (``CABLE CONSTANTS``), que é o
+        caminho primário previsto em
+        :class:`~app.simulation.emt.jmarti.LineFrequencyData`.
+        """
+        omega = frequency_grid_for_delay(
+            self.travel_time_s,
+            f_min_Hz=float(self.fit_f_min_Hz),
+            f_max_Hz=float(self.fit_f_max_Hz),
+        )
+        return LineFrequencyData.from_distributed_parameters(
+            length_m=self.length_m,
+            inductance_H_per_m=self.inductance_H_per_m,
+            capacitance_F_per_m=self.capacitance_F_per_m,
+            resistance_ohm_per_m=self.resistance_ohm_per_m,
+            omega=omega,
+            label=label,
+        )
+
+    def modal_model(self, label: str = "cabo") -> ModalLineModel:
+        """Ajusta o modelo JMarti deste cabo (um modo)."""
+        return ModalLineModel.fit(
+            self.frequency_data(label),
+            n_poles_yc=int(self.fit_poles_zc),
+            n_poles_a=int(self.fit_poles_a),
+            tolerance=float(self.fit_tolerance),
+            label=label,
+        )
+
+    def build(self, name: str, node_k: str, node_m: str) -> BergeronLine | JMartiLine:
+        """Instancia a linha no modelo selecionado por :attr:`model`.
+
+        ``"bergeron"`` (padrão) devolve
+        :class:`~app.simulation.emt.line.BergeronLine`; ``"jmarti"``
+        devolve :class:`~app.simulation.emt.jmarti.JMartiLine` com
+        ajuste racional feito na hora. As duas classes têm a MESMA
+        interface de componente, de modo que nada mais do caso muda.
+        """
+        if str(self.model) == CABLE_MODEL_JMARTI:
+            return JMartiLine(name, node_k, node_m, model=self.modal_model(name))
         return BergeronLine.from_distributed_parameters(
             name,
             node_k,
@@ -697,6 +801,23 @@ class MotorSwitchingCase:
         """Devolve uma cópia com outro ponto da onda — passo do Monte Carlo."""
         return replace(self, source=replace(self.source, phase_deg=float(phase_deg)))
 
+    def with_cable_model(self, model: str) -> "MotorSwitchingCase":
+        """Devolve uma cópia com OS DOIS cabos no modelo indicado.
+
+        ``model`` deve ser ``"bergeron"`` ou ``"jmarti"``
+        (:data:`CABLE_MODELS`). É o único parâmetro necessário para
+        trocar de modelo de linha: a interface de componente é a mesma
+        nos dois casos.
+        """
+        m = str(model)
+        if m not in CABLE_MODELS:
+            raise ValueError(f"model deve ser um de {CABLE_MODELS}, obtido {model!r}")
+        return replace(
+            self,
+            cable_upstream=replace(self.cable_upstream, model=m),
+            cable_downstream=replace(self.cable_downstream, model=m),
+        )
+
     # -- montagem -----------------------------------------------------------
 
     def build(self) -> MotorSwitchingModel:
@@ -852,11 +973,20 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "Tabela III é, por isso, impossível a partir do artigo isolado."
     ),
     "emt_case_constant_parameter_cables": (
-        "Os cabos são de parâmetros CONSTANTES (Bergeron), enquanto A usa "
-        "JMARTI dependente da frequência. Sem efeito pelicular nem retorno "
-        "pela terra, a frente chega ao motor praticamente sem atenuação e o "
-        "dv/dt reportado é COTA SUPERIOR. Herda a limitação "
-        "emt_constant_parameter_line do kernel."
+        "Os cabos são, POR PADRÃO, de parâmetros CONSTANTES (Bergeron), "
+        "enquanto A usa JMARTI dependente da frequência. Sem efeito pelicular "
+        "nem retorno pela terra, a frente chega ao motor praticamente sem "
+        "atenuação e o dv/dt reportado é COTA SUPERIOR. Herda a limitação "
+        "emt_constant_parameter_line do kernel. Desde a implementação de "
+        "app/simulation/emt/jmarti.py o caso aceita "
+        "CableParameters(model='jmarti') — ou "
+        "MotorSwitchingCase.with_cable_model('jmarti') —, mas as tabelas "
+        "Z_c(ω)/A(ω) então geradas vêm do modelo R'L'C' com R' CONSTANTE "
+        "[HIPÓTESE], e NÃO de um cálculo de parâmetros de cabo real: a "
+        "dependência de frequência representada é a das perdas ôhmicas "
+        "puras, menos acentuada que a real. A troca de modelo muda o "
+        "resultado, e a diferença medida entre os dois modelos está "
+        "registrada em tests/test_emt_jmarti.py."
     ),
     "emt_case_no_phase_coupling": (
         "As três fases são células ELETRICAMENTE INDEPENDENTES, acopladas "
@@ -901,8 +1031,13 @@ KNOWN_LIMITATIONS: dict[str, str] = {
         "que a Tabela III NÃO é reprodutível a partir do artigo isolado."
     ),
     "emt_case_no_steady_state_start": (
-        "A simulação parte do repouso (limitação emt_no_steady_state_init do "
-        "kernel). Os instantes de separação padrão (14 a 25 ms) dão de 0,8 a "
+        "A simulação do caso parte do REPOUSO: o kernel já oferece a partida "
+        "fasorial (Solver(init='steady_state')), mas o caso mantém "
+        "deliberadamente init='zero', porque a Tabela III do Documento A não "
+        "informa o estado de regime da rede a montante "
+        "(§emt_case_undisclosed_network_data) e uma semeadura fasorial sobre "
+        "dados presumidos daria falsa precisão. Consequência do repouso: "
+        "os instantes de separação padrão (14 a 25 ms) dão de 0,8 a "
         "1,5 ciclo de acomodação, o que NÃO é suficiente para extinguir o "
         "transitório de energização do ramo R–L do motor: com L/R = 13,0 ms "
         "na variante da Fig. 2 [CÁLCULO PRÓPRIO], a componente contínua ainda "

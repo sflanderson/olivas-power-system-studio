@@ -23,21 +23,78 @@ depende do modo de integração: como demonstrado no cabeçalho de
 exatamente as mesmas condutâncias companheiras da regra trapezoidal de
 passo ``Δt``. Só o vetor ``b`` muda.
 
-[LITERATURA: H. W. Dommel, "Digital Computer Solution of
-Electromagnetic Transients in Single- and Multiphase Networks", *IEEE
-Trans. PAS*, vol. PAS-88, n. 4, pp. 388-399, 1969.]
+A estrutura ``[[G, A_c], [A_l, A_d]]·[v_n; i_x] = [i_n; v_x]`` é a de
+[FONTE: Ho, Ruehli & Brennan 1975, eq. (2), p. 504]; a notação e a
+partição adotadas aqui são as de [LISTA: 02, §1.2, eq. (4)], em que
+``G`` é a matriz de condutâncias nodal, ``v_n`` as tensões nodais
+desconhecidas, ``i_x`` as correntes desconhecidas (fontes de tensão e
+chaves), ``i_n`` as correntes conhecidas (fontes de corrente e termos
+históricos) e ``v_x`` as tensões conhecidas.
+
+[FONTE: H. W. Dommel, "Digital computer solution of electromagnetic
+transients in single- and multiphase networks", *IEEE Trans. PAS*, vol.
+PAS-88, n. 4, pp. 388-399, abr. 1969] — eqs. (12)-(13), p. 390.
+[FONTE: C.-W. Ho, A. E. Ruehli, P. A. Brennan, "The modified nodal
+approach to network analysis", *IEEE Trans. CAS*, vol. CAS-22, n. 6,
+pp. 504-509, jun. 1975.]
+[FONTE: J. Mahseredjian et al., "On a new approach for the simulation
+of transients in power systems", *EPSR* 77 (2007) 1514-1520] — §2.
 [LITERATURA: J. A. Martinez-Velasco (ed.), *Transient Analysis of
 Power Systems: Solution Techniques, Tools and Applications*, Wiley/IEEE
 Press, 2015, cap. 2.]
 
-Amortecimento crítico (CDA)
-============================
+Amortecimento crítico (CDA) — procedimento publicado
+=====================================================
 
-Após CADA mudança de topologia (abertura ou fechamento de chave), o
-passo seguinte de ``Δt`` é substituído por DOIS meios-passos de Euler
-regressivo de ``Δt/2``, como faz o ATP [LITERATURA: J. R. Marti e J.
-Lin, "Suppression of numerical oscillations in the EMTP", *IEEE Trans.
-Power Systems*, vol. 4, n. 2, pp. 739-747, 1989].
+O procedimento implementado é o de [FONTE: J. Lin, J. R. Martí,
+"Implementation of the CDA procedure in the EMTP", *IEEE Trans. Power
+Systems*, vol. 5, n. 2, pp. 394-402, maio 1990, §2, p. 394], reproduzido
+aqui passo a passo porque é o ponto do kernel em que a paráfrase é mais
+perigosa. Conceito original em [LITERATURA: J. R. Martí e J. Lin,
+"Suppression of numerical oscillations in the EMTP", *IEEE Trans. Power
+Systems*, vol. 4, n. 2, pp. 739-747, 1989].
+
+1. A rede marcha normalmente com a regra trapezoidal em
+   ``t = 0, Δt, 2Δt, …`` até que uma descontinuidade esteja prevista
+   para ``t₁⁺``. São descontinuidades: manobras de chave, saltos no
+   valor das fontes (**inclusive em ``t = 0``**) e transições de
+   segmento em indutâncias lineares por partes.
+2. A rede é resolvida NORMALMENTE em ``t₁``, supondo que a
+   descontinuidade ainda não ocorreu — é a solução para ``t₁⁻``.
+3. A descontinuidade é então aplicada (a matriz muda de topologia) e o
+   CDA entra em ação.
+4. O ponto seguinte é obtido em ``t₁ + Δt/2`` pela regra de Euler
+   regressivo com passo ``Δt/2``. Como as condutâncias companheiras do
+   Euler regressivo com ``Δt/2`` são IDÊNTICAS às da regra trapezoidal
+   com ``Δt``, "a matriz [G] da eq. (1) não muda; só as fórmulas do
+   vetor de históricos [h(t)] precisam mudar".
+5. A rede é resolvida uma SEGUNDA vez por Euler regressivo com ``Δt/2``,
+   em ``t₂ = (t₁ + Δt/2) + Δt/2 = t₁ + Δt`` — de modo que a marcha
+   volta a cair sobre a malha uniforme de ``Δt``.
+6. Em seguida a simulação prossegue normalmente com a regra trapezoidal
+   em ``t₂ + Δt``, ``t₂ + 2Δt``, … até a próxima descontinuidade.
+
+São, portanto, EXATAMENTE DOIS meios-passos por descontinuidade, com
+passo ``h = Δt/2``, iniciados no instante da mudança de topologia e
+terminando sobre o ponto ``t₁ + Δt`` da malha regular.
+
+Regra de decisão durante o CDA (item explícito da fonte): "os
+resultados em ``t₁ + Δt/2`` são apenas quantidades matemáticas usadas
+pelo procedimento CDA, sem significado físico. Portanto NENHUMA decisão
+sobre abrir ou fechar chaves é tomada com base nesses resultados. As
+decisões seguintes são tomadas em ``t₁ + Δt``, quando a sobre-elongação
+já foi amortecida." A única exceção admitida pela fonte é a transição
+de segmento em indutâncias lineares por partes, que não existe neste
+kernel. A implementação respeita a regra: os controladores só são
+chamados no início de cada passo COMPLETO (ver :meth:`Solver.run`).
+
+Reconstrução do histórico ao voltar ao trapezoidal: nenhuma é
+necessária. O segundo meio-passo termina sobre ``t₂ = t₁ + Δt`` e deixa
+``i(t₂)`` e ``v(t₂)`` armazenados em cada ramo; o passo trapezoidal
+seguinte lê exatamente esse par pelas eqs. (9b)/(10b) de Dommel. É por
+isso que o CDA "não interfere no esquema normal de solução do EMTP e
+não exige o reajuste de condições iniciais nem outras complicações"
+[FONTE: Lin & Martí 1990, §2, p. 394].
 
 Por que isso é indispensável neste projeto: ao interromper a corrente
 de um indutor (o *chopping* do disjuntor a vácuo, ``I_ch`` de 1 a 2 A
@@ -126,6 +183,13 @@ from app.simulation.emt.components import (
     Component,
     Switch,
     is_ground,
+)
+from app.simulation.emt.steady_state import (
+    INIT_MODES,
+    INIT_STEADY_STATE,
+    INIT_ZERO,
+    PhasorSolution,
+    initialize_steady_state,
 )
 
 log = get_logger(__name__)
@@ -432,12 +496,46 @@ Controller = Callable[[float, "Solver"], None]
 
 
 class TimedSwitchController:
-    """Controlador de chave por tempo absoluto.
+    """Controlador de chave por tempo absoluto, com margem de corrente.
 
-    A chave é fechada no primeiro passo com ``t >= close_time_s`` e
-    aberta no primeiro passo com ``t >= open_time_s``. Como o passo é
-    fixo, o instante efetivo de manobra é quantizado em ``Δt`` —
-    limitação declarada ``emt_switching_quantized_to_step``.
+    Critério de comutação [LISTA: 02, §1.3], que reproduz a semântica do
+    cartão de chave do ATP:
+
+    * **Fechamento** comandado em ``t0`` é INSTANTÂNEO, valendo para
+      todo passo com ``t >= close_time_s``.
+    * **Abertura** comandada em ``t0`` só se efetiva a partir do primeiro
+      instante ``t >= open_time_s`` em que a corrente na chave se anula
+      ou cai abaixo do limiar ``|I_mar|`` — o campo *current margin*
+      (colunas 35-44) do cartão de chave do ATP. É esse campo, e só ele,
+      que representa o corte de corrente do disjuntor a vácuo: "sem o
+      campo Imar o ATP esperaria um zero natural de corrente e a
+      sobretensão praticamente desapareceria" [LISTA: 02, §3.6].
+
+    ``current_margin_A = None`` (padrão) delega o valor ao campo
+    :attr:`Switch.current_margin_A` da própria chave; se este também for
+    ``None``, mantém-se a ABERTURA FORÇADA — a chave abre no primeiro
+    passo com ``t >= open_time_s``, independentemente da corrente. É o
+    comportamento de um interruptor ideal comandado, útil em ensaio
+    numérico, mas NÃO é o de um disjuntor: quem quiser o critério físico
+    deve informar ``I_mar`` (ou usar o polo de VCB de
+    :mod:`app.simulation.emt.vcb`, que implementa o mesmo critério com
+    corrente de *chopping* amostrada). O instante em que a abertura
+    efetivamente ocorre fica registrado em
+    :attr:`effective_open_time_s`.
+
+    Convenção do instante de comutação. O controlador é chamado com o
+    instante JÁ resolvido; a mudança de estado, portanto, só se reflete
+    na solução do passo SEGUINTE. É deliberadamente a convenção do ATP,
+    que "avalia o estado das chaves antes de resolver cada passo, usando
+    o instante anterior" — e que, conforme [LISTA: 02, §2.7 e Tabela 1],
+    reduz o desvio contra o ATP de 4,11·10⁻³ A para 1,21·10⁻⁵ A no
+    circuito de referência da Questão 1.
+
+    Como o passo é fixo, o instante efetivo de manobra é quantizado em
+    ``Δt`` — limitação declarada ``emt_switching_quantized_to_step``.
+    [LISTA: 02, Tabela 4] mede o efeito no caso de referência: com
+    ``Δt = 1 µs`` o corte atrasa 1,578 µs e o pico da TRV cai de
+    506,17 V (analítico) para 504,29 V.
     """
 
     def __init__(
@@ -446,6 +544,7 @@ class TimedSwitchController:
         *,
         close_time_s: float | None = None,
         open_time_s: float | None = None,
+        current_margin_A: float | None = None,
     ) -> None:
         if not isinstance(switch, Switch):
             raise ValueError("TimedSwitchController exige um componente Switch")
@@ -453,16 +552,65 @@ class TimedSwitchController:
             raise ValueError("close_time_s deve ser finito ou None")
         if open_time_s is not None and not math.isfinite(float(open_time_s)):
             raise ValueError("open_time_s deve ser finito ou None")
+        if current_margin_A is not None:
+            margin = float(current_margin_A)
+            if not math.isfinite(margin) or margin < 0.0:
+                raise ValueError(
+                    f"current_margin_A deve ser finita e >= 0, obtida {current_margin_A!r}"
+                )
+        else:
+            margin = None
         self.switch = switch
         self.close_time_s = None if close_time_s is None else float(close_time_s)
         self.open_time_s = None if open_time_s is None else float(open_time_s)
+        self.current_margin_A = margin
+        #: Instante em que a abertura comandada EFETIVAMENTE ocorreu [s],
+        #: ou ``None``. Com ``I_mar`` ele é posterior a ``open_time_s`` —
+        #: é o ``t_c`` de [LISTA: 02, §3.4 e Tabela 4].
+        self.effective_open_time_s: float | None = None
+        self._last_t: float = -1.0
+
+    @property
+    def margin_in_force_A(self) -> float | None:
+        """``I_mar`` efetivamente aplicado [A], ou ``None`` (abertura forçada).
+
+        O valor do controlador tem precedência; ``None`` recai sobre o
+        campo :attr:`Switch.current_margin_A` da própria chave, que é
+        onde o cartão do ATP guardaria o dado.
+        """
+        if self.current_margin_A is not None:
+            return self.current_margin_A
+        return self.switch.current_margin_A
+
+    def reset(self) -> None:
+        """Reinicia a memória de instante efetivo de abertura."""
+        self.effective_open_time_s = None
+        self._last_t = -1.0
 
     def __call__(self, t: float, solver: "Solver") -> None:
-        if self.close_time_s is not None and t >= self.close_time_s:
-            if self.open_time_s is None or t < self.open_time_s:
+        t_f = float(t)
+        if self._last_t >= 0.0 and t_f < self._last_t:
+            # Nova execução do solver: o relógio retrocedeu.
+            self.reset()
+        self._last_t = t_f
+        if self.close_time_s is not None and t_f >= self.close_time_s:
+            if self.open_time_s is None or t_f < self.open_time_s:
                 self.switch.set_state(True)
-        if self.open_time_s is not None and t >= self.open_time_s:
-            self.switch.set_state(False)
+        if self.open_time_s is not None and t_f >= self.open_time_s:
+            # [LISTA: 02, §1.3]: comandada a abertura, ela só se efetiva no
+            # primeiro passo em que |i_sw| <= I_mar (campo Imar do ATP).
+            margin = self.margin_in_force_A
+            if margin is None:
+                interrupted = True
+                self.switch.set_state(False)
+            else:
+                interrupted = (
+                    abs(float(self.switch.branch_current(0))) <= margin
+                )
+                if interrupted:
+                    self.switch.set_state(False)
+            if interrupted and self.effective_open_time_s is None:
+                self.effective_open_time_s = t_f
 
 
 # ---------------------------------------------------------------------------
@@ -524,17 +672,71 @@ class Solver:
         demonstrativo.
     cda_full_steps:
         Quantidade de passos completos substituídos por pares de
-        meios-passos de Euler regressivo após cada evento (padrão 1,
-        que é o do ATP). Em redes muito rígidas depois do evento — a
-        constante de tempo residual muito menor que ``Δt`` — o valor 2
-        elimina o resíduo que um único passo de CDA ainda deixa.
+        meios-passos de Euler regressivo após cada evento. O padrão 1 —
+        isto é, UM par, ou DOIS meios-passos de ``Δt/2`` — é o
+        procedimento publicado: "a rede é resolvida uma segunda vez com
+        a regra de Euler regressivo usando passo ``Δt/2``, isto é, em
+        ``t₂ = (t₁ + Δt/2) + Δt/2``. Em seguida a simulação continua
+        normalmente com a regra trapezoidal" [FONTE: Lin & Martí 1990,
+        §2, p. 394]. Valores maiores que 1 NÃO têm respaldo na fonte
+        [HIPÓTESE]: a única situação em que ela prevê meios-passos
+        adicionais é a mudança de segmento de uma indutância linear por
+        partes detectada logo após o primeiro meio-passo, caso em que
+        são feitos TRÊS meios-passos adicionais — número ímpar,
+        justamente para recair sobre a malha uniforme de ``Δt``
+        [FONTE: Lin & Martí 1990, §4, p. 395]. Esse elemento não existe
+        neste kernel. Mantenha 1 salvo em ensaio numérico declarado.
     record_half_steps:
-        Registra também as amostras dos meios-passos do CDA (padrão
-        ``False``). Ative quando o pico da grandeza de interesse puder
-        cair DENTRO do par de meios-passos — é o caso do primeiro
-        semiciclo da TRV logo após a interrupção. A base de tempo deixa
-        de ser uniforme, o que ``extract_stress_events`` aceita mas
-        sinaliza em ``StressProfile.warnings``.
+        Registra também a amostra INTERMEDIÁRIA do par de meios-passos
+        do CDA (padrão ``False``, que é o correto). A fonte é explícita:
+        "os resultados em ``t₁ + Δt/2`` são apenas quantidades
+        matemáticas usadas pelo procedimento CDA, sem significado
+        físico" [FONTE: Lin & Martí 1990, §2, p. 394] — são o ponto
+        intermediário de um amortecimento deliberado, não a forma de
+        onda da rede. Ativar esta opção injeta esse ponto na série de
+        saída e, portanto, no vetor de estresse ``s_{m,j}``; use-a
+        apenas em ensaio numérico, e nunca para "capturar o pico" da
+        TRV. Para resolver melhor o pico o caminho legítimo é REDUZIR
+        ``Δt``: [LISTA: 02, Tabela 4] mostra o pico convergindo
+        monotonicamente para o valor analítico (501,37 V em 4 µs;
+        504,29 V em 1 µs; 505,84 V em 0,25 µs; 506,17 V analítico).
+        A base de tempo também deixa de ser uniforme, o que
+        ``extract_stress_events`` aceita mas sinaliza em
+        ``StressProfile.warnings``. Emite ``WARNING`` quando ativada.
+    init:
+        Estado inicial da marcha. ``"zero"`` (padrão) parte do REPOUSO —
+        históricos nulos, salvo condição inicial explícita nos ramos.
+        ``"steady_state"`` resolve o circuito por transformação fasorial
+        na topologia CORRENTE das chaves e semeia os históricos por
+        ``I_L(0) = i_L(0) + G_L·v_L(0)`` e
+        ``I_C(0) = −[G_C·v_C(0) + i_C(0)]`` [LISTA: 02, §1.4 e eq. (6)],
+        preenchendo também o histórico de trânsito das linhas de
+        Bergeron com a onda de regime. É o equivalente do ``TSTART``
+        negativo do cartão de fonte do ATP. Nesse modo o paliativo de
+        meios-passos na PARTIDA é desligado automaticamente (não há
+        descontinuidade em ``t = 0``); o CDA das manobras permanece
+        ativo, que é outra coisa. Ver
+        :mod:`app.simulation.emt.steady_state`.
+    init_frequency_Hz:
+        Frequência imposta à solução fasorial [Hz]. ``None`` (padrão)
+        detecta a frequência das fontes; havendo mais de uma, é erro
+        (:class:`MultipleFrequenciesError`).
+    cda_at_start:
+        Aplica o CDA também no primeiro passo. ``None`` (padrão)
+        RESOLVE pelo modo de partida: ``True`` com ``init="zero"``,
+        ``False`` com ``init="steady_state"``. A fonte
+        lista entre as descontinuidades os "saltos no valor das fontes
+        aplicadas (inclusive em ``t = 0``)" [FONTE: Lin & Martí 1990,
+        §2, p. 394], e é o caso quando a simulação parte do REPOUSO com
+        fonte já em valor não nulo. Deve ser ``False`` quando a partida
+        for em REGIME PERMANENTE, com os históricos semeados por
+        ``I_L(0) = i_L(0) + G_L·v_L(0)`` e
+        ``I_C(0) = −[G_C·v_C(0) + i_C(0)]`` [LISTA: 02, eq. (6)]: nesse
+        caso não há descontinuidade em ``t = 0``, e os dois meios-passos
+        de Euler regressivo introduziriam amortecimento numérico onde a
+        marcha trapezoidal reproduz a solução fasorial desde o primeiro
+        passo — desvio de 1,39·10⁻¹⁰ V no circuito de referência
+        [LISTA: 02, §3.7 e Tabela 3].
     solve_strategy:
         ``"auto"`` (padrão) aplica a solução pela inversa cacheada e
         recai automaticamente na substituição LU quando o
@@ -551,11 +753,21 @@ class Solver:
 
     Notes
     -----
-    O estado inicial é o repouso (todas as correntes de indutor e
-    tensões de capacitor nulas, salvo condição inicial explícita nos
-    componentes). NÃO há inicialização fasorial em regime permanente —
-    limitação declarada ``emt_no_steady_state_init``: simule uma janela
-    de acomodação antes do evento de interesse.
+    Com ``init="zero"`` (padrão) o estado inicial é o repouso — todas as
+    correntes de indutor e tensões de capacitor nulas, salvo condição
+    inicial explícita nos componentes. Com ``init="steady_state"`` a
+    partida é a do regime permanente senoidal, resolvido por
+    :func:`app.simulation.emt.steady_state.initialize_steady_state`, e a
+    solução fasorial usada fica disponível em
+    :attr:`Solver.steady_state_solution` para auditoria.
+
+    Em nenhum dos dois modos se registra amostra em ``t = 0``: a
+    primeira amostra da série é a de ``t = Δt``. Com
+    ``init="steady_state"``, porém, o vetor de estado em ``t = 0`` é o do
+    regime permanente, de modo que :meth:`node_voltage` e as leituras de
+    ramo já valem o regime ANTES do primeiro passo — é sobre elas que os
+    controladores decidem a manobra, inclusive pelo critério de margem
+    de corrente ``Imar``.
     """
 
     def __init__(
@@ -566,6 +778,9 @@ class Solver:
         cda_enabled: bool = True,
         cda_full_steps: int = 1,
         record_half_steps: bool = False,
+        cda_at_start: bool | None = None,
+        init: str = INIT_ZERO,
+        init_frequency_Hz: float | None = None,
         solve_strategy: str = "auto",
         use_cached_factorization: bool = True,
         cache_size: int = DEFAULT_FACTORIZATION_CACHE_SIZE,
@@ -585,12 +800,64 @@ class Solver:
                 f"solve_strategy deve ser um de {SOLVE_STRATEGIES}, "
                 f"obtido {solve_strategy!r}"
             )
+        init_mode = str(init)
+        if init_mode not in INIT_MODES:
+            raise ValueError(
+                f"init deve ser um de {INIT_MODES}, obtido {init!r}"
+            )
+        if init_frequency_Hz is not None:
+            f_init = float(init_frequency_Hz)
+            if not math.isfinite(f_init) or f_init <= 0.0:
+                raise ValueError(
+                    f"init_frequency_Hz deve ser finita e > 0, obtida "
+                    f"{init_frequency_Hz!r}"
+                )
 
         self.circuit = circuit
         self.dt = dt_f
         self.cda_enabled = bool(cda_enabled)
         self.cda_full_steps = n_cda
+        if n_cda > 1:
+            log.warning(
+                "cda_full_steps=%d em %r: o procedimento publicado prevê "
+                "EXATAMENTE um par de meios-passos de Δt/2 por descontinuidade "
+                "[Lin & Martí 1990, §2, p. 394]; valores maiores são extensão "
+                "não publicada e introduzem amortecimento numérico adicional",
+                n_cda,
+                circuit.name,
+            )
         self.record_half_steps = bool(record_half_steps)
+        if self.record_half_steps:
+            log.warning(
+                "record_half_steps=True em %r: a amostra em t+Δt/2 é quantidade "
+                "matemática do CDA, SEM significado físico [Lin & Martí 1990, "
+                "§2, p. 394]; ela contaminará a série de saída e o vetor de "
+                "estresse — para resolver o pico da TRV reduza Δt",
+                circuit.name,
+            )
+        self.init = init_mode
+        self.init_frequency_Hz = (
+            None if init_frequency_Hz is None else float(init_frequency_Hz)
+        )
+        # Partida em regime permanente NÃO tem descontinuidade em t = 0:
+        # os dois meios-passos de Euler regressivo introduziriam
+        # amortecimento numérico onde a marcha trapezoidal já reproduz a
+        # solução fasorial desde o primeiro passo [LISTA: 02, §1.4 e §3.7].
+        # O CDA das MANOBRAS continua ativo — é outra coisa.
+        if cda_at_start is None:
+            self.cda_at_start = init_mode == INIT_ZERO
+        else:
+            self.cda_at_start = bool(cda_at_start)
+            if self.cda_at_start and init_mode == INIT_STEADY_STATE:
+                log.warning(
+                    "cda_at_start=True com init='steady_state' em %r: não há "
+                    "descontinuidade em t = 0 na partida em regime permanente, "
+                    "e o par de meios-passos de Euler regressivo AMORTECE o "
+                    "regime que acabou de ser semeado; o desvio contra a "
+                    "solução fasorial deixa de ser da ordem de 1e-10 V "
+                    "[LISTA: 02, Tabela 3]",
+                    circuit.name,
+                )
         self.solve_strategy = str(solve_strategy)
         self.use_cached_factorization = bool(use_cached_factorization)
         self.cache_size = int(cache_size)
@@ -604,6 +871,7 @@ class Solver:
         self._probes: list = []
         self._pending_cda: int = 0
         self._warned_no_cda: bool = False
+        self._steady_state: "PhasorSolution | None" = None
 
         self.stats = SolverResult()
 
@@ -631,6 +899,16 @@ class Solver:
     def cache_entries(self) -> int:
         """Número de fatorações retidas no cache."""
         return len(self._cache)
+
+    @property
+    def steady_state_solution(self) -> "PhasorSolution | None":
+        """Solução fasorial usada na partida, ou ``None``.
+
+        Só é preenchida com ``init="steady_state"``, após a primeira
+        chamada de :meth:`run` com ``reset=True``. Serve à auditoria:
+        permite confrontar a marcha no tempo com o fasor que a semeou.
+        """
+        return self._steady_state
 
     def node_voltage(self, node: str) -> float:
         """Tensão do nó ``node`` no último passo resolvido [V]."""
@@ -824,47 +1102,84 @@ class Solver:
             self._pending_cda = 0
             self._signature = None
             self._factorization = None
+            if self.init == INIT_STEADY_STATE:
+                # Solução fasorial na topologia CORRENTE das chaves e
+                # semeadura dos históricos [LISTA: 02, §1.4, eq. (6)] —
+                # o equivalente do TSTART negativo do cartão de fonte do
+                # ATP. O estado em t = 0 passa a ser o do regime, de modo
+                # que os controladores já leem correntes de regime no
+                # primeiro passo (critério Imar inclusive).
+                self._steady_state = initialize_steady_state(
+                    self.circuit, self.dt, frequency_Hz=self.init_frequency_Hz
+                )
+                self._x = self._steady_state.state_at(0.0)
         for probe in self._probes:
             probe.bind(self.circuit)
 
         wall0 = time.perf_counter()
         self._sync_topology()
-        # Primeiro passo em CDA: os termos de histórico partem de zero e,
-        # na regra trapezoidal, o termo do capacitor usa i(t−Δt) — que não
-        # é conhecido em t = 0 e é INCONSISTENTE com a rede (o capacitor
-        # descarregado conduz i = v_fonte/R no instante inicial). O Euler
-        # regressivo não usa i(t−h) no capacitor, de modo que dois
-        # meios-passos bastam para estabelecer histórico consistente. Sem
-        # isso o erro global do degrau degenera de O(Δt²) para O(Δt).
+        # Primeiro passo em CDA. A fonte inclui explicitamente entre as
+        # descontinuidades que disparam o CDA os "saltos no valor das fontes
+        # aplicadas (inclusive em t = 0)" [FONTE: Lin & Martí 1990, §2,
+        # p. 394]. Aqui a razão é a mesma vista pelo lado do histórico: os
+        # termos partem de zero e, na regra trapezoidal, o termo do capacitor
+        # usa i(t−Δt) — que não é conhecido em t = 0 e é INCONSISTENTE com a
+        # rede (o capacitor descarregado conduz i = v_fonte/R no instante
+        # inicial). O Euler regressivo não usa i(t−h) no capacitor, de modo
+        # que dois meios-passos bastam para estabelecer histórico
+        # consistente. Sem isso o erro global do degrau degenera de O(Δt²)
+        # para O(Δt).
         # [CÁLCULO PRÓPRIO: ver tests/test_emt_kernel.py, convergência.]
-        if self.cda_enabled:
+        # Na partida em REGIME PERMANENTE não há descontinuidade em t = 0 e
+        # o CDA inicial é indevido — use cda_at_start=False [LISTA: 02, §1.4
+        # e eq. (6)].
+        if self.cda_enabled and self.cda_at_start:
             self._pending_cda = self.cda_full_steps
-        # NÃO se registra amostra em t = 0: a solução nodal nesse
-        # instante exigiria uma rodada de condições iniciais consistentes
-        # (indutor como fonte de corrente i_L0, capacitor como fonte de
-        # tensão v_C0), não implementada — cf. KNOWN_LIMITATIONS
-        # ``emt_no_steady_state_init``. Registrar o vetor nulo produziria
-        # uma amostra FALSA em séries com condição inicial não nula.
+        # NÃO se registra amostra em t = 0, nos DOIS modos de partida, para
+        # que a base de tempo seja a mesma e as séries sejam comparáveis.
+        # Com init='zero' a amostra em t = 0 seria o vetor nulo, FALSA em
+        # séries com condição inicial não nula; com init='steady_state' ela
+        # existe e é válida (self._x já é o regime), mas registrá-la
+        # mudaria o comprimento das séries conforme o modo — cf.
+        # KNOWN_LIMITATIONS ``emt_steady_state_residual_deviation``.
         times: list[float] = []
 
+        # Base de tempo por ÍNDICE, não por acumulação. Somar Δt ao
+        # relógio a cada passo faz o erro de arredondamento crescer com o
+        # número de passos: em 1600 passos de 50 µs a marcha acumulada
+        # chega a t = 0,079999999999999 s, ABAIXO do 0,08 s exato, o que
+        # desloca de um passo qualquer comparação contra uma malha exata
+        # — a do ATP, que imprime n·Δt, e a das rotinas de referência do
+        # autor, que constroem t = (0:N−1)·Δt [LISTA: 01, Apêndice A;
+        # LISTA: 02, Apêndice A]. Reconstruir t_n = t_origem + n·Δt
+        # mantém o erro no nível do arredondamento de UMA operação,
+        # independentemente da duração da simulação.
+        # [REPO: tests/test_emt_referencia_eee873.py, marcha temporal]
+        t_origin = self._t
         n_steps = int(math.floor((t_end_f + 0.5 * self.dt) / self.dt))
-        for _ in range(n_steps):
+        for k_step in range(n_steps):
             for ctrl in ctrls:
                 ctrl(self._t, self)
             if self._sync_topology():
                 self._pending_cda = self.cda_full_steps if self.cda_enabled else 0
-            t0 = self._t
+            t0 = t_origin + k_step * self.dt
+            t1 = t_origin + (k_step + 1) * self.dt
             if self._pending_cda > 0:
-                half = 0.5 * self.dt
-                self._advance(t0 + half, MODE_BACKWARD_EULER_HALF)
+                # DOIS meios-passos de Euler regressivo com h = Δt/2, o
+                # primeiro em t0 + Δt/2 e o segundo em t0 + Δt, de modo que a
+                # marcha recai sobre a malha uniforme [FONTE: Lin & Martí
+                # 1990, §2, p. 394, itens 4-5]. Os controladores NÃO são
+                # chamados entre os dois: a amostra intermediária não tem
+                # significado físico e não pode decidir manobra (mesma fonte).
+                self._advance(0.5 * (t0 + t1), MODE_BACKWARD_EULER_HALF)
                 if self.record_half_steps:
                     times.append(self._t)
                     self._record()
-                self._advance(t0 + 2.0 * half, MODE_BACKWARD_EULER_HALF)
+                self._advance(t1, MODE_BACKWARD_EULER_HALF)
                 self._pending_cda -= 1
                 self.stats.cda_events += 1
             else:
-                self._advance(t0 + self.dt, MODE_TRAPEZOIDAL)
+                self._advance(t1, MODE_TRAPEZOIDAL)
             self.stats.steps += 1
             times.append(self._t)
             self._record()

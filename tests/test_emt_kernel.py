@@ -46,6 +46,7 @@ from app.simulation.emt import (
 from app.simulation.emt import KNOWN_LIMITATIONS
 from app.simulation.emt import __all__ as EMT_ALL
 from app.simulation.emt.probes import to_kV, to_stress_profile
+from app.simulation.emt.components import GROUND_INDEX as GROUND_INDEX_LOCAL
 
 
 # ---------------------------------------------------------------------------
@@ -1115,7 +1116,7 @@ class TestSondasEIntegracao:
             1.0e-5, on_step=lambda t, x, s: instantes.append(t)
         )
         assert resultado.steps == 10
-        # Não há amostra fabricada em t = 0 (emt_no_steady_state_init):
+        # Não há amostra fabricada em t = 0 (init="zero"):
         # a série começa no primeiro instante efetivamente resolvido.
         assert len(instantes) == 10
         assert instantes[0] == pytest.approx(1.0e-6)
@@ -1157,3 +1158,354 @@ class TestSondasEIntegracao:
         from app.simulation.runner import AtpRunner
 
         assert AtpRunner(executable_path=None).is_configured() is False
+
+
+# ---------------------------------------------------------------------------
+# Reancoragem nas fontes primárias (auditoria equação a equação)
+# ---------------------------------------------------------------------------
+
+
+class TestFontesPrimarias:
+    """Confronto direto com as equações publicadas e com o caso de referência.
+
+    Cada teste cita a equação da fonte que verifica. Os valores de
+    referência da Lista 02 foram medidos pelo autor contra o ATP.
+    """
+
+    def test_recursao_do_indutor_dommel_apendice_I(self):
+        """``I_L(t) = 2·G_L·v_L(t) + I_L(t−Δt)``.
+
+        [FONTE: Dommel 1969, Apêndice I, p. 395, sinal + para indutância];
+        [LISTA: 02, eq. (3)].
+        """
+        L, dt = 25.0e-3, 10.0e-6
+        ind = Inductor("L", "1", "2", L, initial_current_A=1.5, initial_voltage_V=7.0)
+        ind.prepare(dt)
+        ind.reset()
+        g = ind.conductance_S
+        assert g == pytest.approx(dt / (2.0 * L), rel=1e-15)
+        # I(0) = i(0) + G·v(0) — semeadura de [LISTA: 02, eq. (6)].
+        i_hist_0 = ind.history_current_A(MODE_TRAPEZOIDAL)
+        assert i_hist_0 == pytest.approx(1.5 + g * 7.0, rel=1e-15)
+        # Um passo com v(t) arbitrário deve satisfazer a recursão publicada.
+        ind._idx = (0, GROUND_INDEX_LOCAL)
+        v1 = -3.25
+        ind.commit(np.array([v1]), dt, MODE_TRAPEZOIDAL)
+        assert ind.history_current_A(MODE_TRAPEZOIDAL) == pytest.approx(
+            2.0 * g * v1 + i_hist_0, rel=1e-14
+        )
+
+    def test_recursao_do_capacitor_alterna_de_sinal(self):
+        """``I_C(t) = −2·G_C·v_C(t) − I_C(t−Δt)``.
+
+        [FONTE: Dommel 1969, Apêndice I, p. 395, sinal − para capacitância];
+        [LISTA: 02, eq. (3)]; [LISTA: 01, §2.1].
+        """
+        C, dt = 50.0e-9, 1.0e-6
+        cap = Capacitor("C", "1", "2", C, initial_voltage_V=84.86, initial_current_A=0.0016)
+        cap.prepare(dt)
+        cap.reset()
+        g = cap.conductance_S
+        assert g == pytest.approx(2.0 * C / dt, rel=1e-15)
+        # I_C(0) = −[G_C·v_C(0) + i_C(0)] — [LISTA: 02, eq. (6)].
+        i_hist_0 = cap.history_current_A(MODE_TRAPEZOIDAL)
+        assert i_hist_0 == pytest.approx(-(g * 84.86 + 0.0016), rel=1e-15)
+        cap._idx = (0, GROUND_INDEX_LOCAL)
+        v1 = 12.5
+        cap.commit(np.array([v1]), dt, MODE_TRAPEZOIDAL)
+        assert cap.history_current_A(MODE_TRAPEZOIDAL) == pytest.approx(
+            -2.0 * g * v1 - i_hist_0, rel=1e-14
+        )
+
+    def test_euler_regressivo_meio_passo_lin_marti_eq4(self):
+        """BE com Δt/2 dá a MESMA condutância e histórico só de corrente.
+
+        [FONTE: Lin & Martí 1990, eqs. (2)-(4), p. 395]; [LISTA: 01, Tabela 1].
+        """
+        L, C, dt = 5.0e-3, 50.0e-9, 1.0e-6
+        ind = Inductor("L", "1", "gnd", L, initial_current_A=2.0, initial_voltage_V=9.0)
+        cap = Capacitor("C", "1", "gnd", C, initial_voltage_V=3.0, initial_current_A=0.5)
+        for comp in (ind, cap):
+            comp.prepare(dt)
+            comp.reset()
+        # Condutâncias idênticas nos dois modos: é o que dispensa refatoração.
+        assert ind.conductance_S == pytest.approx((0.5 * dt) / L, rel=1e-15)
+        assert cap.conductance_S == pytest.approx(C / (0.5 * dt), rel=1e-15)
+        # Indutor: h(t) = i(t−Δt/2), SEM o termo de tensão — eq. (4).
+        assert ind.history_current_A(MODE_BACKWARD_EULER_HALF) == pytest.approx(2.0)
+        # Capacitor: h(t) = −G·v(t−Δt/2), SEM o termo de corrente.
+        assert cap.history_current_A(MODE_BACKWARD_EULER_HALF) == pytest.approx(
+            -cap.conductance_S * 3.0
+        )
+
+    def test_cda_executa_exatamente_dois_meios_passos(self):
+        """Um par de meios-passos de Δt/2 por descontinuidade, e só um.
+
+        [FONTE: Lin & Martí 1990, §2, p. 394, itens 4-5]: o segundo
+        meio-passo cai em ``t₁ + Δt``, devolvendo a marcha à malha
+        uniforme. A amostra intermediária não é registrada nem gera
+        decisão de manobra.
+        """
+        ckt = Circuit("cda")
+        ckt.add(_dc_source("E", "1", "gnd", 100.0))
+        ckt.add(Resistor("R", "1", "2", 1.0))
+        ckt.add(Inductor("L", "2", "3", 1.0e-3))
+        sw = ckt.add(Switch("SW", "3", "gnd", closed=True))
+        dt = 1.0e-6
+        sol = Solver(ckt, dt=dt, cda_at_start=False)
+        res = sol.run(
+            20.0 * dt, controllers=[TimedSwitchController(sw, open_time_s=10.0 * dt)]
+        )
+        assert res.topology_changes == 1
+        assert res.cda_events == 1          # UM par = DOIS meios-passos
+        # A base de tempo permanece uniforme: nenhum ponto Δt/2 vazou.
+        passos = np.diff(res.time_s)
+        assert np.allclose(passos, dt, rtol=1e-9)
+
+    def test_chave_mna_muda_uma_unica_linha(self):
+        """Comutação altera UMA linha; dimensão e posto são invariantes.
+
+        [LISTA: 02, §1.2, eqs. (5) e (18)]; [FONTE: Mahseredjian et al.
+        2007, §2, p. 1516, "fixed rank system"].
+        """
+        ckt = Circuit("mna")
+        ckt.add(_dc_source("E", "1", "gnd", 10.0))
+        ckt.add(Resistor("R", "1", "2", 1.0))
+        sw = ckt.add(Switch("SW", "2", "gnd", closed=False))
+        ckt.add(Resistor("Rc", "2", "gnd", 20.0))
+        sol = Solver(ckt, dt=1.0e-6)
+        A_aberta = sol.matrix.copy()
+        sw.close()
+        A_fechada = sol.matrix.copy()
+        assert A_aberta.shape == A_fechada.shape
+        difere = ~np.isclose(A_aberta, A_fechada)
+        linhas = sorted(set(np.nonzero(difere)[0].tolist()))
+        assert len(linhas) == 1, f"a comutação alterou as linhas {linhas}"
+        assert np.linalg.matrix_rank(A_aberta) == np.linalg.matrix_rank(A_fechada)
+
+    def test_linha_sem_perdas_reproduz_dommel_eq7b(self):
+        """``I_k(t−τ) = −(1/Z_c)·e_m(t−τ) − i_mk(t−τ)``.
+
+        [FONTE: Dommel 1969, eq. (7b), p. 389]. Com ``R = 0`` a expressão
+        implementada deve coincidir termo a termo.
+        """
+        lin = BergeronLine("T", "k", "m", surge_impedance_ohm=400.0, travel_time_s=5.0e-6)
+        assert lin.attenuation_factor == pytest.approx(1.0)
+        lin.prepare(1.0e-6)
+        lin.reset()
+        lin._history.append(1.0e-6, 120.0, 0.4, -30.0, -0.1)
+        i_k, i_m = lin._history_sources(1.0e-6 + lin.travel_time_s)
+        g = 1.0 / 400.0
+        assert i_k == pytest.approx(-(-30.0) * g - (-0.1), rel=1e-14)
+        assert i_m == pytest.approx(-120.0 * g - 0.4, rel=1e-14)
+
+
+class TestCasoReferenciaLista02:
+    """Questão 2 da Lista 02 — abertura de disjuntor a vácuo em reator.
+
+    Circuito de [LISTA: 02, §3.1, Figura 6]: ``vs = 100·cos(377t)`` V,
+    ``R1 = 0,5 Ω``, ``L1 = 5 mH``, ``R2 = 5 Ω``, ``L2 = 50 mH``,
+    ``C = 50 nF``; comando de abertura em ``t0 = 30 ms``, corte quando
+    ``|i_s| <= I_mar = 0,5 A``. Os valores de referência foram medidos
+    pelo autor contra o ATP e constam das Tabelas 3 e 4.
+    """
+
+    W = 377.0
+    R1, L1, R2, L2, C = 0.5, 5.0e-3, 5.0, 50.0e-3, 50.0e-9
+
+    @classmethod
+    def _fasores(cls):
+        """Solução fasorial de regime com o disjuntor fechado.
+
+        Referência: [LISTA: 02, §3.3, eqs. (19)-(23)].
+        """
+        w = cls.W
+        z_c = 1.0 / (1j * w * cls.C)
+        z_rl = cls.R2 + 1j * w * cls.L2
+        z_reat = z_rl * z_c / (z_rl + z_c)
+        z_tot = cls.R1 + 1j * w * cls.L1 + z_reat
+        i_s = 100.0 / z_tot
+        v_reat = i_s * z_reat
+        return i_s, v_reat, v_reat / z_rl, v_reat / z_c, z_reat, z_tot
+
+    @classmethod
+    def _circuito(cls, *, semear_derivadas: bool = True):
+        i_s, v_reat, i_r, i_c, _, _ = cls._fasores()
+        w = cls.W
+        ckt = Circuit("lista02_q2")
+        ckt.add(
+            VoltageSource(
+                "E", "1", "gnd", amplitude_V=100.0,
+                frequency_Hz=w / (2.0 * math.pi), phase_reference="cos",
+            )
+        )
+        ckt.add(Resistor("R1", "1", "2", cls.R1))
+        ckt.add(
+            Inductor(
+                "L1", "2", "3", cls.L1,
+                initial_current_A=i_s.real,
+                initial_voltage_V=(1j * w * cls.L1 * i_s).real if semear_derivadas else 0.0,
+            )
+        )
+        sw = ckt.add(Switch("SW", "3", "4", closed=True))
+        ckt.add(
+            Capacitor(
+                "C", "4", "gnd", cls.C,
+                initial_voltage_V=v_reat.real,
+                initial_current_A=i_c.real if semear_derivadas else 0.0,
+            )
+        )
+        ckt.add(Resistor("R2", "4", "5", cls.R2))
+        ckt.add(
+            Inductor(
+                "L2", "5", "gnd", cls.L2,
+                initial_current_A=i_r.real,
+                initial_voltage_V=(1j * w * cls.L2 * i_r).real if semear_derivadas else 0.0,
+            )
+        )
+        return ckt, sw
+
+    def test_solucao_fasorial_confere_com_a_lista(self):
+        """[LISTA: 02, eqs. (19)-(23)], em acordo com as notas de aula."""
+        i_s, v_reat, i_r, _, z_reat, z_tot = self._fasores()
+        assert abs(z_reat) == pytest.approx(19.508791, abs=1e-6)
+        assert math.degrees(np.angle(z_reat)) == pytest.approx(75.1389, abs=1e-4)
+        assert abs(z_tot) == pytest.approx(21.458977, abs=1e-6)
+        assert abs(i_s) == pytest.approx(4.660054, abs=1e-6)
+        assert math.degrees(np.angle(i_s)) == pytest.approx(-75.1394, abs=1e-4)
+        assert abs(v_reat) == pytest.approx(90.912028, abs=1e-6)
+        assert abs(i_r) == pytest.approx(4.661711, abs=1e-6)
+
+    def test_partida_em_regime_permanente_sem_transitorio_espurio(self):
+        """Desvio contra a solução fasorial da ordem de 1e−10 V.
+
+        Valor de referência do autor, medido contra o ATP: 1,39 × 10⁻¹⁰ V
+        [LISTA: 02, §3.7 e Tabela 3]. Exige a semeadura completa
+        ``I_L(0) = i_L(0) + G_L·v_L(0)`` e
+        ``I_C(0) = −[G_C·v_C(0) + i_C(0)]`` [LISTA: 02, eq. (6)] e a
+        ausência de CDA em ``t = 0`` (não há descontinuidade aí).
+        """
+        _, v_reat, _, _, _, _ = self._fasores()
+        ckt, sw = self._circuito()
+        sol = Solver(ckt, dt=1.0e-6, cda_at_start=False)
+        desvio = [0.0]
+
+        def _passo(t, x, s):
+            exato = (v_reat * np.exp(1j * self.W * t)).real
+            desvio[0] = max(desvio[0], abs(s.node_voltage("4") - exato))
+
+        sol.run(
+            0.029,
+            controllers=[TimedSwitchController(sw, open_time_s=0.030, current_margin_A=0.5)],
+            on_step=_passo,
+        )
+        assert desvio[0] < 1.0e-9, f"desvio de regime {desvio[0]:.3e} V"
+
+    def test_semeadura_incompleta_degrada_a_partida(self):
+        """Sem ``v_L(0)`` e ``i_C(0)`` o desvio sobe várias ordens.
+
+        É a lacuna corrigida nesta auditoria: [FONTE: Dommel 1969,
+        Apêndice I, p. 395] e [LISTA: 02, eq. (6)] exigem os DOIS termos.
+        """
+        _, v_reat, _, _, _, _ = self._fasores()
+        ckt, sw = self._circuito(semear_derivadas=False)
+        sol = Solver(ckt, dt=1.0e-6, cda_at_start=False)
+        desvio = [0.0]
+
+        def _passo(t, x, s):
+            exato = (v_reat * np.exp(1j * self.W * t)).real
+            desvio[0] = max(desvio[0], abs(s.node_voltage("4") - exato))
+
+        sol.run(
+            0.029,
+            controllers=[TimedSwitchController(sw, open_time_s=0.030, current_margin_A=0.5)],
+            on_step=_passo,
+        )
+        assert desvio[0] > 1.0e-6, f"desvio {desvio[0]:.3e} V — semeadura incompleta"
+
+    @pytest.mark.parametrize(
+        "dt_us, tc_ms",
+        [(4.0, 32.364000), (2.0, 32.362000), (1.0, 32.361000), (0.5, 32.360000)],
+    )
+    def test_instante_de_corte_reproduz_a_tabela_4(self, dt_us, tc_ms):
+        """Critério ``|i_s| <= I_mar`` reproduz a Tabela 4 dígito a dígito.
+
+        [LISTA: 02, Tabela 4], medida pelo autor com a rotina própria e
+        confirmada pelo ATP (``*** Open switch "N3" to "N4" after
+        3.23600000E-02 sec.``, [LISTA: 02, §3.6]). O instante exato é
+        ``t_c = 32,359422 ms``; o resto é a quantização em Δt.
+        """
+        ckt, sw = self._circuito()
+        sol = Solver(ckt, dt=dt_us * 1.0e-6, cda_at_start=False)
+        corte = [None]
+
+        def _passo(t, x, s):
+            if corte[0] is None and not sw.closed:
+                corte[0] = t
+
+        sol.run(
+            0.040,
+            controllers=[TimedSwitchController(sw, open_time_s=0.030, current_margin_A=0.5)],
+            on_step=_passo,
+        )
+        assert corte[0] is not None, "o disjuntor não interrompeu a corrente"
+        assert corte[0] * 1.0e3 == pytest.approx(tc_ms, abs=1.0e-6)
+
+    def test_pico_da_trv_converge_para_o_analitico(self):
+        """Pico da TRV entre 5,5 e 5,6 vezes o pico de regime, convergente.
+
+        Referência analítica de [LISTA: 02, §3.4, eq. (26)]: 506,170 V com
+        corte exato, isto é 5,57 vezes o pico de regime (90,912 V). O
+        pico numérico é sempre inferior porque o corte só pode cair sobre
+        um ponto da malha [LISTA: 02, Tabela 4], e cresce
+        monotonicamente à medida que Δt diminui.
+        """
+        picos = []
+        for dt in (4.0e-6, 2.0e-6, 1.0e-6, 5.0e-7):
+            ckt, sw = self._circuito()
+            sol = Solver(ckt, dt=dt, cda_at_start=False)
+            pico = [0.0]
+
+            def _passo(t, x, s, pico=pico):
+                pico[0] = max(pico[0], abs(s.node_voltage("4")))
+
+            sol.run(
+                0.040,
+                controllers=[
+                    TimedSwitchController(sw, open_time_s=0.030, current_margin_A=0.5)
+                ],
+                on_step=_passo,
+            )
+            picos.append(pico[0])
+        assert all(b >= a - 1.0e-9 for a, b in zip(picos, picos[1:])), picos
+        assert picos[-1] == pytest.approx(506.170, rel=5.0e-3), picos
+        assert picos[-1] / 90.912028 == pytest.approx(5.57, abs=0.05)
+
+    def test_sem_margem_de_corrente_nao_ha_sobretensao(self):
+        """Sem o campo ``I_mar`` a manobra deixa de representar o VCB.
+
+        [LISTA: 02, §3.6]: "sem o campo Imar o ATP esperaria um zero
+        natural de corrente e a sobretensão praticamente desapareceria".
+        Aqui o efeito oposto é verificado: a abertura FORÇADA no comando
+        (``current_margin_A=None``) corta 3,9 A e produz uma TRV muito
+        maior que a do corte por margem — ou seja, o critério não é
+        detalhe de implementação, é o modelo físico do disjuntor.
+        """
+        picos = {}
+        for rotulo, margem in (("margem", 0.5), ("forcada", None)):
+            ckt, sw = self._circuito()
+            sol = Solver(ckt, dt=1.0e-6, cda_at_start=False)
+            pico = [0.0]
+
+            def _passo(t, x, s, pico=pico):
+                pico[0] = max(pico[0], abs(s.node_voltage("4")))
+
+            sol.run(
+                0.040,
+                controllers=[
+                    TimedSwitchController(sw, open_time_s=0.030, current_margin_A=margem)
+                ],
+                on_step=_passo,
+            )
+            picos[rotulo] = pico[0]
+        assert picos["forcada"] > 2.0 * picos["margem"], picos

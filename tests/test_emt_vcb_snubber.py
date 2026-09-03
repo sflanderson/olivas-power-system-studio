@@ -104,8 +104,8 @@ SOURCE_AMPLITUDE_V: float = 1000.0
 SURGE_OHM: float = math.sqrt(L_LOAD_H / C_LOAD_F)
 #: Tensão do capacitor em regime no instante t = 0, com a fonte no próprio
 #: pico: divisor indutivo ``V·L/(L+L_s) = 909,09 V`` [CÁLCULO PRÓPRIO]. É a
-#: condição inicial CONSISTENTE exigida pela limitação declarada
-#: ``emt_no_steady_state_init`` do kernel: sem ela a bancada — que não tem
+#: condição inicial CONSISTENTE semeada à mão (equivalente ao que
+#: ``Solver(init="steady_state")`` faria): sem ela a bancada — que não tem
 #: nenhuma resistência — mantém para sempre a oscilação de energização de
 #: 50,3 kHz da malha L_s–C, que contamina todo pico medido.
 C_INITIAL_V: float = SOURCE_AMPLITUDE_V * L_LOAD_H / (L_LOAD_H + L_SOURCE_H)
@@ -1038,10 +1038,13 @@ def test_limitacoes_declaradas_seguem_o_padrao_do_projeto():
 
 
 def test_limitacoes_dos_modulos_novos_nao_colidem_com_as_do_kernel():
-    """Nenhuma chave nova repete uma das 10 do kernel EMT."""
+    """Nenhuma chave nova repete uma das do kernel EMT."""
     from app.simulation.emt import KNOWN_LIMITATIONS as KERNEL_LIMITATIONS
 
-    assert len(KERNEL_LIMITATIONS) == 10
+    # O catálogo do kernel cresce quando o kernel cresce (a partida em
+    # regime permanente acrescentou três chaves e removeu a de ausência
+    # de inicialização); o que este teste protege é a AUSÊNCIA DE COLISÃO.
+    assert len(KERNEL_LIMITATIONS) >= 10
     novas = (
         set(VCB_LIMITATIONS)
         | set(SNUBBER_LIMITATIONS)

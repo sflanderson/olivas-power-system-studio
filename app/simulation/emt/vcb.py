@@ -607,6 +607,11 @@ class VacuumCircuitBreakerModel:
         self._arc_established = False
         self._last_didt_A_per_us = 0.0
         self._i_ch_A = self._sample_chopping_current()
+        # O I_ch amostrado É o campo Imar do cartão de chave do ATP nesta
+        # realização: publica-se na própria chave para que o cartão fique
+        # autodescritivo e o critério possa ser lido por quem inspecionar
+        # o circuito [LISTA: 02, §1.3 e §3.6].
+        self.switch.current_margin_A = self._i_ch_A
         self._locked_warned = False
         self._result = VCBPoleResult(
             name=self.name,
@@ -635,6 +640,20 @@ class VacuumCircuitBreakerModel:
     @property
     def sampled_chopping_current_A(self) -> float:
         """``I_ch`` desta realização [A]."""
+        return self._i_ch_A
+
+    @property
+    def current_margin_A(self) -> float:
+        """``I_mar`` em vigor [A] — o campo *current margin* do ATP.
+
+        É o MESMO número de :attr:`sampled_chopping_current_A`, exposto
+        com o nome do campo do cartão de chave do ATP (colunas 35-44)
+        porque é essa a função que ele exerce: a abertura comandada em
+        ``separation_time_s`` só se efetiva no primeiro instante em que
+        ``|i| <= I_mar`` [LISTA: 02, §1.3 e §3.6]. A diferença em relação
+        a um cartão de ATP é que aqui o limiar é AMOSTRADO da faixa de
+        *chopping* do Documento A a cada realização, em vez de fixo.
+        """
         return self._i_ch_A
 
     @property
@@ -697,6 +716,17 @@ class VacuumCircuitBreakerModel:
 
     def _evaluate_power_frequency_arc(self, t: float, i_now: float) -> None:
         """Corte de corrente do arco de frequência industrial.
+
+        O critério ``|i| <= I_ch`` é o mesmo do campo *current margin*
+        (``Imar``, colunas 35-44) do cartão de chave do ATP e o da
+        Seção 5 das notas de aula: "a abertura comandada em ``t0`` só se
+        efetiva a partir do primeiro instante ``t >= t0`` em que a
+        corrente na chave se anula ou cai abaixo de um limiar
+        ``|Imar|``" [LISTA: 02, §1.3]. Aqui ``I_mar`` é a corrente de
+        *chopping* amostrada da faixa do Documento A, em vez de um valor
+        fixo de cartão. Validação do critério contra o ATP no circuito de
+        referência: os dois programas cortam a corrente no MESMO passo,
+        ``t_c = 32,361 ms`` [LISTA: 02, §3.7 e Tabela 3].
 
         O corte só é avaliado a partir do segundo passo de condução do
         arco corrente (guarda ``_arc_established``): no passo da ignição,

@@ -14,48 +14,64 @@ admitem a solução de d'Alembert em ondas viajantes. Definindo
     Z_c = sqrt(L'/C')          (impedância de surto, Ω)
     τ   = ℓ · sqrt(L'·C')      (tempo de trânsito, s)
 
-a grandeza ``v + Z_c·i`` é invariante ao longo de uma característica
-que percorre a linha em ``τ``. Disso resulta o par de equivalentes de
-Norton DESACOPLADOS de Dommel [LITERATURA: H. W. Dommel, "Digital
-Computer Solution of Electromagnetic Transients in Single- and
-Multiphase Networks", *IEEE Trans. PAS*, vol. PAS-88, n. 4, pp.
-388-399, 1969, §III]::
+a grandeza ``e + Z·i`` é constante ao longo da característica
+``x − vt = const``: um observador fictício que deixa o nó ``m`` em
+``t − τ`` e chega ao nó ``k`` em ``t`` encontra o mesmo valor, isto é
+``e_m(t−τ) + Z·i_mk(t−τ) = e_k(t) + Z·(−i_km(t))`` [FONTE: Dommel
+1969, eqs. (4)-(6), p. 389]. Disso resulta o par de equivalentes de
+Norton DESACOPLADOS [FONTE: Dommel 1969, eqs. (7a) e (7b), p. 389;
+Fig. 1(b)]::
 
-    i_km(t) = v_k(t)/Z_c + I_k(t−τ)
-    I_k(t−τ) = −v_m(t−τ)/Z_c − i_mk(t−τ)
+    i_km(t)  = (1/Z_c)·e_k(t) + I_k(t−τ)                   (7a)
+    I_k(t−τ) = −(1/Z_c)·e_m(t−τ) − i_mk(t−τ)               (7b)
 
-    i_mk(t) = v_m(t)/Z_c + I_m(t−τ)
-    I_m(t−τ) = −v_k(t−τ)/Z_c − i_km(t−τ)
+    i_mk(t)  = (1/Z_c)·e_m(t) + I_m(t−τ)                   (7a)
+    I_m(t−τ) = −(1/Z_c)·e_k(t−τ) − i_km(t−τ)               (7b)
 
-O acoplamento entre os dois terminais é APENAS pelo histórico: na
-matriz nodal cada extremidade contribui somente com ``1/Z_c`` na
-própria diagonal. É essa propriedade que torna a linha o elemento que
-"parte" a matriz do sistema em blocos.
+O acoplamento entre os dois terminais é APENAS pelo histórico: "os
+terminais não estão topologicamente conectados; as condições da outra
+extremidade só são vistas indiretamente e com atraso ``τ``" [FONTE:
+Dommel 1969, p. 389]. Na matriz nodal cada extremidade contribui
+somente com ``1/Z_c`` na PRÓPRIA DIAGONAL — "linhas sem perdas
+contribuem apenas para os elementos diagonais da matriz; elementos
+fora da diagonal resultam apenas de parâmetros concentrados" [FONTE:
+Dommel 1969, §I, p. 389]. É essa propriedade que torna a linha o
+elemento que "parte" a matriz do sistema em blocos [FONTE: Dommel
+1969, Fig. 9, p. 392; Dommel 1971, §V, p. 2563].
 
 Perdas concentradas (R/4, R/2, R/4)
 ====================================
 
-O modelo com perdas segue a aproximação clássica do EMTP: a
-resistência série total ``R`` é concentrada em três pontos — ``R/4``
-em cada extremidade e ``R/2`` no meio — e a linha é tratada como duas
-meias-linhas sem perdas. O resultado, com
+O modelo com perdas segue a aproximação de [FONTE: Dommel 1969,
+"Approximation of Series Resistance of Lines", p. 390]: "o programa da
+BPA concentra automaticamente ``R/4`` nas duas extremidades e ``R/2``
+no meio da linha", tratando os dois trechos como meias-linhas sem
+perdas e mantendo válido o equivalente da Fig. 1; muda apenas
 
-    Z = Z_c + R/4                  ζ = (Z_c − R/4)/(Z_c + R/4)
+    Z = sqrt(L'/C') + R/4          ζ = (Z_c − R/4)/(Z_c + R/4)
 
-é
+Empregou-se a forma REFINADA do modelo, a que resulta de eliminar
+explicitamente o nó central [LITERATURA: H. W. Dommel, *EMTP Theory
+Book*, BPA, 1986, §4.2.1.4] — e não a combinação linear de ``I_k`` e
+``I_m`` impressa em [FONTE: Dommel 1969, p. 390], que omite o fator
+``ζ`` sobre as correntes de histórico::
 
     i_km(t) = v_k(t)/Z + I_k(t−τ)
 
     I_k(t−τ) = −(1+ζ)/2 · [ v_m(t−τ)/Z + ζ·i_mk(t−τ) ]
                −(1−ζ)/2 · [ v_k(t−τ)/Z + ζ·i_km(t−τ) ]
 
-Para ``R = 0`` tem-se ``ζ = 1`` e a expressão recai exatamente no caso
-sem perdas. [CÁLCULO PRÓPRIO] Em regime permanente contínuo
-(``i_km = −i_mk = I`` constante) a expressão acima fornece
-``I = (v_k − v_m)/R`` EXATAMENTE, o que se verifica substituindo
-``1 − ζ = (R/2)/Z``; portanto o modelo é exato em corrente contínua e
-a resistência total vista pelo circuito é ``R``, sem erro de
-truncamento. Esse é o teste de aceitação implementado em
+Para ``R = 0`` tem-se ``ζ = 1`` e a expressão recai EXATAMENTE em
+(7a)-(7b). O critério que decidiu entre as duas formas é a
+consistência em corrente contínua. [CÁLCULO PRÓPRIO] Em regime
+permanente contínuo (``i_km = −i_mk = I`` constante), com
+``1 − ζ = (R/2)/Z`` e ``a − b = ζ``, a forma acima fornece
+``I·4ab = (1/Z)·a·(v_k − v_m)`` e portanto ``I = (v_k − v_m)/R``
+EXATAMENTE — a resistência total vista pelo circuito é ``R``, sem erro
+de truncamento, que é o que a aproximação de Dommel promete. A forma
+impressa em 1969, submetida à mesma verificação, devolve
+``R·(Z_c + R/4)/(2·Z_c) ≈ R/2``, ou seja, metade da resistência
+pretendida. Esse é o teste de aceitação implementado em
 ``tests/test_emt_kernel.py``.
 
 Interpolação de histórico
@@ -64,23 +80,61 @@ Interpolação de histórico
 Quando ``τ`` não é múltiplo inteiro de ``Δt`` — e também durante os
 meios-passos do amortecimento crítico (CDA), em que a base de tempo
 deixa de ser uniforme — o valor em ``t − τ`` é obtido por
-**interpolação linear** entre as duas amostras que o cercam. É a mesma
-opção do EMTP; ela introduz um pequeno amortecimento numérico da
-frente de onda, discutido em [LITERATURA: J. A. Martinez-Velasco
-(ed.), *Transient Analysis of Power Systems*, Wiley/IEEE Press, 2015,
-cap. 2] e em [LITERATURA: A. Greenwood, *Electrical Transients in
-Power Systems*, 2. ed., Wiley, 1991, cap. 5].
+**interpolação linear** entre as duas amostras que o cercam. É a opção
+padrão do programa da BPA: "uma opção usa interpolação linear, porque
+na maioria dos casos práticos as curvas ``e(t)`` e ``i(t)`` são suaves
+em vez de descontínuas; para casos com descontinuidades esperadas,
+outra opção arredonda o tempo de trânsito ``τ`` para o múltiplo
+inteiro de ``Δt`` mais próximo. As duas opções elevam tempos de
+trânsito ``τ < Δt`` para ``Δt``" [FONTE: Dommel 1969, "Accuracy",
+p. 391]. Aqui apenas a interpolação linear está implementada; o
+arredondamento de ``τ`` NÃO está, e ``τ < Δt`` é sinalizado por
+``WARNING`` com retenção de ordem zero em vez de ser elevado a ``Δt``
+— divergência declarada em relação à fonte, cf.
+:meth:`BergeronLine.prepare`. A interpolação introduz um pequeno
+amortecimento numérico da frente de onda, discutido em [LITERATURA:
+J. A. Martinez-Velasco (ed.), *Transient Analysis of Power Systems*,
+Wiley/IEEE Press, 2015, cap. 2] e em [LITERATURA: A. Greenwood,
+*Electrical Transients in Power Systems*, 2. ed., Wiley, 1991, cap. 5].
+
+Condições iniciais da linha — lacuna declarada
+===============================================
+
+[FONTE: Dommel 1969, Apêndice I, p. 395] exige que, para uma linha sem
+perdas, os valores ``I_k`` e ``I_m`` sejam dados em
+``t = 0, −Δt, −2Δt, …, −τ``: "a necessidade de conhecê-los antes de
+``t = 0`` é consequência de registrar somente as condições terminais;
+se as condições fossem dadas também ao longo da linha, em incrementos
+de tempo de trânsito ``Δt``, os valores iniciais em ``t = 0``
+bastariam". O padrão deste módulo é o histórico NULO antes de ``t = 0``
+(:meth:`_TravelHistory.value_at` devolve zeros), isto é, linha
+inicialmente desenergizada — o que basta para a partida do repouso.
+
+Para a partida em REGIME PERMANENTE a exigência do Apêndice I é
+atendida por :meth:`BergeronLine.seed_steady_state`, que preenche o
+buffer com a onda senoidal de regime nos instantes
+``0, −Δt, −2Δt, …`` cobrindo todo o tempo de trânsito ``τ`` — os
+``I_k`` e ``I_m`` de que Dommel fala, calculados a partir da solução
+fasorial do PRÓPRIO modelo (:mod:`app.simulation.emt.steady_state`).
+Sem esse preenchimento, os primeiros ``τ/Δt`` passos veriam histórico
+nulo e a linha injetaria um degrau espúrio de amplitude igual à tensão
+de regime.
 
 Limitação declarada — dependência de frequência
 ================================================
 
-Este modelo é de **parâmetros constantes** (CP / Bergeron). Não há
-modelo de dependência de frequência tipo JMarti [LITERATURA: J. R.
-Marti, "Accurate Modelling of Frequency-Dependent Transmission Lines
-in Electromagnetic Transient Simulations", *IEEE Trans. PAS*, vol.
-PAS-101, n. 1, pp. 147-157, 1982] nem transformação modal para
-múltiplos condutores. Impacto sobre a frente de onda, relevante para o
-estudo de TRV de disjuntor a vácuo:
+Este modelo é de **parâmetros constantes** (CP / Bergeron): não
+representa a dependência de frequência nem o acoplamento entre
+condutores. O modelo dependente da frequência
+[LITERATURA: J. R. Marti, "Accurate Modelling of Frequency-Dependent
+Transmission Lines in Electromagnetic Transient Simulations", *IEEE
+Trans. PAS*, vol. PAS-101, n. 1, pp. 147-157, 1982] está implementado
+em :mod:`app.simulation.emt.jmarti` (:class:`~app.simulation.emt.jmarti.JMartiLine`
+e :class:`~app.simulation.emt.jmarti.ModalJMartiLine`), com a MESMA
+interface de componente — trocar de modelo não exige mudar mais nada do
+circuito. O que segue descreve, portanto, o que se perde ao ficar
+NESTE modelo. Impacto sobre a frente de onda, relevante para o estudo
+de TRV de disjuntor a vácuo:
 
 * o efeito pelicular e o retorno pela terra atenuam e DEFORMAM a
   frente real; com parâmetros constantes o degrau chega à outra
@@ -98,11 +152,22 @@ Consequência prática: os valores de ``V_pk`` e ``dv/dt`` extraídos por
 ``app.postprocessor.prognosis.stress_profile.extract_stress_events``
 sobre formas de onda deste modelo devem ser lidos como **cota
 superior** de estresse dielétrico, não como estimativa central.
+
+[CÁLCULO PRÓPRIO, tests/test_emt_jmarti.py] Medida do viés sobre a
+mesma frente íngreme (cabo de 500 m com ``R' = 20 mΩ/m``,
+``Δt = 5 ns``, fonte casada e terminação aberta): o Bergeron sem perdas
+entrega pico de 100,000 V com ``dv/dt = 2,000·10¹⁰ V/s`` e tempo de
+frente NULO na resolução de ``Δt`` — a onda sobe em um único passo,
+qualquer que seja o comprimento —, enquanto o modelo dependente da
+frequência entrega 99,194 V, ``1,750·10¹⁰ V/s`` (−12,5 %) e
+``T1 = 1,29 µs``. O viés dominante é, portanto, o TEMPO DE FRENTE, não
+a amplitude.
 """
 
 from __future__ import annotations
 
 import math
+from typing import Sequence
 
 import numpy as np
 
@@ -142,6 +207,30 @@ class _TravelHistory:
         """Zera o buffer, mantendo a amostra inicial nula em ``t = 0``."""
         self._t = [0.0]
         self._data = [(0.0, 0.0, 0.0, 0.0)]
+        self._cursor = 0
+
+    def seed(
+        self,
+        times: Sequence[float],
+        samples: Sequence[tuple[float, float, float, float]],
+    ) -> None:
+        """Substitui o buffer por um histórico pré-existente.
+
+        ``times`` deve ser estritamente crescente e terminar em ``0,0``;
+        os instantes NEGATIVOS representam o passado que a marcha no
+        tempo não simulou — é assim que a onda de regime permanente
+        entra no histórico de trânsito (ver
+        :meth:`BergeronLine.seed_steady_state`).
+        """
+        ts = [float(t) for t in times]
+        if len(ts) != len(samples) or not ts:
+            raise ValueError("seed exige times e samples do mesmo tamanho, não vazios")
+        if any(ts[k] >= ts[k + 1] for k in range(len(ts) - 1)):
+            raise ValueError("seed exige times estritamente crescente")
+        self._t = ts
+        self._data = [
+            (float(s[0]), float(s[1]), float(s[2]), float(s[3])) for s in samples
+        ]
         self._cursor = 0
 
     def append(
@@ -253,6 +342,10 @@ class BergeronLine(Component):
         self._i_hist_k: float = 0.0
         self._i_hist_m: float = 0.0
         self._warned_short: bool = False
+        #: Semente de regime permanente: ``(V̂_k, Î_km, V̂_m, Î_mk, ω, Δt)``
+        #: ou ``None``. Preservada através de :meth:`reset`, como as
+        #: condições iniciais dos elementos concentrados.
+        self._seed: tuple[complex, complex, complex, complex, float, float] | None = None
 
     # -- construção alternativa --------------------------------------------
 
@@ -311,7 +404,9 @@ class BergeronLine(Component):
                 "linha %r: tempo de trânsito τ=%.6g s menor que o passo Δt=%.6g s; "
                 "o histórico será retido por ordem zero (fallback) e a linha "
                 "comporta-se como um ramo concentrado — reduza Δt ou use "
-                "elementos concentrados",
+                "elementos concentrados. Dommel 1969, p. 391, eleva nesse caso "
+                "τ para Δt para preservar o equivalente da Fig. 1; aqui isso "
+                "NÃO é feito, para que a divergência fique visível ao usuário",
                 self.name,
                 self.travel_time_s,
                 self._dt,
@@ -325,11 +420,102 @@ class BergeronLine(Component):
         self._i_mk = 0.0
         self._i_hist_k = 0.0
         self._i_hist_m = 0.0
+        if self._seed is not None:
+            self._apply_seed()
+
+    # -- condição inicial em regime permanente ------------------------------
+
+    def seed_steady_state(
+        self,
+        *,
+        v_k: complex,
+        i_km: complex,
+        v_m: complex,
+        i_mk: complex,
+        omega_rad_s: float,
+        dt: float,
+    ) -> int:
+        """Preenche o histórico de trânsito com a onda de regime permanente.
+
+        Atende à exigência de [FONTE: Dommel 1969, Apêndice I, p. 395] de
+        conhecer as grandezas terminais em ``t = 0, −Δt, …, −τ``. Os
+        fasores são de AMPLITUDE com o cosseno como referência,
+        ``x(t) = Re{X̂ e^{jωt}}`` [LISTA: 02, §1.4], e as correntes são as
+        que ENTRAM na linha por cada terminal — a mesma convenção de
+        :meth:`branch_current`.
+
+        A semente é PRESERVADA por :meth:`reset`, de modo que a
+        reexecução do solver reinicia sempre do mesmo regime permanente,
+        exatamente como as condições iniciais de indutor e capacitor.
+        Use :meth:`clear_steady_state_seed` para voltar à partida do
+        repouso.
+
+        Returns
+        -------
+        int
+            Número de amostras escritas no buffer.
+        """
+        dt_f = _require_positive(dt, "dt")
+        w = float(omega_rad_s)
+        if not math.isfinite(w) or w <= 0.0:
+            raise ValueError(f"omega_rad_s deve ser finita e > 0, obtida {omega_rad_s!r}")
+        self._seed = (
+            complex(v_k),
+            complex(i_km),
+            complex(v_m),
+            complex(i_mk),
+            w,
+            dt_f,
+        )
+        return self._apply_seed()
+
+    def clear_steady_state_seed(self) -> None:
+        """Descarta a semente de regime e volta ao histórico nulo."""
+        self._seed = None
+        self._history.reset()
+
+    def _apply_seed(self) -> int:
+        """Escreve no buffer as amostras da onda de regime até ``−(τ + 2Δt)``."""
+        assert self._seed is not None
+        v_k, i_km, v_m, i_mk, w, dt_f = self._seed
+        # Duas amostras de folga: a consulta mais antiga é em t = Δt − τ
+        # (primeiro passo) e, com CDA na partida, em Δt/2 − τ; o buffer
+        # precisa ENVOLVER esse instante para que a interpolação linear
+        # não caia no ramo de retenção de ordem zero.
+        n = int(math.ceil(self.travel_time_s / dt_f)) + 2
+        times = [-(n - k) * dt_f for k in range(n + 1)]
+        samples = []
+        for t in times:
+            rot = np.exp(1j * w * t)
+            samples.append(
+                (
+                    float(np.real(v_k * rot)),
+                    float(np.real(i_km * rot)),
+                    float(np.real(v_m * rot)),
+                    float(np.real(i_mk * rot)),
+                )
+            )
+        self._history.seed(times, samples)
+        last = samples[-1]
+        self._v_k, self._i_km, self._v_m, self._i_mk = last
+        return len(times)
 
     # -- estampagem ---------------------------------------------------------
 
     def _history_sources(self, t: float) -> tuple[float, float]:
-        """Calcula ``(I_k, I_m)`` em ``t`` a partir do estado em ``t − τ``."""
+        """Calcula ``(I_k, I_m)`` em ``t`` a partir do estado em ``t − τ``.
+
+        Sem perdas (``ζ = 1``, ``a = 1``, ``b = 0``) reduz-se termo a
+        termo a [FONTE: Dommel 1969, eq. (7b), p. 389]::
+
+            I_k(t−τ) = −(1/Z_c)·e_m(t−τ) − i_mk(t−τ)
+            I_m(t−τ) = −(1/Z_c)·e_k(t−τ) − i_km(t−τ)
+
+        Com perdas concentradas, a forma refinada da aproximação
+        ``R/4, R/2, R/4`` de [FONTE: Dommel 1969, p. 390] — ver a
+        dedução e a verificação em corrente contínua no cabeçalho do
+        módulo.
+        """
         v_k_d, i_km_d, v_m_d, i_mk_d = self._history.value_at(t - self.travel_time_s)
         z = self._zeta
         a = 0.5 * (1.0 + z)
@@ -339,6 +525,14 @@ class BergeronLine(Component):
         return i_k, i_m
 
     def stamp_matrix(self, A: np.ndarray) -> None:
+        """Estampa ``1/Z`` SÓ nas diagonais das duas extremidades.
+
+        A ausência de termo fora da diagonal não é economia: é a própria
+        estrutura do modelo das características, em que os dois
+        terminais estão topologicamente desconectados e só se comunicam
+        pelo histórico com atraso ``τ`` [FONTE: Dommel 1969, §I, p. 389
+        e Fig. 1(b)].
+        """
         k, m = self._idx[0], self._idx[1]
         if k != GROUND_INDEX:
             A[k, k] += self._g

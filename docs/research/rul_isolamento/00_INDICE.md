@@ -1,14 +1,21 @@
 # Monitoramento de degradação de isolamento e RUL de motores de indução MT — índice e nota metodológica
 
-**Objetivo.** Registrar, em um único ponto de entrada, (i) o objetivo e o desenho em três etapas do estudo que fundamenta o módulo MVP de RUL (*remaining useful life*) de isolamento de estator para motores de indução de média tensão (MT, 2,3–13,8 kV) manobrados por disjuntores a vácuo (VCB) em plantas críticas; (ii) o método de produção e de verificação do material, incluindo o sistema de rótulos de evidência que governa todo o corpus; (iii) o mapa navegável dos documentos e dos anexos; (iv) as premissas do usuário e as limitações globais que restringem o uso acadêmico do material; e (v) o próximo passo recomendado. Este arquivo é índice e contrato metodológico: ele **não** repete conteúdo técnico dos anexos, apenas os endereça.
+**Objetivo.** Registrar, em um único ponto de entrada, (i) o objetivo e o desenho em três etapas do estudo que fundamenta o módulo MVP de RUL (*remaining useful life*) de isolamento de estator para motores de indução de média tensão (MT, 2,3–13,8 kV) manobrados por disjuntores a vácuo (VCB) em plantas críticas; (ii) o método de produção e de verificação do material, incluindo o sistema de rótulos de evidência que governa todo o corpus; (iii) o mapa navegável dos documentos, dos anexos e dos **dois pacotes de código** que são o produto executável da série; (iv) as premissas do usuário — inclusive as decisões de arquitetura do autor sobre motor de física próprio e sobre modelos de linha — e as limitações globais que restringem o uso acadêmico do material; e (v) o próximo passo recomendado. Este arquivo é índice e contrato metodológico: ele **não** repete conteúdo técnico dos anexos nem do código, apenas os endereça.
 
-**Diagnóstico.** A Etapa 1 está entregue e verificada, em `01_ETAPA1_monitoramento_degradacao_isolamento.md` (873 linhas), sustentada por 31 anexos (8 949 linhas) organizados em cinco subdiretórios [REPO: `docs/research/rul_isolamento/`, contagem por `wc -l` nesta sessão]. O acervo cobre com solidez três dos quatro elos da cadeia manobra → estresse → estado → vida: o **gerador de estresse** (Documento A, ATP/EMTP, com números de TRV e RRRV verificados), o **envelope normativo de suportabilidade** (IEC 60034-15, IEEE 522, IEC 60034-18-41/-42, IEC 60071-1, IEC 62271-110) e o **estado da arte de monitoramento e de prognóstico** (13 fichamentos + IEC 60034-27-x, IEEE 43/1434, ISO 13374-1/13381-1). O elo ausente é o quarto e decisivo: **nenhuma fonte primária acessada fornece parâmetros de curva de vida (expoente $n$, limiar $V_{th}$, fração espira-a-espira $a(t_f)$) medidos em mica-epóxi pré-formada de MT sob impulsos de VCB** [FATO: `01_ETAPA1...md`, bloco inicial, "Limitações" (b) e §5.4, D1–D2]. Consequentemente, a Etapa 2 não pode ser um exercício de calibração a partir da literatura: precisa ser desenhada como **arquitetura de acumulador de dano com parâmetros declaradamente livres**, cuja incerteza é propagada, e não escondida.
+**Diagnóstico.** As três etapas estão entregues e verificadas, em cinco documentos que somam 4 461 linhas — `01_…md` (873 l.), `02_…md` (960 l.), `03_…md` (701 l.), `04_…md` (733 l.) e `05_…md` (818 l.) —, sustentadas por 31 anexos (8 949 linhas) organizados em seis subdiretórios [REPO: `docs/research/rul_isolamento/`, contagem por `wc -l` nesta sessão]. A esse acervo textual juntou-se uma camada nova, de natureza distinta: **código executável e testado**, nos pacotes `app/simulation/emt/` (11 arquivos, 9 915 l., 273 testes) e `app/postprocessor/prognosis/` (5 arquivos, 3 240 l., 176 testes), com 449 testes passando em 62,66 s [CÁLCULO PRÓPRIO: `python3 -m pytest tests/test_emt_kernel.py tests/test_emt_vcb_snubber.py tests/test_emt_steady_state.py tests/test_emt_jmarti.py tests/test_emt_referencia_eee873.py tests/test_pp_prognosis_core.py -q` → `449 passed`, nesta sessão]. O acervo cobre com solidez três dos quatro elos da cadeia manobra → estresse → estado → vida: o **gerador de estresse** — que deixou de depender de binário de terceiro, porque o motor EMT próprio produz o vetor $s_{m,j}$ diretamente da sonda, sem arquivo intermediário [REPO: `docs/research/rul_isolamento/05_MOTOR_EMT_DEDICADO.md`, §11.1] —, o **envelope normativo de suportabilidade** (IEC 60034-15, IEEE 522, IEC 60034-18-41/-42, IEC 60071-1, IEC 62271-110) e o **estado da arte de monitoramento e de prognóstico** (13 fichamentos + IEC 60034-27-x, IEEE 43/1434, ISO 13374-1/13381-1). O elo ausente continua sendo o quarto e decisivo: **nenhuma fonte primária acessada fornece parâmetros de curva de vida (expoente $n$, limiar $V_{th}$, fração espira-a-espira $a(t_f)$) medidos em mica-epóxi pré-formada de MT sob impulsos de VCB** [FATO: `01_ETAPA1...md`, bloco inicial, "Limitações" (b) e §5.4, D1–D2]. Por isso o acumulador implementado é, por construção, **arquitetura com parâmetros declaradamente livres**, cuja incerteza é propagada, e não escondida. Duas lacunas estruturais permanecem abertas e estão registradas como tais: o motor **não lê `.atp`** (§4.1, P6) e é hoje um ***backend* órfão**, não importado por nenhum módulo fora do próprio pacote [FATO: `05_…md`, §11.3 e §11.4].
 
 **Arquivos consultados.**
 
 | Arquivo | Papel na composição deste índice |
 |---|---|
 | `01_ETAPA1_monitoramento_degradacao_isolamento.md` (873 l.) | Documento indexado; dele provêm o escopo da Etapa 1, as equações-âncora (§5.4), as limitações declaradas e a lista de referências sem fonte primária |
+| `02_ETAPA2_cruzamento_A_x_B.md` (960 l.) | Documento indexado; acoplamento causal B → $\lambda$ / A → severidade, cadeia térmica derivada, acumulador multiestresse, *health-aware load shedding* |
+| `03_ETAPA3_contexto_c_level.md` (701 l.) | Documento indexado (Etapa 3, parte 1); tabela-mestra fenômeno → KPI, custo de indisponibilidade verificado, modelo $E[C]$, painel executivo |
+| `04_ARQUITETURA_MVP_RUL_OLIVAS.md` (733 l.) | Documento indexado (Etapa 3, parte 2); arquitetura do MVP, contratos de dados, realização de D1–D7 em código, *roadmap* e critérios de aceite |
+| `05_MOTOR_EMT_DEDICADO.md` (818 l.) | Documento indexado; fundamentação, implementação, validação e critério de migração para C++ do motor EMT próprio; §11 (ponte com o prognóstico e papel do `.atp`) e §12 (41 limitações catalogadas) |
+| `app/simulation/emt/` (11 arq., 9 915 l.) | Pacote de código indexado; motor EMT dedicado (MNA, modelos companheiros, CDA, Bergeron, JMarti, VCB, *snubber*) |
+| `app/postprocessor/prognosis/` (5 arq., 3 240 l.) | Pacote de código indexado; perfil de estresse, modelos de dano D1–D7, estimador de RUL e *Asset Health Index* |
+| `tests/test_emt_*.py` (5 arq., 4 154 l. com o de prognóstico) + `tests/test_pp_prognosis_core.py` | Contagem real de testes e estado de regressão declarados na §3.8 |
 | `anexos/fichamentos_AB/A_snubber_tiristor_vcb.md` (423 l.) | Estado verificado do Documento A: Tabelas I–III, parâmetros do VCB, seção 8 ("o que A não afirma") |
 | `anexos/fichamentos_AB/B_load_shedding_n1_nsga.md` (473 l.) | Estado verificado do Documento B: restrições g1–g3, NSGA-II/III, ausências declaradas |
 | `anexos/fichamentos/01…13_*.md` (13 arq., 2 961 l.) | Corpus de apoio; convenções de rotulagem de cada fichamento |
@@ -16,12 +23,14 @@
 | `anexos/repo/*.md` (5 arq., 1 820 l.) | Mapas do código do Olivas Power System Studio (VCB/snubber, TRT, motor/partida, confiabilidade, convenções) |
 | `anexos/cruzamento/*.md` (2 arq., 812 l.) | Cruzamentos A × literatura × repositório e B × consumo de vida |
 | `anexos/verdicts/{A,B}_*.json` | Veredictos da verificação adversarial dos fichamentos A e B |
+| Fontes primárias de EMT (5 arq., texto integral) | Dommel 1969 e 1971; Ho, Ruehli e Brennan 1975; Lin e Martí 1990; Mahseredjian et al. 2007 — base das deduções do documento 05 (§2.1, camada nova) |
+| Listas 01 e 02 de EEE873 (2 arq., texto integral) | Trabalhos do próprio autor; fixam a notação e são o caso de referência já validado contra o ATP (§2.1) |
 
 **Estratégia.** O índice adota três eixos de organização, nesta ordem de precedência: **(1) estado epistêmico** — cada item do acervo é classificado por origem (fonte primária lida / metadado / fonte secundária / inferência) por meio do sistema de rótulos da §2.7, que é o mesmo em todos os arquivos; **(2) função na cadeia causal** — cada anexo é posicionado como gerador de estresse, envelope normativo, indicador de estado, modelo de vida ou infraestrutura computacional; **(3) rastreabilidade** — todo caminho é relativo à raiz `docs/research/rul_isolamento/`, de modo que o diretório seja portável para anexo de tese, apêndice de artigo ou pacote de entrega, sem reescrita de referências.
 
-**Limitações.** (a) O escopo detalhado das Etapas 2 e 3 é **previsto**, não contratado: apenas a Etapa 1 tem produto verificável em disco; o desdobramento apresentado na §1.3 é proposta deste índice [HIPÓTESE de escopo]. (b) O índice herda integralmente as limitações da Etapa 1 (§4.2), inclusive a ausência de parâmetros de vida para mica-epóxi e a não leitura do texto integral da IEEE Std 522 e da Tabela 1 da IEC 60034-15:2025. (c) Documentos A e B estão em revisão duplo-cega, sem autoria divulgada, o que impede citação nominal e obriga a marca [INSERIR CITAÇÃO] em toda referência bibliográfica a eles. (d) A contagem de linhas e de arquivos reflete o estado da árvore no momento da redação; qualquer inclusão posterior de anexo exige atualização da §3.
+**Limitações.** (a) As três etapas têm produto verificável em disco, mas os produtos **não têm o mesmo estatuto**: os documentos 01 a 03 são estudo com evidência rotulada; o 04 e o 05 descrevem **código que existe e é testado**, e por isso envelhecem com o código — toda contagem de linha, de teste e de limitação neles vale para o estado da árvore declarado, e deve ser reconferida por execução antes de citação acadêmica [CÁLCULO PRÓPRIO]. (b) O índice herda integralmente as limitações da Etapa 1 (§4.2), inclusive a ausência de parâmetros de vida para mica-epóxi e a não leitura do texto integral da IEEE Std 522 e da Tabela 1 da IEC 60034-15:2025. (c) Documentos A e B estão em revisão duplo-cega, sem autoria divulgada, o que impede citação nominal e obriga a marca [INSERIR CITAÇÃO] em toda referência bibliográfica a eles. (d) A contagem de linhas e de arquivos reflete o estado da árvore no momento da redação; qualquer inclusão posterior de anexo exige atualização da §3.
 
-**Próximo passo recomendado.** Antes de abrir a Etapa 2, executar a extração declarada como próximo passo da Etapa 1 — tensão no nó do motor, contagem de reignições por polo e tempo de frente $T_1$ por reignição, a partir do modelo ATP existente, sem alterar o circuito —, porque esses três números são as **entradas obrigatórias** de qualquer acumulador de dano e hoje não existem em nenhum documento do acervo [FATO: `01_ETAPA1...md`, bloco inicial, "Próximo passo recomendado"; FATO por omissão: doc A, p. 1–5]. Sem eles, a Etapa 2 produziria arquitetura sem dado de entrada.
+**Próximo passo recomendado.** A extração declarada como próximo passo da Etapa 1 — tensão no nó do motor, contagem de reignições por polo e tempo de frente $T_1$ por reignição — deixou de depender do binário do ATP: as três grandezas são hoje **saídas do motor próprio**, componentes nomeados do vetor de estresse $s_{m,j}$ [FATO: `05_…md`, §11.2]. O que resta, e é o que a §5 detalha, é (i) **fechar a lacuna do leitor de `.atp` → `Circuit`**, sem o qual a decisão de "fonte única da verdade" é intenção de arquitetura e não propriedade do código, e (ii) **retirar o motor da condição de *backend* órfão**, proibida pelas convenções do repositório [FATO: `05_…md`, §11.3–§11.4, §12.4]. O confronto numérico contra a Tabela III do Documento A permanece **aberto e assim reportado**, por falta dos dados de rede que A não publica [FATO: `05_…md`, §9].
 
 ---
 
@@ -42,18 +51,20 @@ O contexto de aplicação — refinarias e plataformas de óleo e gás (O&G) —
 | Q1 | Por que o dano espira-a-espira é o modo de falha crítico e o mais difícil de detectar? | 1 (entregue) |
 | Q2 | Quanto estresse dielétrico uma manobra severa impõe, em números verificáveis, e como ele se compara aos envelopes normativos? | 1 (entregue) |
 | Q3 | Por que nenhum método normalizado converte uma manobra em consumo de vida, e o que faltaria para que convertesse? | 1 (entregue) |
-| Q4 | Que arquitetura computacional converte oscilograma de manobra em RUL com incerteza declarada, e como ela se acopla ao repositório existente? | 2 (prevista) |
-| Q5 | Que valor econômico e que indicadores (Asset Health Index, custo evitado) tornam o módulo defensável perante C-Level, e como o resultado é entregue como trabalho acadêmico reprodutível? | 3 (prevista) |
+| Q4 | Que arquitetura computacional converte oscilograma de manobra em RUL com incerteza declarada, e como ela se acopla ao repositório existente? | 2 (entregue) + 4 |
+| Q5 | Que valor econômico e que indicadores (Asset Health Index, custo evitado) tornam o módulo defensável perante C-Level, e como o resultado é entregue como trabalho acadêmico reprodutível? | 3 (entregue, em duas partes: 03 e 04) |
+| Q6 | Quem resolve o transitório que gera o vetor de estresse, com que fundamentação e com que validação — e sob que critério objetivo o laço interno migra para C++? | 05 (entregue) |
 
 ### 1.3 As três etapas
 
 | Etapa | Escopo | Produto | Estado |
 |---|---|---|---|
 | **1 — Monitoramento de degradação de isolamento** | Estresse dielétrico espira-a-espira; TRVs de VCB; efeito cumulativo de reignições; envelope normativo de suportabilidade; métodos atuais de monitoramento; lacuna metodológica | `01_ETAPA1_monitoramento_degradacao_isolamento.md` (10 seções, 873 l.) + 31 anexos | **Entregue e verificado** [REPO: `docs/research/rul_isolamento/01_ETAPA1_monitoramento_degradacao_isolamento.md`] |
-| **2 — Especificação do módulo MVP de RUL** | Arquitetura do acumulador de dano; extração de descritores do transitório (ATP/EMTP); acoplamento aos Documentos A (estresse por manobra) e B (frequência de manobras sob N-1); propagação de incerteza; pontos de integração no repositório; plano de calibração dos parâmetros livres | Documento `02_*` + protótipo de código | **Prevista** [HIPÓTESE de escopo — a confirmar com o autor] |
-| **3 — Caso de negócio e entrega acadêmica** | Tradução de RUL em decisão (Asset Health Index, semáforo, custo evitado); demanda de C-Level; contexto industrial brasileiro e de O&G; reprodutibilidade (FAIR4RS, DOI de software); empacotamento dos entregáveis | Documento `03_*` + pacote de entrega | **Prevista** [HIPÓTESE de escopo — a confirmar com o autor] |
+| **2 — Cruzamento dos domínios A × B** | Acoplamento causal (B fixa $\lambda$, A fixa a severidade); acoplamento inverso pelo estado elétrico, magnético e térmico; cadeia térmica que B não modela; acumulador multiestresse; *health-aware load shedding*; snubber como variável de decisão; experimento mínimo de cruzamento | `02_ETAPA2_cruzamento_A_x_B.md` (12 seções, 960 l.) | **Entregue** [REPO: `docs/research/rul_isolamento/02_ETAPA2_cruzamento_A_x_B.md`] |
+| **3 — Caso de negócio e arquitetura de entrega** | Parte 1: tradução fenômeno → KPI, custo de indisponibilidade verificado, modelo $E[C]$, objeções, painel executivo, roteiro de entrega. Parte 2: arquitetura do MVP, inventário de arquivos, contratos de dados entre camadas, realização de D1–D7 em código, plano de validação, *roadmap* e riscos | `03_ETAPA3_contexto_c_level.md` (9 seções, 701 l.) + `04_ARQUITETURA_MVP_RUL_OLIVAS.md` (9 seções, 733 l.) | **Entregue em duas partes** [REPO: idem] |
+| **Anexo de motor** (fora da numeração de etapas) | Justificativa da decisão por motor EMT dedicado e próprio; MNA e modelos companheiros; CDA; partida em regime permanente; Bergeron e JMarti; VCB dinâmico; *snubber*; validação contra fontes primárias e contra as Listas EEE873; *benchmark* aberto contra A; desempenho e critério de migração para C++ | `05_MOTOR_EMT_DEDICADO.md` (13 seções, 818 l.) + os dois pacotes de código da §3.8 | **Entregue; duas lacunas declaradas** (leitor de `.atp`; *backend* órfão) |
 
-Os insumos das Etapas 2 e 3 **já estão parcialmente coletados** e residem em `anexos/pesquisa/` (`entrega_trabalho_computacional.md`, `termico_partidas_n1_otimizacao.md` para a Etapa 2; `c_level_demanda_rul.md`, `contexto_industrial_brasil_og.md` para a Etapa 3) e em `anexos/repo/` (pontos de integração). A separação entre etapas é de **redação**, não de coleta.
+Os insumos das Etapas 2 e 3 residem em `anexos/pesquisa/` (`entrega_trabalho_computacional.md`, `termico_partidas_n1_otimizacao.md` para a Etapa 2; `c_level_demanda_rul.md`, `contexto_industrial_brasil_og.md` para a Etapa 3) e em `anexos/repo/` (pontos de integração). A separação entre etapas é de **redação**, não de coleta. O documento 05 é de natureza distinta dos demais: enquanto 01 a 04 argumentam a partir de texto e de código lido, o 05 documenta **código escrito nesta série**, e por isso traz `arquivo:linha` em cada afirmação e um teste por equação deduzida.
 
 ### 1.4 O que a Etapa 1 efetivamente fixou
 
@@ -70,14 +81,28 @@ Quatro resultados estruturais, que as etapas seguintes tomam como dados de entra
 
 ### 2.1 Corpus
 
-O corpus tem duas camadas, com estatutos epistêmicos distintos e não intercambiáveis.
+O corpus tem quatro camadas, com estatutos epistêmicos distintos e **não intercambiáveis**. A distinção que mais importa é a das duas últimas: uma é literatura **publicada e revisada por pares**, que pode fundamentar um modelo; a outra é **trabalho do próprio autor**, que fixa notação e serve de caso de referência, mas não é fonte de autoridade sobre si mesma.
 
 | Camada | Itens | Estatuto | Onde está o produto |
 |---|---|---|---|
-| **Documentos do autor** | A (snubber ativo a tiristor, ATP/EMTP, VCB dinâmico) e B (load shedding seletivo sob N-1, OpenDSS, NSGA-II/III) | Submissões em revisão duplo-cega, **sem autoria divulgada**; texto integral lido | `anexos/fichamentos_AB/` (2 arq.) |
+| **Documentos do autor (em revisão)** | A (snubber ativo a tiristor, ATP/EMTP, VCB dinâmico) e B (load shedding seletivo sob N-1, OpenDSS, NSGA-II/III) | Submissões em revisão duplo-cega, **sem autoria divulgada**; texto integral lido | `anexos/fichamentos_AB/` (2 arq.) |
 | **Literatura de apoio** | 13 artigos de RUL/PHM, prognóstico de isolamento, IGBT, mancais, séries temporais e revisões | Publicados; texto integral lido para todos; tabelas/figuras nem sempre recuperadas pela extração | `anexos/fichamentos/` (13 arq.) |
+| **Fontes primárias de EMT** | 5 artigos clássicos de formulação numérica (tabela abaixo) | **Publicados e canônicos**; texto integral acessado; sustentam dedução de modelo, com número de equação e página | `05_MOTOR_EMT_DEDICADO.md`, §§2–5 e docstrings de `app/simulation/emt/` |
+| **Trabalhos do autor em EEE873** | Listas 01 e 02 da disciplina EEE873 — Análise de Redes Elétricas no Domínio do Tempo (PPGEE/UFMG, prof. Alberto de Conti) | **Não publicados**; texto integral disponível. Fixam a **notação** do projeto e são **caso de referência já validado contra o ATP** — nunca fonte de autoridade sobre a física | `05_MOTOR_EMT_DEDICADO.md`, §8; `tests/test_emt_referencia_eee873.py` (35 testes) |
+
+Composição da camada de fontes primárias de EMT, toda ela com texto integral acessado e citada no formato `[FONTE: autor ano, p. N, eq. (N)]`:
+
+| Fonte | O que sustenta no código |
+|---|---|
+| DOMMEL, 1969 (PAS-88, n. 4) | Modelos companheiros de $L$ e $C$ pela regra trapezoidal; equivalente de Bergeron e perdas $R/4$, $R/2$, $R/4$; condições iniciais de linha (Apêndice I) |
+| DOMMEL, 1971 (PAS-90, n. 6) | Elementos não lineares e variantes no tempo — hoje **fora** do kernel; base do item 6 do trabalho futuro |
+| HO; RUEHLI; BRENNAN, 1975 (CAS-22, n. 6) | Formulação nodal aumentada (MNA): estampa de fonte de tensão e de chave por variável de corrente adicional |
+| LIN; MARTÍ, 1990 (PWRS-5, n. 2) | Procedimento de amortecimento crítico (CDA): dois meios-passos de Euler regressivo na descontinuidade |
+| MAHSEREDJIAN et al., 2007 (EPSR 77) | Enquadramento de arquitetura de solver moderno; motivação da separação entre montagem, fatoração e controle |
 
 Camada complementar, não bibliográfica: **normas e guias** (IEC, IEEE, ISO, NEMA, ABNT, CIGRE), acessados por preview oficial, amostra de norma ou página do organismo, sempre com a cláusula/tabela identificada; e o **próprio repositório**, lido como fonte de fato verificável.
+
+**Regra de uso das Listas EEE873**, que decorre do estatuto declarado: as convenções que elas fixam — $G_L = \Delta t/(2L)$, $G_C = 2C/\Delta t$, $I_L(t) = 2G_L v_L(t) + I_L(t-\Delta t)$, semeadura em regime permanente com $I_L(0) = i_L(0) + G_L v_L(0)$ e $I_C(0) = -[G_C v_C(0) + i_C(0)]$, fasor de amplitude com cosseno como referência, critério de abertura por margem $I_{mar}$ — são adotadas **por serem as do autor**, e as tolerâncias que elas publicam (§8) são **alvo de regressão**, não evidência independente. A evidência independente, nesses casos, é o ATP, contra o qual as listas já foram confrontadas: regime permanente × solução fasorial 1,39 × 10⁻¹⁰ V; rotina própria × ATP 4,27 × 10⁻⁴ V em tensão (8,5 × 10⁻⁵ %) e 4,83 × 10⁻⁷ A em corrente; pico da TRV de 504,292 V coincidente entre a rotina própria e o ATP [LISTA: 02, Tabela 3, $\Delta t = 1$ µs, $t_{max} = 100$ ms].
 
 Composição da camada de apoio:
 
@@ -151,6 +176,8 @@ Regra "zero suposição": **toda** afirmação factual do estudo carrega um rót
 | `[FATO: doc A/B, p. N]` | Enunciado presente no texto do Documento A ou B, na página indicada | Reler a página no `.txt` de origem | Livre no estudo; em publicação, sem citação nominal enquanto durar a revisão cega |
 | `[FATO: artigo NN, p. N]` | Enunciado presente no artigo de apoio NN do corpus | Reler a página no fichamento e no texto extraído | Livre, com citação ABNT |
 | `[FATO por omissão]` | **Ausência** verificada por busca no texto integral | Repetir a busca no texto integral | Sustenta afirmações negativas ("A não quantifica X"); nunca sustenta afirmação positiva |
+| `[FONTE: autor ano, p. N, eq. (N)]` | Enunciado, equação ou dedução de **fonte primária publicada** de EMT (as cinco da §2.1) | Reler a equação na página indicada do texto integral | Livre, com citação completa; é o único rótulo que fundamenta a dedução de um modelo numérico |
+| `[LISTA: 01/02, seção]` | Convenção, resultado ou tolerância dos **trabalhos do próprio autor** em EEE873 | Reler a seção da lista; e, quando for número, reconferir contra o ATP nela reportado | Fixa notação e serve de **alvo de regressão**; **não** é evidência independente sobre a física, porque é do próprio autor |
 | `[NORMA: id, tabela/cláusula]` | Texto ou requisito de norma, com cláusula/tabela identificada | Conferir a cláusula na amostra ou no exemplar | Livre, desde que a edição seja citada; ver §4.2 sobre edições não lidas |
 | `[LITERATURA: ref + URL]` | Fonte externa acessada; distingue-se texto integral lido de resumo/metadado | Abrir a URL registrada | Livre; resumo/metadado **não** sustenta valor numérico |
 | `[REPO: caminho:linha]` | Conteúdo do repositório lido diretamente | `sed -n 'N,Mp' caminho` no commit indicado | Livre; depende do commit, que deve ser citado quando relevante |
@@ -214,24 +241,40 @@ com $\Delta D_m$ [adimensional] o dano de uma manobra $m$, $\widehat{\mathrm{RUL
 ```
 docs/research/rul_isolamento/
 ├── 00_INDICE.md                                       (este arquivo)
-├── 01_ETAPA1_monitoramento_degradacao_isolamento.md   (Etapa 1 — entregue)
+├── 01_ETAPA1_monitoramento_degradacao_isolamento.md   (Etapa 1 — entregue,  873 l.)
+├── 02_ETAPA2_cruzamento_A_x_B.md                      (Etapa 2 — entregue,  960 l.)
+├── 03_ETAPA3_contexto_c_level.md                      (Etapa 3, parte 1,    701 l.)
+├── 04_ARQUITETURA_MVP_RUL_OLIVAS.md                   (Etapa 3, parte 2,    733 l.)
+├── 05_MOTOR_EMT_DEDICADO.md                           (motor EMT próprio,   818 l.)
 └── anexos/
     ├── fichamentos/        13 arquivos — literatura de apoio
     ├── fichamentos_AB/      2 arquivos — Documentos A e B do autor
     ├── pesquisa/            9 arquivos — 3 pesquisas dirigidas + 6 pesquisas web
     ├── repo/                5 arquivos — mapas do código
-    └── cruzamento/          2 arquivos — A × B × literatura × repositório
+    ├── cruzamento/          2 arquivos — A × B × literatura × repositório
+    └── verdicts/            2 arquivos — veredictos da verificação adversarial (JSON)
 ```
 
-Todos os caminhos citados adiante são **relativos a `docs/research/rul_isolamento/`**. Os anexos são referenciados, nunca transcritos: o conteúdo técnico vive neles.
+Fora deste diretório, e parte integrante da entrega, os dois pacotes de código detalhados na §3.8:
+
+```
+app/simulation/emt/          11 arquivos,  9 915 l. — motor de transitórios dedicado
+app/postprocessor/prognosis/  5 arquivos,  3 240 l. — perfil de estresse, dano, RUL, AHI
+tests/test_emt_*.py           5 arquivos            — 273 testes do motor
+tests/test_pp_prognosis_core.py                     — 176 testes do prognóstico
+```
+
+Todos os caminhos de documento citados adiante são **relativos a `docs/research/rul_isolamento/`**; os caminhos de código são **relativos à raiz do repositório**. Os anexos são referenciados, nunca transcritos: o conteúdo técnico vive neles.
 
 ### 3.2 Documentos principais
 
 | Caminho relativo | Conteúdo | Extensão |
 |---|---|---|
 | `01_ETAPA1_monitoramento_degradacao_isolamento.md` | 10 seções: enquadramento do modo de falha; física do estresse espira-a-espira; perfil de estresse do Documento A (Tabela III, normalizações, tempo de frente equivalente); referencial normativo de suportabilidade; efeito cumulativo de reignições (D1–D7 + exemplo numérico); correção conceitual sobre "redução do BIL"; métodos atuais de monitoramento; lacuna metodológica e proposta de contagem de estresse; limitações; referências | 873 linhas |
-| `02_*` (previsto) | Especificação do módulo MVP de RUL | — |
-| `03_*` (previsto) | Caso de negócio e entrega acadêmica | — |
+| `02_ETAPA2_cruzamento_A_x_B.md` | 12 seções: os dois domínios lado a lado; acoplamento causal (B fixa $\lambda$, A fixa a severidade); acoplamento inverso pelo estado no instante da manobra; cadeia térmica derivada que B não modela; sinergia multiestresse; *health-aware load shedding*; snubber como variável de decisão; mapeamento dos artigos por elo; o que o Olivas já entrega; experimento mínimo de cruzamento; limitações; referências | 960 linhas |
+| `03_ETAPA3_contexto_c_level.md` | 9 seções (Etapa 3, parte 1): tabela-mestra fenômeno → KPI; custo de indisponibilidade com ressalva por levantamento; modelo de decisão econômica $E[C]$ e valor de opção; argumentos e objeções; painel executivo e o que ele **não** deve exibir; narrativa de valor de A e B; roteiro de entrega do trabalho computacional; riscos; referências | 701 linhas |
+| `04_ARQUITETURA_MVP_RUL_OLIVAS.md` | 9 seções (Etapa 3, parte 2): fluxo de dados do gêmeo digital em camadas; inventário de arquivos (criado, a criar, a alterar); contratos de dados entre camadas; realização de D1–D7 e (5.1)–(5.2) no código; plano de validação; *roadmap* por versão; riscos técnicos; limitações e o que **não** foi implementado; referências | 733 linhas |
+| `05_MOTOR_EMT_DEDICADO.md` | 13 seções: por que um motor dedicado e próprio (F1–F3) e o `.atp` como fonte da verdade; MNA e modelos companheiros; CDA; partida em regime permanente; Bergeron e JMarti lado a lado, com o viés de $T_1$ medido; VCB dinâmico; *snubber* e a lacuna do nível de *breakover*; validação (fontes primárias + regressão dígito a dígito contra as Listas EEE873); *benchmark* aberto contra o Documento A; desempenho medido e critério objetivo de migração para C++; integração com o prognóstico e papel do `.atp`; 41 limitações catalogadas e trabalho futuro; referências | 818 linhas |
 
 ### 3.3 `anexos/fichamentos/` — literatura de apoio (13)
 
@@ -279,6 +322,53 @@ Os três primeiros são as **pesquisas dirigidas da Etapa 1**; os seis restantes
 | `cruzamento/cruzamento_A_snubber_vcb.md` | Perfil de estresse por evento a partir de A; acumuladores D1–D9; matriz estressor × indicador × modelo; inventário de pontos de integração |
 | `cruzamento/cruzamento_B_load_shedding_n1.md` | Documento B como fonte da taxa $\lambda_m$ e da severidade das manobras; consumo de vida sob decisões de shedding; ausências de B |
 
+### 3.8 Pacotes de código — o produto executável da série
+
+Diferentemente dos anexos, que são texto, esta é a parte da entrega que **executa e é testada**. Caminhos relativos à raiz do repositório; contagens medidas nesta sessão [CÁLCULO PRÓPRIO: `wc -l` e `pytest --collect-only`].
+
+**`app/simulation/emt/` — motor de transitórios eletromagnéticos dedicado (11 arquivos, 9 915 linhas)**
+
+| Arquivo | Linhas | Papel |
+|---|---|---|
+| `__init__.py` | 457 | Fachada (77 nomes em `__all__`), decisão do autor gravada no cabeçalho, `KNOWN_LIMITATIONS` (19 chaves alcançáveis) |
+| `components.py` | 1 259 | `Resistor`, `Inductor`, `Capacitor`, `VoltageSource`, `Switch`, `CoupledRL` — modelos companheiros e estampas MNA |
+| `circuit.py` | 1 207 | Montagem, fatoração LU com cache por topologia, CDA, `Solver`, base de tempo indexada |
+| `jmarti.py` | 2 349 | Linha dependente da frequência: ajuste racional por *vector fitting*, fase mínima, atraso, convolução recursiva |
+| `vcb.py` | 1 115 | Disjuntor a vácuo dinâmico: corte por margem, recuperação parabólica, reignição, extinção de alta frequência, contagem |
+| `steady_state.py` | 810 | Partida em regime permanente senoidal por solução fasorial |
+| `snubber.py` | 684 | SCR antiparalelos com $R_s$: disparo por sobretensão, bloqueio no zero |
+| `line.py` | 601 | Linha de Bergeron a parâmetros constantes, com perdas $R/4$, $R/2$, $R/4$ e semeadura de regime |
+| `probes.py` | 310 | Sondas e a ponte `to_stress_profile` para o prognóstico |
+| `cases/motor_switching.py` + `cases/__init__.py` | 1 068 + 55 | Caso de manobra do motor de 1 250 kW / 4,16 kV do Documento A |
+
+**`app/postprocessor/prognosis/` — núcleo de prognóstico (5 arquivos, 3 240 linhas)**
+
+| Arquivo | Linhas | Papel |
+|---|---|---|
+| `damage_models.py` | 1 112 | Acumuladores D1–D7 com parâmetros declaradamente livres |
+| `stress_profile.py` | 682 | `extract_stress_events` → `StressProfile`: consumidor do vetor de estresse $s_{m,j}$ |
+| `health_index.py` | 631 | *Asset Health Index* e semáforo |
+| `rul_estimator.py` | 554 | Estimativa de RUL como distribuição (E4) |
+| `__init__.py` | 261 | Fachada (33 nomes em `__all__`) |
+
+**Suíte de testes — contagem real**
+
+| Arquivo | Testes | Escopo |
+|---|---|---|
+| `tests/test_emt_kernel.py` | 94 | Montagem de matriz, soluções analíticas, Bergeron, CDA, cache de fatoração, convergência, sondas, fontes primárias |
+| `tests/test_emt_vcb_snubber.py` | 52 | VCB, *snubber*, balanço de energia no corte |
+| `tests/test_emt_jmarti.py` | 49 | Ajuste racional, fase mínima, atraso, ondas viajantes, viés de frente |
+| `tests/test_emt_steady_state.py` | 43 | Partida fasorial, idempotência, ordem do resíduo, linha semeada |
+| `tests/test_emt_referencia_eee873.py` | 35 | **Regressão dígito a dígito contra as Listas 01 e 02**, que já são validadas contra o ATP |
+| `tests/test_pp_prognosis_core.py` | 176 | Perfil de estresse, acumuladores, RUL, AHI |
+| **Total** | **449** | `449 passed in 62,66 s` nesta sessão |
+
+Dois números merecem registro, porque contradizem contagens ainda presentes em documentos anteriores desta série e prevalece o medido: o pacote de prognóstico tem **3 240** linhas (o documento 04 registra 3 052) e o catálogo de limitações do motor soma **41** chaves, das quais apenas **19** são alcançáveis pela fachada — as de `vcb.py`, `snubber.py` e do caso de manobra **não são agregadas**, defeito de laudo já identificado e priorizado [FATO: `05_…md`, §12.1 e §12.4, item 2].
+
+### 3.9 Corpus externo ao repositório
+
+As cinco fontes primárias de EMT e as duas Listas de EEE873 (§2.1) **não estão versionadas neste diretório**: foram acessadas em texto integral durante a redação do documento 05 e são citadas por identidade bibliográfica, não por caminho. A rastreabilidade delas é feita pelo par rótulo + localização interna — `[FONTE: Dommel 1969, p. 389, eq. (4)-(6)]`, `[LISTA: 02, §3.6]` —, verificável por quem tenha o mesmo texto em mãos. As Listas permanecem com **[INSERIR CITAÇÃO]** na forma nominal ABNT, porque dados de autoria e de data não devem ser presumidos [FATO: `05_…md`, §13].
+
 ---
 
 ## 4. Premissas do usuário e limitações globais
@@ -292,6 +382,8 @@ Os três primeiros são as **pesquisas dirigidas da Etapa 1**; os seis restantes
 | **P3** | O contexto de aplicação é **O&G** (refinarias, plataformas) | **Hipótese**: nenhum dado de campo de planta específica está no corpus | Usada como cenário de severidade e de valor econômico; toda cifra de custo de parada é rotulada `[LITERATURA]` e nunca atribuída a uma planta |
 | **P4** | O módulo deve entregar **RUL com incerteza**, integrável a um Asset Health Index | Compatível com a norma de prognóstico [NORMA: ISO 13381-1:2015, 3.3, 3.9] | Fixada como requisito de saída (E4): distribuição e nível de confiança, não número único |
 | **P5** | O snubber ativo de A é **mitigação**, e mitigação altera vida | Sustentada por A quanto à redução do estresse [FATO: doc A, Tabela III, p. 3] e por literatura quanto ao efeito de mitigação sobre confiabilidade [FATO: artigo 09] | O efeito sobre RUL é **conclusão a demonstrar** pelo módulo, não premissa: A não calcula RUL |
+| **P6** | **Decisão do autor**: o motor de física é **dedicado e próprio**, em Python, com o laço interno migrável para C++ depois **atrás da mesma API**; o `.atp` permanece **fonte única da verdade** do caso técnico, e o motor o **resolve**, não o substitui como registro | **Decisão, não hipótese**; apoiada em três fatos observáveis do repositório — binário de terceiro obtido por credenciamento e não distribuído, orientação a um caso por execução com E/S por arquivo, e inexistência de qualquer consumidor de `.pl4` —, sendo que a demanda de $10^3$ a $10^4$ execuções é o que a torna necessária [FATO: `05_…md`, §1.1, F1–F3] | Adotada como requisito de arquitetura. **Duas ressalvas de execução, ambas declaradas**: (i) o kernel **não lê `.atp`**, de modo que o caso resolvido e o caso registrado são hoje dois objetos mantidos em sincronia manual — enquanto o leitor `.atp` → `Circuit` não existir, "fonte única da verdade" é intenção de arquitetura, não propriedade do código [FATO: `05_…md`, §11.3]; (ii) o pacote é ***backend* órfão**, condição proibida pelas convenções desde a v3.1.0 [FATO: `05_…md`, §11.4]. Nada se afirma sobre termos de licença do ATP — o texto não foi acessado [FATO por omissão] |
+| **P7** | **Decisão do autor sobre modelos de linha**: Bergeron a parâmetros constantes é o **padrão**, e JMarti (dependente da frequência) é **opcional**, selecionado por um único parâmetro, sem tocar circuito, sondas, VCB ou *snubber* | Implementada e medida. O padrão continua `'bergeron'` **para não alterar silenciosamente resultados já publicados** [FATO: `05_…md`, §5.5; REPO: `app/simulation/emt/cases/motor_switching.py:804`] | Consequência **direta sobre o vetor de estresse**, e por isso premissa e não detalhe: o viés dominante entre os dois modelos não é de amplitude, é de **tempo de frente** — o Bergeron sem perdas sobe em um único passo ($T_1 = 0$) qualquer que seja $\Delta t$, contra $T_1 = 1{,}29$ µs do JMarti sobre a mesma frente, com d$v$/d$t$ 12,5 % menor. Logo: $V_{pk}$ e d$v$/d$t$ do Bergeron **sem perdas** são **cota superior** de estresse, nunca estimativa central; a cota superior **não vale** para o Bergeron **com perdas** concentradas, que mede pico menor que o JMarti (97,58 V contra 99,19 V); e o erro de ajuste do JMarti é erro de **modelo**, não reduzido por refino de $\Delta t$ [FATO: `05_…md`, §5.5] |
 
 ### 4.2 Limitações globais
 
@@ -309,6 +401,9 @@ Os três primeiros são as **pesquisas dirigidas da Etapa 1**; os seis restantes
 | **L10** | **Documentos A e B em revisão duplo-cega, sem autoria** | [FATO: doc A, p. 1; doc B, p. 1] | Citação nominal impossível; referência ABNT permanece com `[INSERIR CITAÇÃO]` até publicação |
 | **L11** | **Contexto O&G é hipótese** (P3) | §4.1 | Nenhuma conclusão do estudo pode depender de dado de planta não disponível |
 | **L12** | **Bloqueios de acesso a editoras** (HTTP 403) durante a coleta | Cabeçalhos das pesquisas | Resumos e metadados sustentam existência e escopo, **nunca** valores numéricos |
+| **L13** | **O motor EMT não lê `.atp` e é *backend* órfão** | [FATO: `05_…md`, §11.3–§11.4] | A premissa P6 só se realiza no código quando o leitor de cartões existir; até lá, toda divergência entre o `.atp` e o caso em Python é possível e não é detectada automaticamente |
+| **L14** | **O confronto contra a Tabela III do Documento A não fecha** | [FATO: `05_…md`, §9] | Com os parâmetros publicados de A, nenhum polo alcança a primeira interrupção bem-sucedida; faltam dados de rede que A não publica. Nenhum número de A pode ser apresentado como reproduzido |
+| **L15** | **Martí (1982) não acessado**: a formulação do modelo dependente da frequência foi montada a partir de fontes secundárias, com o limite sem perdas conferido contra Dommel 1969 | [FATO: `05_…md`, §5.4] | Números de equação e de página de 1982 permanecem `[INSERIR CITAÇÃO]` no código; a recursão exponencial híbrida é **escolha própria não publicada** e deve ser declarada em laudo |
 
 ### 4.3 Regras de uso do acervo em texto acadêmico
 
@@ -317,19 +412,23 @@ Os três primeiros são as **pesquisas dirigidas da Etapa 1**; os seis restantes
 3. Afirmação negativa sobre A ou B exige rótulo `[FATO por omissão]` e a indicação de que foi verificada por busca no texto integral.
 4. Rótulo `[HIPÓTESE]` jamais fundamenta conclusão; aparece somente como premissa declarada, com o teste que a decidiria.
 5. Comparação entre TRV do disjuntor e envelope de suportabilidade de máquina traz sempre a ressalva de grandeza (L3).
+6. Afirmação rotulada `[LISTA: 01/02]` **não** se apresenta como validação independente: é trabalho do próprio autor. O que valida é o ATP contra o qual a lista já foi confrontada, e é esse confronto que se cita (§2.1).
+7. Todo número de $V_{pk}$, d$v$/d$t$ ou $T_1$ produzido pelo motor declara o **modelo de linha** que o gerou, porque o viés entre Bergeron e JMarti é de tempo de frente e altera o dano (P7).
 
 ---
 
 ## 5. Próximo passo recomendado
 
-**Passo imediato (pré-Etapa 2), por ordem de dependência:**
+O passo que este índice recomendava na sua versão anterior — extrair do modelo ATP a tensão no nó do motor, a contagem de reignições e o tempo de frente — **está cumprido por outro caminho**: as três grandezas são saídas nomeadas do motor próprio, entregues ao acumulador sem arquivo intermediário [FATO: `05_…md`, §11.1–§11.2]. A fila passa a ser esta, por ordem de dependência:
 
-1. **Extrair do modelo ATP do Documento A, sem alterar o circuito**, as três grandezas ausentes: (i) tensão fase-terra e fase-neutro no nó do motor; (ii) número de reignições por polo por manobra, $n_{r,m}$; (iii) tempo de frente $T_1$ por reignição, na definição normativa. Sonda já existente no `/OUTPUT` do arquivo de referência [REPO: `git show ad308d5:trt_all_motors_dt_ea.atp:857-859`, conforme `01_ETAPA1...md`]. Sem essas três séries, (E4) não tem entrada.
-2. **Verificar sensibilidade ao passo de integração** (L5): repetir um caso com passo de 10–50 ns e medir se as frentes de sub-microssegundo alteram materialmente a RRRV. O resultado decide se as RRRV da Tabela III podem ser usadas diretamente como dose ou apenas como limite inferior.
-3. **Fechar as lacunas normativas de maior impacto** (L8): obter o texto integral da IEEE Std 522 (Fig. 1, envelope tensão × tempo de frente) e a Tabela 1 da IEC 60034-15:2025, que definem o denominador do confronto de suportabilidade.
-4. **Só então abrir a Etapa 2**, com a arquitetura de (E1)–(E4) instanciada sobre dados reais do modelo e com plano explícito de calibração e de propagação de incerteza dos parâmetros livres de (E2).
+1. **Leitor de cartões `.atp` → `Circuit`.** É o item que converte a premissa P6 de intenção em propriedade do código. Enquanto não existir, o caso resolvido e o caso registrado são dois objetos em sincronia manual (L13) [FATO: `05_…md`, §12.4, item 1].
+2. **Agregar `vcb`, `snubber` e o caso de manobra à fachada de `KNOWN_LIMITATIONS`.** Correção de baixo custo e alto impacto: hoje um laudo que enumere as limitações do motor **omite silenciosamente** as do disjuntor a vácuo e as do *snubber* — inclusive as duas que precisam obrigatoriamente aparecer em qualquer laudo do estudo de A [FATO: `05_…md`, §12.1].
+3. **Retirar o motor da condição de *backend* órfão** (L13): `Feature`, ação de menu, laudo, i18n e `CHANGELOG`, conforme o Sprint 1 do documento 04 [FATO: `05_…md`, §11.4].
+4. **Obter os dados de rede omitidos pelo Documento A** e as tabelas de `CABLE CONSTANTS` do caso ATP — únicos caminhos para fechar o *benchmark* que hoje se reporta como aberto (L14).
+5. **Fechar as lacunas normativas de maior impacto** (L8): texto integral da IEEE Std 522 (Fig. 1, envelope tensão × tempo de frente) e Tabela 1 da IEC 60034-15:2025, que definem o denominador do confronto de suportabilidade.
+6. **Calibrar os parâmetros livres de (E2)** — que permanecem livres por ausência de fonte (L7) —, com propagação de incerteza declarada, e **não** por arbitramento.
 
-**Decisão a submeter ao autor antes da Etapa 2**: confirmar o escopo previsto nas linhas 2 e 3 da tabela da §1.3, que hoje é proposta deste índice e não contrato [HIPÓTESE de escopo].
+**Sobre a migração para C++**: não é próximo passo. Ela deve ser aberta apenas quando as três condições objetivas do documento 05 forem simultaneamente verdadeiras — orçamento de tempo excedido **depois** de explorado o paralelismo por processo, perfil ainda dominado pelo interpretador, e API congelada pelos 273 testes do motor como contrato de regressão [FATO: `05_…md`, §10.4].
 
 ---
 
@@ -341,9 +440,19 @@ AUTORES OMITIDOS (revisão duplo-cega). **Selective mitigation of vacuum circuit
 
 AUTORES OMITIDOS (revisão duplo-cega). **Selective load shedding for the switching of large motors under N-1 contingency: constrained multiobjective optimization with NSGA-II, NSGA-III and regression surrogates**. Submissão ao SEPOC 2026. 6 p. — **Documento B**. Autoria a confirmar após publicação — [INSERIR CITAÇÃO].
 
+AUTOR DESTE REPOSITÓRIO. **Lista de exercícios 01 — EEE873: Análise de Redes Elétricas no Domínio do Tempo** (prof. Alberto de Conti). Programa de Pós-Graduação em Engenharia Elétrica, Universidade Federal de Minas Gerais. Modelos numéricos de indutor e capacitor (trapezoidal e Euler regressiva), solução analítica por Laplace do Exemplo A, solução nodal, ordem de convergência, código MATLAB e arquivo `.atp`. Citada como [LISTA: 01, seção]. Forma nominal ABNT — [INSERIR CITAÇÃO]: dados de autoria e de data não devem ser presumidos.
+
+AUTOR DESTE REPOSITÓRIO. **Lista de exercícios 02 — EEE873: Análise de Redes Elétricas no Domínio do Tempo** (prof. Alberto de Conti). Programa de Pós-Graduação em Engenharia Elétrica, Universidade Federal de Minas Gerais. Análise nodal modificada e modelagem de chaves; Questão 1 (curto-circuito na carga de circuito RL); Questão 2 (abertura de disjuntor a vácuo alimentando reator), com as Tabelas 1 a 4 e a comparação contra o ATP. Citada como [LISTA: 02, seção]. Forma nominal ABNT — [INSERIR CITAÇÃO]: idem.
+
 CIGRE. **Technical Brochure 703 — Insulation degradation under fast, repetitive voltage pulses**. WG D1.43. Paris: CIGRE, 2017. Cópia consultada: https://cigre.cz/dokumenty_komise/d1/WG%20D1.43_TB_Final.pdf. Acesso em: 2 set. 2026.
 
+DOMMEL, H. W. Digital computer solution of electromagnetic transients in single- and multiphase networks. **IEEE Transactions on Power Apparatus and Systems**, v. PAS-88, n. 4, p. 388–399, abr. 1969. — Fonte primária; texto integral acessado.
+
+DOMMEL, H. W. Nonlinear and time-varying elements in digital simulation of electromagnetic transients. **IEEE Transactions on Power Apparatus and Systems**, v. PAS-90, n. 6, p. 2561–2567, nov./dez. 1971. — Fonte primária; texto integral acessado.
+
 FEILAT, E. A. Lifetime assessment of electrical insulation. In: **Electric Field**. Londres: IntechOpen, 2018. DOI 10.5772/intechopen.72423. Disponível em: https://cdn.intechopen.com/pdfs/58128.pdf. Acesso em: 2 set. 2026.
+
+HO, C.-W.; RUEHLI, A. E.; BRENNAN, P. A. The modified nodal approach to network analysis. **IEEE Transactions on Circuits and Systems**, v. CAS-22, n. 6, p. 504–509, jun. 1975. — Fonte primária; texto integral acessado.
 
 IEC. **IEC 60034-15:2009** — Rotating electrical machines — Part 15: Impulse voltage withstand levels of form-wound stator coils for rotating a.c. machines. 3. ed. Genebra: IEC, 2009. Amostra oficial: https://cdn.standards.iteh.ai/samples/15848/1b914cc7cb9b4c4582e502f946666007/IEC-60034-15-2009.pdf. Acesso em: 2 set. 2026.
 
@@ -365,7 +474,11 @@ ISO. **ISO 13381-1:2015** — Condition monitoring and diagnostics of machines �
 
 KOHLER, J. L.; SOTTILE, J.; TRUTT, F. C. Condition monitoring of stator windings in induction motors. Part I — Experimental investigation of the effective negative-sequence impedance detector. **IEEE Transactions on Industry Applications**, 2002. DOI 10.1109/TIA.2002.802935. (Resumo verificado; texto integral não acessado.)
 
+LIN, J.; MARTÍ, J. R. Implementation of the CDA procedure in the EMTP. **IEEE Transactions on Power Systems**, v. 5, n. 2, p. 394–402, maio 1990. — Fonte primária; texto integral acessado.
+
 MA, K.; LISERRE, M.; BLAABJERG, F.; KEREKES, T. Thermal loading and lifetime estimation for power device considering mission profiles in wind power converter. **IEEE Transactions on Power Electronics**, v. 30, n. 2, p. 590–602, fev. 2015. DOI 10.1109/TPEL.2014.2312335.
+
+MAHSEREDJIAN, J. et al. On a new approach for the simulation of transients in power systems. **Electric Power Systems Research**, v. 77, n. 11, p. 1514–1520, 2007. — Fonte primária; texto integral acessado.
 
 RELIASOFT. **Miner's rule and cumulative damage models**. HotWire, n. 116. Disponível em: https://help.reliasoft.com/articles/content/hotwire/issue116/hottopics116.htm. Acesso em: 2 set. 2026.
 
