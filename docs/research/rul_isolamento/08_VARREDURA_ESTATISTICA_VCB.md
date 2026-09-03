@@ -128,6 +128,12 @@ Critério de insensibilidade ao passo, aplicado à pior realização:
 Variação de ±5 % num refinamento de 10 vezes. O resultado é uma propriedade do modelo tal como
 formulado, não um degrau numérico [CÁLCULO PRÓPRIO: medição].
 
+> **Ressalva acrescentada depois.** O teste acima vale para **esta** realização e não generaliza:
+> medido sobre as oito em escalada, duas colapsam para uma única reignição e 2,3 pu a
+> $\Delta t = 0{,}2$ µs. O que sobrevive ao refinamento é o *envelope* da escalada quando ela
+> ocorre, não o *desfecho* de cada realização marginal, e a cauda desta varredura — feita a 1 µs
+> — deve ser lida como ordem de grandeza. Ver `09_PARA_RAIOS_E_CRITERIO_DE_ACEITACAO.md`, §6.3.
+
 ### 3.2 A escalada é comandada pela rampa de recuperação, não pela física de alta frequência
 
 Diagnóstico do polo A da pior realização (RRDS sorteada 44,3 kV/ms, capacidade de extinção

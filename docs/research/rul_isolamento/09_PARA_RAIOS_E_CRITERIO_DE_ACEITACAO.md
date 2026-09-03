@@ -179,7 +179,83 @@ importante dos três [F10].
 | 3. Teto de sanidade no consumidor do resultado | Pendente — cabe ao acumulador de dano, não ao motor |
 | 4. Alimentar o modelo de dano com a cauda | **Liberado para a configuração COM para-raios.** Sem para-raios a cauda continua fora do domínio físico e não deve ser usada |
 
-## 6. O que continua aberto
+## 6. A instalação sem para-raios: disrupção como evento terminal
+
+O caso do arquivo `.atp` não tem para-raios, e para ele a cauda continuava sem limite. A
+alternativa mínima — implementada em `app/simulation/emt/flashover.py` — é um limiar no envelope
+normativo **com registro do evento**.
+
+### 6.1 O que o limiar afirma, e o que não afirma
+
+A IEC 60034-15 fixa níveis de **suportabilidade de ensaio**, não a tensão de ruptura, que fica
+acima do nível de ensaio por margem não publicada. O ramo, portanto, não prevê o instante físico
+da disrupção: marca a fronteira além da qual o resultado **deixa o domínio que a norma garante**,
+e conta as travessias.
+
+A consequência para o modelo de dano precisa ser dita com precisão: uma realização que atinge o
+nível **não é estresse a integrar, é um evento terminal a contar**. Grampear a tensão reduz o
+estresse calculado — é conservador quanto à amplitude e **anticonservador quanto ao dano**. Por
+isso a saída que importa é a contagem, não a forma de onda grampeada.
+
+Níveis implementados, com as duas edições:
+
+| $U_N$ | 2009 — $U_P$ / $U'_P$ | 2025 (CDV) — SLI / SFI | 2025 reforçado |
+|---|---|---|---|
+| 4,16 kV | 21,64 / 14,07 kV | 16,98 / 11,89 kV | 31,98 / 22,89 kV |
+| 6,6 kV | 31,40 / 20,41 kV | 26,94 / 18,86 kV | 41,94 / 29,86 kV |
+| 13,8 kV | 60,20 / 39,13 kV | 56,34 / 39,44 kV | 71,34 / 50,44 kV |
+
+Os valores da edição 2025 reproduzem a Tabela 1 do CDV em três dígitos, mas o CDV está marcado
+*subject to change* e a Tabela 1 da edição publicada não foi acessada. O nível **reforçado** do
+CDV — padrão + 15 kV (SLI) e + 11 kV (SFI) — é previsto justamente para *"very frequent switching
+or aborted starts"*, que é a condição deste estudo.
+
+### 6.2 Resultado
+
+Sobre as 150 realizações do cenário da literatura sem amortecedor, com $\Delta t = 1$ µs:
+
+| Limiar | Realizações que disruptam | Atraso após a separação (p50 / mín / máx) |
+|---|---|---|
+| IEC 2009, $U_P$ = 21,64 kV | 8 / 150 | 0,485 / 0,467 / 0,561 ms |
+| IEC 2025 (CDV), SLI = 16,98 kV | 8 / 150 | 0,413 / 0,386 / 0,481 ms |
+
+São exatamente as oito realizações em escalada. A leitura de engenharia é direta: **quando a
+escalada começa, o envelope normativo cai em menos de 0,6 ms**. Não há janela de detecção nem de
+atuação nessa escala — o que confirma que a mitigação tem de ser preventiva (para-raios, RC,
+chaveamento controlado) e não reativa.
+
+A comparação que fecha o argumento: com o para-raios, a mesma realização **não chega ao
+envelope**. É a diferença entre uma manobra que envelhece a isolação e uma que a rompe.
+
+### 6.3 Duas ressalvas medidas, que limitam o que a cauda pode afirmar
+
+**O pico grampeado não é resultado quantitativo.** O caminho fecha no passo seguinte ao
+cruzamento, e os meios-passos do CDA não chamam controladores; com frentes de quilovolt por
+microssegundo a ultrapassagem medida vai de 1,04 a 1,87 vez o limiar nas oito realizações. O que
+o ramo entrega é a contagem e o instante, não a amplitude.
+
+**Realizações marginais não estão convergidas em passo.** A escalada é uma cadeia de decisões de
+limiar sobre o $di/dt$ nos zeros de alta frequência, e essa cadeia diverge com o passo. Medido,
+sem grampo:
+
+| Realização | $\Delta t$ = 1 µs | $\Delta t$ = 0,2 µs |
+|---|---|---|
+| 0 | 56,43 pu / 70 reign. | 65,59 pu / 148 reign. |
+| 1 | 77,53 pu / 128 reign. | 76,90 pu / 158 reign. |
+| 5 | 48,71 pu / 87 reign. | **2,26 pu / 1 reign.** |
+| 7 | 52,09 pu / 94 reign. | **2,31 pu / 1 reign.** |
+
+**Isto corrige a leitura da §3.1 do documento 08.** Ali o critério de insensibilidade ao passo
+foi aplicado à *pior* realização, e o resultado — ±5 % num refinamento de dez vezes — vale para
+ela e está corretamente rotulado como tal. Ele **não generaliza**: duas das oito realizações em
+escalada colapsam para uma única reignição a 0,2 µs. O que sobrevive ao refinamento é o
+*envelope* da escalada quando ela ocorre, não o *desfecho* de cada realização marginal.
+
+Consequência prática: a estatística de população (4 a 5 % das realizações escalam) é mais robusta
+que qualquer realização individual, e a cauda deve ser varrida com $\Delta t \le 0{,}2$ µs ou
+reportada como faixa.
+
+## 7. O que continua aberto
 
 * **A curva do para-raios é uma reconstrução** de dois pontos publicados, escalada de 11 para
   4,16 kV por regra de seleção. Um para-raios real tem curva de catálogo. O que os resultados
@@ -190,9 +266,13 @@ importante dos três [F10].
   calculado é cota inferior [`emt_nonlinear_no_dynamic_arrester_model`].
 * **Não há classe de descarga**: a energia é medida (57,2 J no pior caso) mas não confrontada
   automaticamente com a capacidade do para-raios [`emt_arrester_no_energy_rating`].
-* **A instalação sem para-raios continua sem limite dielétrico.** O caso do arquivo `.atp` não
-  tem para-raios, e para ele a cauda de escalada permanece fora do domínio físico. A alternativa
-  mínima — um limiar de disrupção no envelope da IEC 60034-15 — não foi implementada.
+* **A varredura de 150 realizações foi feita a $\Delta t = 1$ µs** e sua cauda, portanto, não
+  está convergida (§6.3). Refazê-la a 0,2 µs custa cinco vezes mais e é o próximo passo natural
+  se a fração de realizações em escalada for usada como número, e não como ordem de grandeza.
+* **A disrupção representada é apenas fase-terra no terminal.** Não há disrupção entre espiras —
+  interna à bobina, não aparece como ramo do circuito — nem entre fases, embora Vollet reporte
+  sobretensões fase-fase de até o dobro das fase-terra. Um resultado sem disrupção fase-terra não
+  é, portanto, um resultado sem disrupção.
 
 ## Referências
 

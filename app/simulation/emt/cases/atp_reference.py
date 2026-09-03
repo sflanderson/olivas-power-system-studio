@@ -287,6 +287,7 @@ from app.simulation.emt.probes import (
     NodeVoltageProbe,
 )
 from app.simulation.emt.arrester import three_phase_arrester
+from app.simulation.emt.flashover import three_phase_flashover
 from app.simulation.emt.snubber import (
     SnubberBranch,
     SnubberMasterTrigger,
@@ -1482,6 +1483,14 @@ class AtpReferenceCase:
     #: a cauda de escalada fora do domínio físico
     #: [REPO: docs/research/rul_isolamento/08_VARREDURA_ESTATISTICA_VCB.md].
     motor_arrester_system_voltage_V: float | None = None
+    #: Nível de disrupção da isolação no terminal do motor [V de pico].
+    #: ``None`` (padrão) não representa disrupção — que é a configuração
+    #: do arquivo. Um valor instala um caminho de disrupção por fase, com
+    #: registro do evento; use :func:`app.simulation.emt.flashover.
+    #: iec_60034_15_levels` para obtê-lo do envelope normativo. A
+    #: travessia é EVENTO TERMINAL a contar, não estresse a integrar —
+    #: ver o cabeçalho de :mod:`app.simulation.emt.flashover`.
+    motor_flashover_level_V: float | None = None
 
     def __post_init__(self) -> None:
         for label, value in (("dt_s", self.dt_s), ("t_end_s", self.t_end_s)):
@@ -1502,6 +1511,13 @@ class AtpReferenceCase:
                 raise ValueError(
                     "motor_arrester_system_voltage_V deve ser finita e > 0, "
                     f"obtida {self.motor_arrester_system_voltage_V!r}"
+                )
+        if self.motor_flashover_level_V is not None:
+            v = float(self.motor_flashover_level_V)
+            if not math.isfinite(v) or v <= 0.0:
+                raise ValueError(
+                    "motor_flashover_level_V deve ser finito e > 0, obtido "
+                    f"{self.motor_flashover_level_V!r}"
                 )
         if str(self.cable_phasor_reading) not in CABLE_PHASOR_READINGS:
             raise ValueError(
@@ -1675,6 +1691,18 @@ class AtpReferenceCase:
             for moa in arresters:
                 ckt.add(moa)
 
+        # -- disrupção da isolação no terminal do motor ----------------------
+        flashovers: tuple = ()
+        if self.motor_flashover_level_V is not None:
+            flashovers = three_phase_flashover(
+                "disrupcao",
+                NODES_MOTOR,
+                NODE_GROUND,
+                threshold_V=float(self.motor_flashover_level_V),
+            )
+            for caminho in flashovers:
+                ckt.extend(caminho.components)
+
         # -- polos do disjuntor ----------------------------------------------
         recovery = self.recovery()
         if self.vcb_samples is not None:
@@ -1780,7 +1808,11 @@ class AtpReferenceCase:
                 BranchCurrentProbe(f"i_vcb_{ph}", ckt.get(f"vcb_{ph}"))
             )
 
-        controllers = tuple(poles) + ((gate,) if gate is not None else ())
+        controllers = (
+            tuple(poles)
+            + ((gate,) if gate is not None else ())
+            + tuple(f.controller for f in flashovers)
+        )
         return AtpReferenceModel(
             case=self,
             reference=reference,
@@ -1792,6 +1824,7 @@ class AtpReferenceCase:
             snubber_gate=gate,
             literal_poles=literal_poles,
             arresters=arresters,
+            flashovers=flashovers,
             controllers=controllers,
             trv_probes=trv_probes,
             bus_probes=bus_probes,
@@ -1889,6 +1922,7 @@ class AtpReferenceModel:
     snubber_gate: "SnubberArmingGate | SnubberMasterTrigger | None"
     literal_poles: tuple[AtpLiteralPole, ...]
     arresters: tuple = ()
+    flashovers: tuple = ()
     controllers: tuple = ()
     trv_probes: dict = field(default_factory=dict)
     bus_probes: dict = field(default_factory=dict)
