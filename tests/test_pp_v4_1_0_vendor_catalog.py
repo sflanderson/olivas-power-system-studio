@@ -585,9 +585,13 @@ class TestCableCatalogAdditions:
         assert c240.rated_voltage_kV == 6.0
         assert c240.insulation == InsulationType.HEPR
         assert "105" in c240.notes
+        # K=134 (Cu, conexões prensadas, T1=105°C), não o K=143/142
+        # genérico do módulo (calibrado para T1=90°C das demais entradas)
+        assert math.isclose(c240.icw_kA_1s, 0.134 * 240, abs_tol=1e-3)
         for c in py:
             assert c.ampacity_air_A > c.ampacity_buried_A > 0
             assert c.R_ac_ohm_per_km_at_90C > c.R_dc_ohm_per_km_at_20C
+            assert math.isclose(c.icw_kA_1s, 0.134 * c.cross_section_mm2, abs_tol=1e-3)
 
     def test_prysmian_rdc_close_to_induscabos_iec60228(self):
         """Rcc (Prysmian, 3 casas) e R_dc (Induscabos, 4 casas) derivam

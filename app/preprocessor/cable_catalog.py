@@ -456,8 +456,14 @@ _NEXANS_TRXLPE_11kV: tuple[CatalogCable, ...] = (
 # Corrente" (NBR 14039 Tab. 30 — ar livre 30 °C / diretamente enterrado
 # 20 °C, ρ_solo=2,5 K·m/W, 3 cabos unipolares em trifólio). C_uF_per_km
 # derivado de Xc (Ω·km) por C=1/(2π·60·Xc) — não impresso diretamente.
-# Isolação HEPR 105 °C (Eprotenax): Rca/ampacidade em referência de
-# temperatura MAIS ALTA que as demais entradas do catálogo (XLPE 90 °C).
+# icw usa K=134 (seção "Correntes de Curto-Circuito no Condutor", Cu,
+# conexões prensadas, T1=105°C→T2=250°C — específico deste produto, não
+# o K=143/142 genérico usado nas demais entradas do módulo, calibrado
+# para T1=90°C). Isolação HEPR 105 °C (Eprotenax Compact 105 — nome
+# comercial Prysmian; a classificação HEPR não aparece literalmente
+# neste documento, mas é a isolação padrão da linha): Rca/ampacidade/icw
+# em referência de temperatura MAIS ALTA que as demais entradas do
+# catálogo (XLPE 90 °C).
 # ---------------------------------------------------------------------------
 
 _PRYSMIAN_SRC = "Prysmian — Média Tensão Uso Geral, EPROTENAX COMPACT 105 3,6/6 kV"
@@ -473,15 +479,21 @@ def _prysmian(s: float, rcc20: float, rac105: float, x_tri: float,
         R_dc_ohm_per_km_at_20C=rcc20, R_ac_ohm_per_km_at_90C=rac105,
         X_ohm_per_km=x_tri, C_uF_per_km=round(c_uf_km, 4),
         ampacity_air_A=i_air, ampacity_buried_A=i_bur,
-        icw_kA_1s=round(0.143 * s, 3),
+        # K=134 (Cu, conexões prensadas, T1=105°C→T2=250°C) — NÃO o K=143
+        # genérico do módulo (que é o K=142 de T1=90°C arredondado); a
+        # fonte publica a tabela específica para este produto de 105 °C.
+        icw_kA_1s=round(0.134 * s, 3),
         notes=(
-            "R_ac e ampacidade referenciados a 105 °C (isolação HEPR "
-            "Eprotenax Compact 105), não 90 °C como as demais entradas do "
-            "catálogo — não comparar R_ac diretamente entre fabricantes "
-            "sem ajustar a temperatura de referência. Arranjo trifólio "
-            "(3 cabos unipolares). Ampacidade ao ar: 30 °C ambiente, "
-            "bandeja. Ampacidade enterrada: NBR 14039 Tab. 30, 20 °C "
-            "ambiente, ρ_solo=2,5 K·m/W (coluna a, a mais conservadora). "
+            "R_ac, ampacidade e I²t (K=134, não o K=143/142 genérico do "
+            "módulo) referenciados a 105 °C (isolação HEPR — Eprotenax "
+            "Compact 105; classificação HEPR de catálogo comercial "
+            "Prysmian, não impressa literalmente neste documento), não "
+            "90 °C como as demais entradas do catálogo — não comparar R_ac "
+            "nem icw diretamente entre fabricantes sem ajustar a "
+            "temperatura de referência. Arranjo trifólio (3 cabos "
+            "unipolares). Ampacidade ao ar: 30 °C ambiente, bandeja. "
+            "Ampacidade enterrada: NBR 14039 Tab. 30, 20 °C ambiente, "
+            "ρ_solo=2,5 K·m/W (coluna a, a mais conservadora). "
             "C_uF_per_km calculado de Xc (não impresso na fonte)."
         ),
         manufacturer="Prysmian", source=_PRYSMIAN_SRC,
