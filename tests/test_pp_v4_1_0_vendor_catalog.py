@@ -503,7 +503,15 @@ class TestRelayRegistryAdditions:
         micom = get_model("Schneider-MiCOM-P127")
         assert m.family != micom.family
         assert m.time_dial_range == (0.1, 12.5)
-        assert m.tms_range == (0.05, 1.0)
+        assert m.tms_range == (0.07, 8.33)   # curva VIT/B, referência do manual
+
+    def test_schneider_sepam_s40_functions_are_variant_specific(self):
+        """46BC e 27R são de OUTRAS variantes da plataforma Sepam 40
+        (S50+/T50+/T52 e M41 respectivamente) — não do S40 básico."""
+        m = get_model("Schneider-Sepam-S40")
+        assert not supports_function(m, "46BC")
+        assert not supports_function(m, "27R")
+        assert supports_function(m, "27") and supports_function(m, "59")
 
 
 # ---------------------------------------------------------------------------

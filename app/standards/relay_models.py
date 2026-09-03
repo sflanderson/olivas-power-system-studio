@@ -882,9 +882,13 @@ ABB_REF620 = RelayModel(
         "(67): ângulo característico -179..180°, quantidade de "
         "polarização configurável (self/neg-seq/cross/pos-seq). "
         "Distância (21P) e diferencial de alta impedância de barra "
-        "(87/HIPDIF) confirmados como exclusivos do REM620 na revisão "
-        "2019 do manual técnico consultada; o Product Guide REF620 "
-        "2022 já anuncia 87 (fase A/B/C) mas sem faixa numérica "
+        "(87/HIPDIF) confirmados como exclusivos do REM620 pela seção "
+        "de identificação da função ('available in REM620 Ver.2.1 "
+        "only', §4.7.1.1/4.6.4.1 do manual técnico 2019) — leitura "
+        "inequívoca; a Tabela 1 (índice consolidado de funções) tem "
+        "uma anomalia de alinhamento na linha do 21P especificamente, "
+        "não usada como evidência primária aqui. O Product Guide "
+        "REF620 2022 já anuncia 87 (fase A/B/C) mas sem faixa numérica "
         "confirmada para essa revisão — não modelado aqui por "
         "ausência de dado verificado."
     ),
@@ -935,7 +939,7 @@ GE_369 = RelayModel(
         "retardo 0.0-255.0 s. 55 Fator de potência: 0.99-0.05 passo "
         "0.01. Curva de sobrecarga padrão (fórmula publicada, "
         "verbatim): tempo_disparo = (multiplicador_curva × 2.2116623) "
-        "/ [0.02530337×(pickup-1) + 0.05054758×(pickup-1)²], onde "
+        "/ [0.02530337×(pickup-1)² + 0.05054758×(pickup-1)], onde "
         "pickup = corrente/FLA e multiplicador_curva ∈ {1..15}; acima "
         "de 8.0×pickup o tempo é mantido no valor de 8.0× (curva "
         "achatada para não agir como elemento instantâneo). Não é a "
@@ -963,7 +967,7 @@ SCHNEIDER_SEPAM_S40 = RelayModel(
     manual_path="Schneider PCRED301006EN ed. 02/2017 (Sepam série 40 User's Manual)",
     ansi_functions=(
         "50", "51", "50N", "51N", "50G", "51G", "50BF",
-        "46", "46BC", "27", "27R", "27S", "59", "59N", "47",
+        "46", "27", "27S", "59", "59N", "47",
         "81H", "81L", "79",
     ),
     tc_curve_standards=(
@@ -979,7 +983,13 @@ SCHNEIDER_SEPAM_S40 = RelayModel(
         IeeeCurveType.EXTREMELY_INVERSE,
     ),
     pickup_range_per_in=(0.1, 24.0),
-    tms_range=(0.05, 1.0),
+    # TMS varia POR CURVA (manual, nota "Setting ranges in TMS mode"):
+    # SIT/A 0.04-4.20; VIT/B 0.07-8.33; LTI/B 0.01-0.93; EIT/C
+    # 0.13-15.47; IEEE MI 0.42-51.86; VI 0.73-90.57; EI 1.24-154.32;
+    # IAC Inv 0.34-42.08; VI 0.61-75.75; EI 1.08-134.4. Usado abaixo:
+    # VIT/B, curva de referência do próprio manual ("VIT com TMS=1
+    # corresponde a T=1.5s").
+    tms_range=(0.07, 8.33),
     time_dial_range=(0.1, 12.5),
     description=(
         "Variante básica de 14 da plataforma Sepam 1000+ (S40-S53 "
@@ -993,8 +1003,15 @@ SCHNEIDER_SEPAM_S40 = RelayModel(
         "toroidal 2A: 0.1-30 A, 20A: 2-300 A; TC sensível 1A: "
         "0.05-15×In0 (mín. 0.1 A). 46 Desbalanço: tempo definido "
         "0.1-5×Ib / 0.1-300 s; IDMT 0.1-0.5×Ib (curva Schneider) ou "
-        "0.1-1×Ib (IEC/IEEE). 27/27R/27S/59/59N/47: 5-120% Unp "
-        "(faixas específicas por função), 0.05-300 s. 81H/81L: "
+        "0.1-1×Ib (IEC/IEEE). 27 Subtensão: 5-120% Unp; 27S "
+        "(fase-neutro): 5-120% Vnp; 59 Sobretensão: 50-150% Unp "
+        "(Uns<208V) ou 50-135% (Uns≥208V) — NÃO a mesma faixa de 27; "
+        "59N (deslocamento de tensão de neutro): 2-80% Unp; 47 "
+        "(sobretensão seq. negativa): 1-50% Unp; todas com retardo "
+        "0.05-300 s. 27R (subtensão remanente, 5-100% Unp) é exclusivo "
+        "do M41/motor — não suportado pelo S40 (removido de "
+        "ansi_functions; 46BC, exclusivo de S50-S53/T50/T52, idem). "
+        "81H/81L: "
         "50-65 Hz / 40-60 Hz (faixas por banda), 0.1-300 s. Ajuste de "
         "retardo IDMT por dois métodos equivalentes: tempo T "
         "(operação a 10×Is) ou fator TMS = T/β (β = constante de "
