@@ -723,6 +723,16 @@ class Solver:
 
         wall0 = time.perf_counter()
         self._sync_topology()
+        # Primeiro passo em CDA: os termos de histórico partem de zero e,
+        # na regra trapezoidal, o termo do capacitor usa i(t−Δt) — que não
+        # é conhecido em t = 0 e é INCONSISTENTE com a rede (o capacitor
+        # descarregado conduz i = v_fonte/R no instante inicial). O Euler
+        # regressivo não usa i(t−h) no capacitor, de modo que dois
+        # meios-passos bastam para estabelecer histórico consistente. Sem
+        # isso o erro global do degrau degenera de O(Δt²) para O(Δt).
+        # [CÁLCULO PRÓPRIO: ver tests/test_emt_kernel.py, convergência.]
+        if self.cda_enabled:
+            self._pending_cda = self.cda_full_steps
         times: list[float] = [self._t]
         self._record()
         if on_step is not None:
