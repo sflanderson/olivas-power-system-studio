@@ -35,12 +35,16 @@ from app.simulation.emt.vcb_scenarios import (
     LITERATURE_RRDS_RANGE_KV_PER_MS,
     LITERATURE_RRDS_WORST_KV_PER_MS,
     LITERATURE_SCENARIO,
+    LITERATURE_WORST_ARC_TIME_S,
     MEASURED_SCENARIO,
     SCENARIOS,
+    PoleCurrentZeros,
     VcbParameterRanges,
     sample_vcb_parameters,
+    sample_vcb_parameters_by_arc_time,
     scenario,
     sweep_samples,
+    sweep_three_pole_samples,
 )
 
 JANELA = (14.0e-3, 30.7e-3)
@@ -297,3 +301,257 @@ def test_sem_amostras_o_caso_usa_os_valores_do_arquivo():
     for polo, t_sep, i_ch in zip(m.poles, VCB_SEPARATION_TIME_S, VCB_CHOPPING_CURRENT_A):
         assert polo.separation_time_s == pytest.approx(t_sep)
         assert polo.sampled_chopping_current_A == pytest.approx(i_ch)
+
+
+# ---------------------------------------------------------------------------
+# 6. Amostragem por tempo de arco
+# ---------------------------------------------------------------------------
+
+
+class TestZerosDeCorrenteDoPolo:
+    """A geometria dos zeros, que é o que define o tempo de arco."""
+
+    def test_zeros_espacados_de_meio_periodo(self):
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        t1 = z.first_zero_after(0.0)
+        t2 = z.first_zero_after(t1)
+        assert t2 - t1 == pytest.approx(z.half_period_s, rel=1e-12)
+        assert z.half_period_s == pytest.approx(1.0 / 120.0, rel=1e-12)
+
+    def test_primeiro_zero_de_uma_cossenoide_com_fase_nula(self):
+        """``cos(ωt) = 0`` em ``t = T/4``."""
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        assert z.first_zero_after(0.0) == pytest.approx(1.0 / 240.0, rel=1e-12)
+
+    def test_o_zero_devolvido_anula_a_corrente(self):
+        z = PoleCurrentZeros(phase_angle_rad=0.7, frequency_Hz=60.0)
+        tz = z.first_zero_after(0.021)
+        assert np.cos(z.omega_rad_s * tz + z.phase_angle_rad) == pytest.approx(
+            0.0, abs=1e-12
+        )
+
+    def test_busca_e_estritamente_posterior_mesmo_partindo_de_um_zero(self):
+        z = PoleCurrentZeros(phase_angle_rad=-0.3, frequency_Hz=60.0)
+        tz = z.first_zero_after(0.01)
+        assert z.first_zero_after(tz) == pytest.approx(tz + z.half_period_s, rel=1e-12)
+
+    def test_construcao_a_partir_do_fasor(self):
+        z = PoleCurrentZeros.from_phasor(74.0 * np.exp(1j * 0.42), frequency_Hz=60.0)
+        assert z.phase_angle_rad == pytest.approx(0.42, rel=1e-12)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"phase_angle_rad": float("nan")},
+            {"phase_angle_rad": 0.0, "frequency_Hz": 0.0},
+            {"phase_angle_rad": 0.0, "frequency_Hz": -60.0},
+        ],
+    )
+    def test_parametros_invalidos_levantam(self, kwargs):
+        with pytest.raises(ValueError):
+            PoleCurrentZeros(**kwargs)
+
+    def test_fasor_nulo_levanta(self):
+        with pytest.raises(ValueError, match="nulo"):
+            PoleCurrentZeros.from_phasor(0j)
+
+
+class TestSeparacaoDerivadaDoTempoDeArco:
+    """O recuo a partir do zero de corrente é exato e respeita o piso."""
+
+    def test_o_tempo_de_arco_realizado_e_o_pedido(self):
+        z = PoleCurrentZeros(phase_angle_rad=1.1, frequency_Hz=60.0)
+        for tau in (0.0, 5.0e-6, 50.0e-6, 99.0e-6):
+            t_sep = z.separation_for_arc_time(tau, earliest_separation_s=14.0e-3)
+            assert z.arc_time_after(t_sep) == pytest.approx(tau, abs=1e-12)
+
+    def test_separacao_nunca_fica_abaixo_do_piso(self):
+        z = PoleCurrentZeros(phase_angle_rad=-2.0, frequency_Hz=60.0)
+        piso = 14.0e-3
+        for tau in np.linspace(0.0, 100.0e-6, 25):
+            assert z.separation_for_arc_time(float(tau), earliest_separation_s=piso) >= piso
+
+    def test_tempo_de_arco_acima_de_meio_periodo_levanta(self):
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        with pytest.raises(ValueError, match="meio período"):
+            z.separation_for_arc_time(z.half_period_s)
+
+    @pytest.mark.parametrize("tau", [-1.0e-6, float("inf"), float("nan")])
+    def test_tempo_de_arco_invalido_levanta(self, tau):
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        with pytest.raises(ValueError):
+            z.separation_for_arc_time(tau)
+
+    def test_piso_invalido_levanta(self):
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        with pytest.raises(ValueError, match="earliest_separation_s"):
+            z.separation_for_arc_time(10.0e-6, earliest_separation_s=-1.0)
+
+
+class TestAmostragemPorTempoDeArco:
+    """A varredura passa a ter a janela de escalada como alvo, e não como sorte."""
+
+    def test_janela_padrao_e_a_de_escalada_maxima_de_wong(self):
+        assert LITERATURE_WORST_ARC_TIME_S == (0.0, 100.0e-6)
+
+    def test_amostras_caem_na_janela_pedida(self):
+        z = PoleCurrentZeros(phase_angle_rad=0.9, frequency_Hz=60.0)
+        rng = np.random.default_rng(3)
+        amostras = [
+            sample_vcb_parameters_by_arc_time(
+                LITERATURE_SCENARIO, rng=rng, zeros=z, earliest_separation_s=14.0e-3
+            )
+            for _ in range(200)
+        ]
+        taus = np.array([a.arc_time_s for a in amostras])
+        assert taus.min() >= 0.0
+        assert taus.max() <= 100.0e-6
+        assert taus.max() - taus.min() > 80.0e-6  # cobre a janela
+        for a in amostras:
+            assert z.arc_time_after(a.separation_time_s) == pytest.approx(
+                a.arc_time_s, abs=1e-12
+            )
+
+    def test_amostragem_uniforme_no_ciclo_quase_nunca_atinge_a_janela(self):
+        """O motivo de existir esta parametrização.
+
+        100 µs sobre os 8,333 ms entre zeros são 1,2 % do ciclo: a
+        varredura uniforme cai na janela de escalada cerca de uma vez em
+        cada 83 realizações [CÁLCULO PRÓPRIO].
+        """
+        z = PoleCurrentZeros(phase_angle_rad=0.9, frequency_Hz=60.0)
+        uniformes = sweep_samples(
+            LITERATURE_SCENARIO, n=500, separation_window_s=(14.0e-3, 30.7e-3), seed=1
+        )
+        na_janela = sum(
+            1 for a in uniformes if z.arc_time_after(a.separation_time_s) <= 100.0e-6
+        )
+        assert na_janela / len(uniformes) < 0.05
+
+        dirigidas = [
+            sample_vcb_parameters_by_arc_time(
+                LITERATURE_SCENARIO,
+                rng=np.random.default_rng(k),
+                zeros=z,
+                earliest_separation_s=14.0e-3,
+            )
+            for k in range(50)
+        ]
+        assert all(a.arc_time_s <= 100.0e-6 for a in dirigidas)
+
+    def test_parametros_do_disjuntor_continuam_nas_faixas(self):
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        rng = np.random.default_rng(11)
+        for _ in range(100):
+            a = sample_vcb_parameters_by_arc_time(LITERATURE_SCENARIO, rng=rng, zeros=z)
+            assert (
+                LITERATURE_SCENARIO.chopping_A[0]
+                <= a.chopping_current_A
+                <= LITERATURE_SCENARIO.chopping_A[1]
+            )
+            assert (
+                LITERATURE_SCENARIO.didt_A_per_us[0]
+                <= a.didt_capability_A_per_us
+                <= LITERATURE_SCENARIO.didt_A_per_us[1]
+            )
+            assert (
+                LITERATURE_SCENARIO.rrds_kV_per_ms[0]
+                <= a.rrds_a_kV_per_ms
+                <= LITERATURE_SCENARIO.rrds_kV_per_ms[1]
+            )
+
+    @pytest.mark.parametrize("janela", [(-1.0e-6, 1.0e-6), (2.0e-6, 1.0e-6)])
+    def test_janela_de_tempo_de_arco_invalida_levanta(self, janela):
+        z = PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0)
+        with pytest.raises(ValueError, match="arc_time_window_s"):
+            sample_vcb_parameters_by_arc_time(
+                LITERATURE_SCENARIO,
+                rng=np.random.default_rng(0),
+                zeros=z,
+                arc_time_window_s=janela,
+            )
+
+
+class TestVarreduraTripolar:
+    """Os três polos partilham o acionamento; só os zeros os separam."""
+
+    ZEROS = (
+        PoleCurrentZeros(phase_angle_rad=0.0, frequency_Hz=60.0),
+        PoleCurrentZeros(phase_angle_rad=-2.0 * np.pi / 3.0, frequency_Hz=60.0),
+        PoleCurrentZeros(phase_angle_rad=2.0 * np.pi / 3.0, frequency_Hz=60.0),
+    )
+
+    def test_separacao_e_comum_as_tres_fases(self):
+        for tripla in sweep_three_pole_samples(
+            LITERATURE_SCENARIO,
+            n=25,
+            zeros_abc=self.ZEROS,
+            earliest_separation_s=14.0e-3,
+            seed=7,
+        ):
+            t = tripla[0].separation_time_s
+            assert all(p.separation_time_s == t for p in tripla)
+
+    def test_tempos_de_arco_diferem_entre_as_fases_por_um_terco_de_meio_periodo(self):
+        """Zeros defasados de 120° elétricos ficam a ``T/6`` um do outro."""
+        tripla = sweep_three_pole_samples(
+            LITERATURE_SCENARIO,
+            n=1,
+            zeros_abc=self.ZEROS,
+            earliest_separation_s=14.0e-3,
+            seed=5,
+        )[0]
+        taus = sorted(p.arc_time_s for p in tripla)
+        passo = 1.0 / 360.0  # T/6 em 60 Hz
+        assert taus[1] - taus[0] == pytest.approx(passo, abs=2.0e-4)
+        assert taus[2] - taus[1] == pytest.approx(passo, abs=2.0e-4)
+
+    def test_o_polo_condutor_e_o_que_cai_na_janela(self):
+        for k in (0, 1, 2):
+            tripla = sweep_three_pole_samples(
+                LITERATURE_SCENARIO,
+                n=20,
+                zeros_abc=self.ZEROS,
+                earliest_separation_s=14.0e-3,
+                leading_pole=k,
+                seed=2,
+            )
+            assert all(p[k].arc_time_s <= 100.0e-6 for p in tripla)
+
+    def test_parametros_do_arco_sao_sorteados_por_polo(self):
+        """Corte, di/dt e RRDS são do arco, não do acionamento."""
+        triplas = sweep_three_pole_samples(
+            LITERATURE_SCENARIO,
+            n=30,
+            zeros_abc=self.ZEROS,
+            earliest_separation_s=14.0e-3,
+            seed=13,
+        )
+        iguais = sum(
+            1
+            for t in triplas
+            if len({round(p.chopping_current_A, 9) for p in t}) == 1
+        )
+        assert iguais == 0
+
+    def test_reprodutibilidade_por_semente(self):
+        kwargs = dict(
+            n=10, zeros_abc=self.ZEROS, earliest_separation_s=14.0e-3, seed=99
+        )
+        a = sweep_three_pole_samples(LITERATURE_SCENARIO, **kwargs)
+        b = sweep_three_pole_samples(LITERATURE_SCENARIO, **kwargs)
+        assert a == b
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"n": 0},
+            {"zeros_abc": ZEROS[:2]},
+            {"leading_pole": 3},
+        ],
+    )
+    def test_argumentos_invalidos_levantam(self, kwargs):
+        base = dict(n=5, zeros_abc=self.ZEROS, earliest_separation_s=14.0e-3)
+        base.update(kwargs)
+        with pytest.raises(ValueError):
+            sweep_three_pole_samples(LITERATURE_SCENARIO, **base)

@@ -66,6 +66,7 @@ O levantamento consolidado, com a verificação de cada valor, está em
 
 from __future__ import annotations
 
+import cmath
 import math
 from dataclasses import dataclass, field, replace
 from typing import Iterator, Sequence
@@ -85,6 +86,9 @@ logger = get_logger(__name__)
 
 __all__ = [
     "DOC_A_SCENARIO",
+    "LITERATURE_WORST_ARC_TIME_S",
+    "LITERATURE_RRDS_WORST_KV_PER_MS",
+    "PoleCurrentZeros",
     "FIELD_PEAK_CEILING_PU",
     "LITERATURE_CHOPPING_RANGE_A",
     "LITERATURE_DIDT_RANGE_A_PER_US",
@@ -95,8 +99,10 @@ __all__ = [
     "VcbParameterRanges",
     "VcbSample",
     "sample_vcb_parameters",
+    "sample_vcb_parameters_by_arc_time",
     "scenario",
     "sweep_samples",
+    "sweep_three_pole_samples",
 ]
 
 
@@ -410,3 +416,297 @@ def sweep_samples(
         )
         for _ in range(int(n))
     ]
+
+
+# ---------------------------------------------------------------------------
+# Amostragem por TEMPO DE ARCO
+# ---------------------------------------------------------------------------
+#
+# Sortear o instante de separação uniformemente no ciclo é correto quanto à
+# física, mas ineficiente quanto à amostragem: a janela em que a escalada é
+# provável — tempo de arco de 0 a 100 µs [LITERATURA: Wong, Snider e Lo,
+# IPST 2003, p. 5-6] — ocupa 1,2 % de um ciclo de 60 Hz (100 µs sobre os
+# 8,333 ms entre zeros consecutivos) [CÁLCULO PRÓPRIO]. Uma varredura de
+# 100 realizações cai nessa janela cerca de uma vez.
+#
+# A variável de controle é, portanto, o tempo de arco, e não o instante
+# absoluto. É também a variável que a IEC 62271-110:2023 manda determinar
+# em ensaio, sob o nome de "re-ignition-free arcing time window", para fins
+# de chaveamento controlado [NORMA: IEC 62271-110:2023, 3.7 e 4.1].
+
+
+@dataclass(frozen=True)
+class PoleCurrentZeros:
+    """Zeros da corrente de um polo, em regime permanente senoidal.
+
+    Enquanto a chave está fechada, a corrente do polo é a de regime. Com a
+    referência cosseno de amplitude adotada no projeto,
+    ``i(t) = |I|·cos(ωt + φ)``, e os zeros são os instantes em que
+    ``ωt + φ = π/2 + kπ`` [CÁLCULO PRÓPRIO]. A expressão é exata até o
+    primeiro zero após a separação — que é justamente o intervalo sobre o
+    qual o tempo de arco se define.
+
+    Attributes
+    ----------
+    phase_angle_rad:
+        Ângulo ``φ`` do fasor de corrente do polo [rad].
+    frequency_Hz:
+        Frequência fundamental [Hz].
+    """
+
+    phase_angle_rad: float
+    frequency_Hz: float = 60.0
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.phase_angle_rad):
+            raise ValueError(
+                f"phase_angle_rad deve ser finito, obtido {self.phase_angle_rad!r}"
+            )
+        if not (math.isfinite(self.frequency_Hz) and self.frequency_Hz > 0.0):
+            raise ValueError(
+                f"frequency_Hz deve ser finita e > 0, obtido {self.frequency_Hz!r}"
+            )
+
+    @classmethod
+    def from_phasor(cls, phasor: complex, frequency_Hz: float = 60.0) -> "PoleCurrentZeros":
+        """Constrói a partir do fasor de corrente do polo.
+
+        Raises
+        ------
+        ValueError
+            Fasor nulo — sem zeros definidos.
+        """
+        if abs(complex(phasor)) <= 0.0:
+            raise ValueError("fasor de corrente nulo: os zeros não estão definidos")
+        return cls(
+            phase_angle_rad=float(cmath.phase(complex(phasor))),
+            frequency_Hz=float(frequency_Hz),
+        )
+
+    @property
+    def omega_rad_s(self) -> float:
+        """``ω = 2πf`` [rad/s]."""
+        return 2.0 * math.pi * float(self.frequency_Hz)
+
+    @property
+    def half_period_s(self) -> float:
+        """Intervalo entre zeros consecutivos, ``T/2`` [s]."""
+        return 0.5 / float(self.frequency_Hz)
+
+    def _zero_at_index(self, k: int) -> float:
+        return (0.5 * math.pi + k * math.pi - self.phase_angle_rad) / self.omega_rad_s
+
+    def first_zero_after(self, t: float) -> float:
+        """Primeiro zero de corrente estritamente após ``t`` [s]."""
+        t = float(t)
+        k = (
+            math.floor(
+                (self.omega_rad_s * t + self.phase_angle_rad - 0.5 * math.pi) / math.pi
+            )
+            + 1
+        )
+        tz = self._zero_at_index(k)
+        while tz <= t:  # guarda contra arredondamento na fronteira
+            k += 1
+            tz = self._zero_at_index(k)
+        return tz
+
+    def first_zero_at_or_after(self, t: float, *, rel_tol: float = 1.0e-9) -> float:
+        """Primeiro zero de corrente em ``t`` ou depois [s].
+
+        Difere de :meth:`first_zero_after` no ponto de fronteira: separar
+        os contatos exatamente sobre um zero interrompe ali mesmo, e não
+        meio ciclo adiante. ``rel_tol`` é a tolerância de fronteira em
+        frações de meio período — o padrão, ``1e-9``, vale 8,3 ps em
+        60 Hz [CÁLCULO PRÓPRIO].
+        """
+        t = float(t)
+        x = (
+            self.omega_rad_s * t + self.phase_angle_rad - 0.5 * math.pi
+        ) / math.pi
+        k = math.ceil(x - float(rel_tol))
+        return self._zero_at_index(k)
+
+    def arc_time_after(self, separation_time_s: float) -> float:
+        """Tempo de arco resultante de separar os contatos em ``t`` [s].
+
+        É a distância até o zero de corrente em que a interrupção é
+        tentada. Separação sobre o próprio zero dá tempo de arco nulo.
+        """
+        t = float(separation_time_s)
+        return max(0.0, self.first_zero_at_or_after(t) - t)
+
+    def separation_for_arc_time(
+        self, arc_time_s: float, *, earliest_separation_s: float = 0.0
+    ) -> float:
+        """Instante de separação que produz o tempo de arco pedido [s].
+
+        Escolhe o primeiro zero de corrente compatível com o piso
+        ``earliest_separation_s`` e recua ``arc_time_s`` a partir dele.
+
+        Raises
+        ------
+        ValueError
+            Tempo de arco negativo, não finito ou maior ou igual a ``T/2``
+            — acima de meio período o recuo cruzaria um zero anterior e o
+            tempo de arco realizado não seria o pedido.
+        """
+        tau = float(arc_time_s)
+        if not math.isfinite(tau) or tau < 0.0:
+            raise ValueError(f"arc_time_s deve ser finito e >= 0, obtido {arc_time_s!r}")
+        if tau >= self.half_period_s:
+            raise ValueError(
+                "arc_time_s deve ser < T/2 = "
+                f"{self.half_period_s:.6g} s, obtido {tau!r}: acima de meio período "
+                "o recuo atravessa um zero anterior e o tempo de arco realizado "
+                "difere do pedido"
+            )
+        piso = float(earliest_separation_s)
+        if not math.isfinite(piso) or piso < 0.0:
+            raise ValueError(
+                f"earliest_separation_s deve ser finito e >= 0, obtido {earliest_separation_s!r}"
+            )
+        return self.first_zero_at_or_after(piso + tau) - tau
+
+
+def sample_vcb_parameters_by_arc_time(
+    ranges: VcbParameterRanges,
+    *,
+    rng: np.random.Generator,
+    zeros: PoleCurrentZeros,
+    arc_time_window_s: tuple[float, float] = LITERATURE_WORST_ARC_TIME_S,
+    earliest_separation_s: float = 0.0,
+) -> VcbSample:
+    """Sorteia uma realização com o TEMPO DE ARCO como variável de controle.
+
+    Os três parâmetros do disjuntor são sorteados como em
+    :func:`sample_vcb_parameters`; o que muda é o instante de separação,
+    aqui derivado do tempo de arco sorteado e dos zeros da corrente do
+    polo.
+
+    Parameters
+    ----------
+    ranges:
+        Faixas do cenário.
+    rng:
+        Gerador semeado.
+    zeros:
+        Zeros da corrente do polo.
+    arc_time_window_s:
+        Janela ``(mín, máx)`` do tempo de arco [s]. O padrão é a janela em
+        que a escalada é mais severa [LITERATURA: Wong 2003].
+    earliest_separation_s:
+        Piso do instante de separação [s] — tipicamente o fim da janela de
+        acomodação do regime permanente.
+
+    Raises
+    ------
+    ValueError
+        Janela de tempo de arco inválida.
+    """
+    t0, t1 = float(arc_time_window_s[0]), float(arc_time_window_s[1])
+    if not (math.isfinite(t0) and math.isfinite(t1)) or t0 < 0.0 or t1 < t0:
+        raise ValueError(
+            "arc_time_window_s deve ser (início >= 0, fim >= início) finito, "
+            f"obtido {arc_time_window_s!r}"
+        )
+    tau = _uniform(rng, (t0, t1))
+    t_sep = zeros.separation_for_arc_time(
+        tau, earliest_separation_s=earliest_separation_s
+    )
+    return VcbSample(
+        scenario_name=ranges.name,
+        chopping_current_A=_uniform(rng, ranges.chopping_A),
+        didt_capability_A_per_us=_uniform(rng, ranges.didt_A_per_us),
+        rrds_a_kV_per_ms=_uniform(rng, ranges.rrds_kV_per_ms),
+        rrds_b_kV_per_ms2=float(ranges.rrds_parabolic_kV_per_ms2 or 0.0),
+        separation_time_s=t_sep,
+        arc_time_s=tau,
+    )
+
+
+def sweep_three_pole_samples(
+    ranges: VcbParameterRanges,
+    *,
+    n: int,
+    zeros_abc: Sequence[PoleCurrentZeros],
+    arc_time_window_s: tuple[float, float] = LITERATURE_WORST_ARC_TIME_S,
+    earliest_separation_s: float = 0.0,
+    leading_pole: int = 0,
+    seed: int = 0,
+) -> list[tuple[VcbSample, VcbSample, VcbSample]]:
+    """``n`` realizações de um disjuntor TRIPOLAR, uma tupla por realização.
+
+    Os três polos de um disjuntor compartilham o mesmo acionamento, de modo
+    que a separação mecânica é comum às três fases; o que difere entre elas
+    é o tempo de arco, porque cada polo tem seus próprios zeros de corrente
+    [CONVENÇÃO DE MODELAGEM — a dispersão mecânica entre polos, de ordem
+    sub-milissegundo, é desprezada aqui]. Amostrar as três fases de forma
+    independente, como faz :func:`sweep_samples`, produz um disjuntor que
+    não existe.
+
+    O sorteio é feito sobre o tempo de arco do polo ``leading_pole``; o
+    instante de separação comum decorre dele, e os tempos de arco das
+    outras duas fases são consequência da geometria dos zeros.
+
+    Os parâmetros do disjuntor (corte, di/dt, RRDS) são sorteados por polo:
+    são propriedades do arco e da superfície de contato, e não do
+    acionamento.
+
+    Parameters
+    ----------
+    ranges:
+        Faixas do cenário.
+    n:
+        Número de realizações.
+    zeros_abc:
+        Zeros da corrente das três fases, na ordem ``a, b, c``.
+    arc_time_window_s:
+        Janela do tempo de arco do polo condutor [s].
+    earliest_separation_s:
+        Piso do instante de separação [s].
+    leading_pole:
+        Índice ``0, 1, 2`` do polo cujo tempo de arco é sorteado.
+    seed:
+        Semente do gerador.
+
+    Raises
+    ------
+    ValueError
+        ``n`` não positivo, ``zeros_abc`` sem três elementos ou
+        ``leading_pole`` fora de ``0..2``.
+    """
+    if int(n) <= 0:
+        raise ValueError(f"n deve ser > 0, obtido {n!r}")
+    zeros = tuple(zeros_abc)
+    if len(zeros) != 3:
+        raise ValueError(f"zeros_abc deve trazer 3 polos, obtido {len(zeros)}")
+    if int(leading_pole) not in (0, 1, 2):
+        raise ValueError(f"leading_pole deve estar em 0..2, obtido {leading_pole!r}")
+
+    rng = np.random.default_rng(int(seed))
+    realizacoes: list[tuple[VcbSample, VcbSample, VcbSample]] = []
+    for _ in range(int(n)):
+        condutor = sample_vcb_parameters_by_arc_time(
+            ranges,
+            rng=rng,
+            zeros=zeros[int(leading_pole)],
+            arc_time_window_s=arc_time_window_s,
+            earliest_separation_s=earliest_separation_s,
+        )
+        t_sep = condutor.separation_time_s
+        polos: list[VcbSample] = []
+        for k, z in enumerate(zeros):
+            if k == int(leading_pole):
+                polos.append(condutor)
+                continue
+            polos.append(
+                replace(
+                    sample_vcb_parameters(
+                        ranges, rng=rng, separation_window_s=(t_sep, t_sep)
+                    ),
+                    arc_time_s=z.arc_time_after(t_sep),
+                )
+            )
+        realizacoes.append((polos[0], polos[1], polos[2]))
+    return realizacoes
