@@ -259,6 +259,37 @@ class TestFuses:
         assert f.current_range_A == (2.0, 100.0)
         assert len(f.ratings) == 14
 
+    def test_bussmann_gg_sizes_1_to_4_present(self):
+        """Tamanhos 1/02/2/03/3/4 gG completam a linha NH (000/00/0 já
+        existentes), incluindo os corpos intermediários '02'/'03'."""
+        ids = {f.model_id for f in library.list_fuses(vendor="Eaton")}
+        for expected in (
+            "BUSSMANN-NH1-GG-500V", "BUSSMANN-NH02-GG-500V",
+            "BUSSMANN-NH2-GG-500V", "BUSSMANN-NH03-GG-500V",
+            "BUSSMANN-NH3-GG-500V", "BUSSMANN-NH4-GG-500V",
+        ):
+            assert expected in ids
+
+    def test_bussmann_nh4_size_g_suffix(self):
+        """Tamanho 4 usa part numbers com sufixo 'G', não 'B' — único
+        entre os tamanhos NH gG deste catálogo."""
+        f = library.get_fuse("BUSSMANN-NH4-GG-500V")
+        assert f.current_range_A == (500.0, 1250.0)
+        assert all(r.part_number.endswith("G") for r in f.ratings)
+        r = f.get_rating(1000)
+        assert r.i2t_prearcing_A2s == 4800000 and r.i2t_total_A2s == 13000000
+
+    def test_bussmann_nh3_vs_nh03_are_distinct_bodies(self):
+        """'03' é um corpo intermediário entre 0 e 3, com faixa e I²t
+        próprios — não deve ser confundido com o tamanho '3'."""
+        nh3 = library.get_fuse("BUSSMANN-NH3-GG-500V")
+        nh03 = library.get_fuse("BUSSMANN-NH03-GG-500V")
+        assert nh3.current_range_A == (315.0, 800.0)
+        assert nh03.current_range_A == (250.0, 400.0)
+        r3 = nh3.get_rating(400)
+        r03 = nh03.get_rating(400)
+        assert r3.i2t_prearcing_A2s == r03.i2t_prearcing_A2s == 642900
+
     def test_bussmann_am_anomaly_preserved(self):
         """25 A (3500) > 32 A (2200) no pré-arco — impresso assim na
         fonte; não deve ter sido 'corrigido' na transcrição."""

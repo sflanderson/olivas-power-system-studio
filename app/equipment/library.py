@@ -1384,6 +1384,135 @@ _FUSES: list[FuseModel] = [
         ),
     ),
     FuseModel(
+        model_id="BUSSMANN-NH1-GG-500V",
+        manufacturer="Eaton",
+        full_name="Bussmann NH tamanho 1 gG/gL 500 V a.c.",
+        fuse_class="gG", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
+        standard="IEC 60269", source_doc=_BUSSMANN_10164,
+        ratings=(
+            _fr("50NHG1B", 50, 6350, 18000, 6.4),
+            _fr("63NHG1B", 63, 6800, 23000, 5.6),
+            _fr("80NHG1B", 80, 10500, 31200, 7.7),
+            _fr("100NHG1B", 100, 22000, 68200, 8.2),
+            _fr("125NHG1B", 125, 29000, 82000, 13),
+            _fr("160NHG1B", 160, 62000, 310000, 12.3),
+            _fr("200NHG1B", 200, 97000, 368600, 15),
+            _fr("224NHG1B", 224, 124000, 471200, 18),
+            _fr("250NHG1B", 250, 151300, 574900, 19),
+            _fr("315NHG1B", 315, 320000, 750000, 22),
+            _fr("355NHG1B", 355, 320000, 750000, 32),
+        ),
+        notes=(
+            "i2t_total = I1 a 120 kA / 500 V a.c. (ensaio IEC 60269). "
+            "315/355 A: rated_voltage de catálogo 440 V a.c. (não 500 V); "
+            "I²t pré-arco e total idênticos entre 315 e 355 A — impresso "
+            "assim na fonte (mesmo elemento fusível), não corrigido."
+        ),
+    ),
+    FuseModel(
+        model_id="BUSSMANN-NH02-GG-500V",
+        manufacturer="Eaton",
+        full_name="Bussmann NH tamanho 02 gG/gL 500 V a.c.",
+        fuse_class="gG", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
+        standard="IEC 60269", source_doc=_BUSSMANN_10164,
+        ratings=(
+            _fr("35NHG02B", 35, 2400, 11800, 4.7),
+            _fr("40NHG02B", 40, 3300, 16500, 5),
+            _fr("50NHG02B", 50, 5600, 27800, 6.4),
+            _fr("63NHG02B", 63, 6600, 26100, 5.5),
+            _fr("80NHG02B", 80, 9800, 38900, 7.3),
+            _fr("100NHG02B", 100, 20600, 82300, 7.5),
+            _fr("125NHG02B", 125, 25000, 100000, 12),
+            _fr("160NHG02B", 160, 62000, 248000, 12),
+            _fr("200NHG02B", 200, 96900, 367900, 15),
+            _fr("224NHG02B", 224, 124000, 471200, 18),
+            _fr("250NHG02B", 250, 151300, 574900, 19),
+        ),
+        notes=(
+            "Tamanho '02' — corpo intermediário entre 0 e 2 (norma DIN/"
+            "IEC), distinto do tamanho '2'. i2t_total = I1 a 120 kA / "
+            "500 V a.c."
+        ),
+    ),
+    FuseModel(
+        model_id="BUSSMANN-NH2-GG-500V",
+        manufacturer="Eaton",
+        full_name="Bussmann NH tamanho 2 gG/gL 500 V a.c.",
+        fuse_class="gG", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
+        standard="IEC 60269", source_doc=_BUSSMANN_10164,
+        ratings=(
+            _fr("250NHG2B", 250, 170000, 437000, 23),
+            _fr("300NHG2B", 300, 320000, 840000, 20),
+            _fr("315NHG2B", 315, 361700, 1446500, 21),
+            _fr("355NHG2B", 355, 446500, 1785800, 27),
+            _fr("400NHG2B", 400, 642900, 2571500, 30),
+            _fr("425NHG2B", 425, 720000, 1862000, 31),
+            _fr("450NHG2B", 450, 870000, 2275000, 31),
+            _fr("500NHG2B", 500, 1200000, 2720000, 37),
+        ),
+        notes=(
+            "i2t_total = I1 a 120 kA / 500 V a.c. 500 A: rated_voltage de "
+            "catálogo 440 V a.c. (não 500 V)."
+        ),
+    ),
+    FuseModel(
+        model_id="BUSSMANN-NH03-GG-500V",
+        manufacturer="Eaton",
+        full_name="Bussmann NH tamanho 03 gG/gL 500 V a.c.",
+        fuse_class="gG", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
+        standard="IEC 60269", source_doc=_BUSSMANN_10164,
+        ratings=(
+            _fr("250NHG03B", 250, 160800, 642900, 20),
+            _fr("315NHG03B", 315, 361700, 1446500, 21),
+            _fr("355NHG03B", 355, 446500, 1785800, 27),
+            _fr("400NHG03B", 400, 642900, 2571500, 30),
+        ),
+        notes=(
+            "Tamanho '03' — corpo intermediário entre 0 e 3, distinto do "
+            "tamanho '3'. i2t_total = I1 a 120 kA / 500 V a.c."
+        ),
+    ),
+    FuseModel(
+        model_id="BUSSMANN-NH3-GG-500V",
+        manufacturer="Eaton",
+        full_name="Bussmann NH tamanho 3 gG/gL 500 V a.c.",
+        fuse_class="gG", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
+        standard="IEC 60269", source_doc=_BUSSMANN_10164,
+        ratings=(
+            _fr("315NHG3B", 315, 375000, 970000, 22),
+            _fr("355NHG3B", 355, 400000, 1110000, 25),
+            _fr("400NHG3B", 400, 642900, 2571500, 30),
+            _fr("425NHG3B", 425, 570000, 1934000, 30),
+            _fr("450NHG3B", 450, 670000, 2260000, 33),
+            _fr("500NHG3B", 500, 886000, 3898400, 37),
+            _fr("630NHG3B", 630, 1590000, 6996000, 47),
+            _fr("800NHG3B", 800, 2420000, 5420000, 59),
+        ),
+        notes=(
+            "i2t_total = I1 a 120 kA / 500 V a.c. 800 A: rated_voltage de "
+            "catálogo 440 V a.c. (não 500 V)."
+        ),
+    ),
+    FuseModel(
+        model_id="BUSSMANN-NH4-GG-500V",
+        manufacturer="Eaton",
+        full_name="Bussmann NH tamanho 4 gG/gL 500 V a.c.",
+        fuse_class="gG", rated_voltage_kV=0.5, breaking_capacity_kA=120.0,
+        standard="IEC 60269", source_doc=_BUSSMANN_10164,
+        ratings=(
+            _fr("500NHG4G", 500, 800000, 3850000, 37),
+            _fr("630NHG4G", 630, 880000, 4100000, 47),
+            _fr("800NHG4G", 800, 1500000, 6480000, 68),
+            _fr("1000NHG4G", 1000, 4800000, 13000000, 80),
+            _fr("1250NHG4G", 1250, 7000000, 18000000, 108),
+        ),
+        notes=(
+            "Part numbers com sufixo 'G' (não 'B' como os demais tamanhos "
+            "NH) — impresso assim na fonte, único conjunto sem variante de "
+            "lug isolado listada. i2t_total = I1 a 120 kA / 500 V a.c."
+        ),
+    ),
+    FuseModel(
         model_id="BUSSMANN-NH-AM-500-690V",
         manufacturer="Eaton",
         full_name="Bussmann NH aM 500/690 V a.c. (tamanhos 000-3)",
