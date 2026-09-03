@@ -1,0 +1,11 @@
+{
+ "file": "/tmp/claude-0/-home-user-olivas-power-system-studio/9d851478-5457-5818-8269-a836133b8dbc/scratchpad/out/fichamentos_AB/B_load_shedding_n1_nsga.md",
+ "changes": [
+  "(reparo falhou)"
+ ],
+ "refuted": [],
+ "unsupported": [
+  "§8, item 17 (fora da lista numerada de 40 claims): \"NÃO discute o efeito do afundamento de tensão de 0,85 pu sobre os motores já em operação (reaceleração, escorregamento, contatores)\" [FATO: ausência]",
+  "§9.1 \"Declaradas pelos autores\": \"g3 nunca fica ativa nesta planta (a tensão limita primeiro), logo a restrição térmica do transformador não foi exercitada como restrição ativa\" [FATO: doc B, p. 3]"
+ ]
+}

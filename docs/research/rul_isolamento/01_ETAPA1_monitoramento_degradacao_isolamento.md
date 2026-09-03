@@ -8,15 +8,15 @@
 
 | Arquivo | Papel nesta etapa |
 |---|---|
-| `scratchpad/papers_AB/txt/A_sepoc_snubber.txt` (p. 1–5) | Fonte primária do Documento A: Tabelas I–III, Seções II–VI, referências [1]–[24] |
-| `scratchpad/out/fichamentos_AB/A_snubber_tiristor_vcb.md` | Fichamento verificado de A, incluindo leituras das Figs. 1–4 e a lista explícita do que A não afirma (§8) |
-| `scratchpad/out/etapa1/espira_a_espira_reignicoes_cumulativas.md` | Distribuição espira-a-espira, contagem de reignições, modelos de dano (F1–F37, C1–C9) |
-| `scratchpad/out/etapa1/iec60034_15_bil_suportabilidade.md` | IEC 60034-15 (2009/2025), IEEE 522, IEC 60071-1, IEC 60034-18-41/-42 (F1–F27) |
-| `scratchpad/out/etapa1/metodos_monitoramento_estator_atual.md` | Tabela comparativa de métodos, ISO 13374-1/13381-1, percentis de DP (F1–F50, C1–C6) |
-| `scratchpad/out/cross/cruzamento_A_snubber_vcb.md` | Perfil de estresse por evento, acumuladores D1–D9, matriz estressor × indicador × modelo, inventário do repositório |
-| `scratchpad/out/web/fisica_surtos_vcb_isolamento.md` | Física de chopping/reignição, modelos de vida (F1–F48) |
-| `scratchpad/out/web/normas_monitoramento_isolamento.md` | Estado das edições normativas, ISO 55000/55001, CIGRE C4.76 e JWG A3.53 (F1–F59) |
-| `scratchpad/out/fichamentos/02, 07, 09, 12, 13` | Jensen (EKF), Vichare & Pecht (LCM), Strangas (prognóstico + mitigação), Ma (perfil de missão), Wu (survey DL) |
+| `(PDF do autor, fora do repositório) A_sepoc_snubber.txt` (p. 1–5) | Fonte primária do Documento A: Tabelas I–III, Seções II–VI, referências [1]–[24] |
+| `anexos/fichamentos_AB/A_snubber_tiristor_vcb.md` | Fichamento verificado de A, incluindo leituras das Figs. 1–4 e a lista explícita do que A não afirma (§8) |
+| `anexos/pesquisa/espira_a_espira_reignicoes_cumulativas.md` | Distribuição espira-a-espira, contagem de reignições, modelos de dano (F1–F37, C1–C9) |
+| `anexos/pesquisa/iec60034_15_bil_suportabilidade.md` | IEC 60034-15 (2009/2025), IEEE 522, IEC 60071-1, IEC 60034-18-41/-42 (F1–F27) |
+| `anexos/pesquisa/metodos_monitoramento_estator_atual.md` | Tabela comparativa de métodos, ISO 13374-1/13381-1, percentis de DP (F1–F50, C1–C6) |
+| `anexos/cruzamento/cruzamento_A_snubber_vcb.md` | Perfil de estresse por evento, acumuladores D1–D9, matriz estressor × indicador × modelo, inventário do repositório |
+| `anexos/pesquisa/fisica_surtos_vcb_isolamento.md` | Física de chopping/reignição, modelos de vida (F1–F48) |
+| `anexos/pesquisa/normas_monitoramento_isolamento.md` | Estado das edições normativas, ISO 55000/55001, CIGRE C4.76 e JWG A3.53 (F1–F59) |
+| `anexos/fichamentos/02, 07, 09, 12, 13` | Jensen (EKF), Vichare & Pecht (LCM), Strangas (prognóstico + mitigação), Ma (perfil de missão), Wu (survey DL) |
 
 **Estratégia.** O documento segue a cadeia causal completa **manobra → transitório no disjuntor → tensão no terminal do motor → tensão longitudinal na primeira bobina → descarga parcial e *treeing* → perda de suportabilidade → falha**, marcando em cada elo o que é fato verificado, o que é inferência física e o que é hipótese a calibrar. Os números do Documento A são tratados como *dados de entrada* de um acumulador de dano, não como resultado de conformidade normativa. Toda comparação com norma é apresentada com a ressalva de que a grandeza reportada por A é TRV **no disjuntor**, não tensão nos terminais do motor.
 

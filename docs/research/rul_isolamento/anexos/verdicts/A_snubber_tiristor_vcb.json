@@ -1,0 +1,14 @@
+{
+ "file": "/tmp/claude-0/-home-user-olivas-power-system-studio/9d851478-5457-5818-8269-a836133b8dbc/scratchpad/out/fichamentos_AB/A_snubber_tiristor_vcb.md",
+ "changes": [
+  "(reparo falhou)"
+ ],
+ "refuted": [
+  "Claim 33 (e Seção 8, item 29 do fichamento): 'a sigla RUL aparece uma vez (p. 2) como finalidade da camada digital'"
+ ],
+ "unsupported": [
+  "Claim 6 (Seção 3.2 do fichamento): 'Cabo fonte→VCB: LCC (JMARTI), 0,5 km, 185 mm²'",
+  "Claim 15 / Seção 9.2 do fichamento: 'Nota 5 exclui explicitamente a partida interrompida do caso coberto pelos níveis-padrão'",
+  "Claim 31: 'o snubber está no barramento do VCB, a montante do cabo de 240 mm², não nos terminais físicos do motor'"
+ ]
+}
