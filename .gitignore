@@ -135,3 +135,6 @@ auto-save/
 # gerados pelo autor e permitidos
 # ------------------------------------------------------------
 !tests/fixtures/*.atp
+
+# Pacote de entrega gerado por scripts/empacotar_rul.py — reproduzível, não versionado
+entrega/
